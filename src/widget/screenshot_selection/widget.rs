@@ -302,14 +302,13 @@ where
             ui.is_recording,
             ui.recording_annotation_mode,
             ui.pencil_popup_open,
-            crate::widget::icon_toggle::get_toggle_percent(&ui.timeline, ui.is_video_mode),
+            crate::widget::icon_toggle::get_toggle_percent(ui.is_video_mode),
             {
                 let on_event = on_event.clone();
                 move |is_video| on_event(ScreenshotEvent::capture_mode_toggle(is_video))
             },
             // Compute animated content opacity for toolbar fade effect
             crate::widget::toolbar::get_toolbar_opacity(
-                &ui.timeline,
                 ui.toolbar_unhovered_opacity,
                 ui.toolbar_is_hovered,
             ),
@@ -610,7 +609,7 @@ where
     }
 
     fn layout(
-        &self,
+        &mut self,
         tree: &mut Tree,
         renderer: &cosmic::Renderer,
         limits: &layout::Limits,
@@ -618,19 +617,19 @@ where
         let children = &mut tree.children;
         let bg_node = self
             .bg_element
-            .as_widget()
+            .as_widget_mut()
             .layout(&mut children[0], renderer, limits);
         let fg_node = self
             .fg_element
-            .as_widget()
+            .as_widget_mut()
             .layout(&mut children[1], renderer, limits);
         let shapes_node =
             self.shapes_element
-                .as_widget()
+                .as_widget_mut()
                 .layout(&mut children[2], renderer, limits);
         let mut menu_node =
             self.menu_element
-                .as_widget()
+                .as_widget_mut()
                 .layout(&mut children[3], renderer, limits);
 
         let menu_bounds = menu_node.bounds();
@@ -660,9 +659,9 @@ where
         let mut nodes = vec![bg_node, fg_node, shapes_node, menu_node.clone()];
 
         // Layout settings drawer if present
-        if let Some(ref drawer) = self.settings_drawer_element {
+        if let Some(ref mut drawer) = self.settings_drawer_element {
             let mut drawer_node = drawer
-                .as_widget()
+                .as_widget_mut()
                 .layout(&mut children[4], renderer, limits);
             let drawer_bounds = drawer_node.bounds();
             let drawer_margin = 8.0_f32;
@@ -711,7 +710,7 @@ where
         }
 
         // Layout shape selector popup if present
-        if let Some(ref selector) = self.shape_popup_element {
+        if let Some(ref mut selector) = self.shape_popup_element {
             let child_idx = if self.settings_drawer_element.is_some() {
                 5
             } else {
@@ -719,7 +718,7 @@ where
             };
             let mut selector_node =
                 selector
-                    .as_widget()
+                    .as_widget_mut()
                     .layout(&mut children[child_idx], renderer, limits);
             let selector_bounds = selector_node.bounds();
             let selector_margin = 4.0_f32;
@@ -768,7 +767,7 @@ where
         }
 
         // Layout redact popup if present
-        if let Some(ref popup) = self.redact_popup_element {
+        if let Some(ref mut popup) = self.redact_popup_element {
             let mut child_idx = 4;
             if self.settings_drawer_element.is_some() {
                 child_idx += 1;
@@ -778,7 +777,7 @@ where
             }
             let mut popup_node =
                 popup
-                    .as_widget()
+                    .as_widget_mut()
                     .layout(&mut children[child_idx], renderer, limits);
             let popup_bounds = popup_node.bounds();
             let popup_margin = 4.0_f32;
@@ -827,7 +826,7 @@ where
         }
 
         // Layout pencil popup if present (only during recording)
-        if let Some(ref popup) = self.pencil_popup_element {
+        if let Some(ref mut popup) = self.pencil_popup_element {
             let mut child_idx = 4;
             if self.settings_drawer_element.is_some() {
                 child_idx += 1;
@@ -840,7 +839,7 @@ where
             }
             let mut popup_node =
                 popup
-                    .as_widget()
+                    .as_widget_mut()
                     .layout(&mut children[child_idx], renderer, limits);
             let popup_bounds = popup_node.bounds();
             let popup_margin = 4.0_f32;
@@ -1195,17 +1194,17 @@ where
         }
     }
 
-    fn on_event(
+    fn update(
         &mut self,
         tree: &mut Tree,
-        event: cosmic::iced_core::Event,
+        event: &cosmic::iced_core::Event,
         layout: Layout<'_>,
         cursor: cosmic::iced::mouse::Cursor,
         renderer: &cosmic::Renderer,
         clipboard: &mut dyn cosmic::iced_core::Clipboard,
         shell: &mut cosmic::iced_core::Shell<'_, Msg>,
         viewport: &cosmic::iced_core::Rectangle,
-    ) -> cosmic::iced_core::event::Status {
+    ) {
         use cosmic::iced_core::Event;
         use cosmic::iced_core::mouse::{Button, Event as MouseEvent};
 
@@ -1250,7 +1249,7 @@ where
 
                     // If click is outside toolbar and popups, pass it through
                     if !inside_toolbar && !inside_pencil_popup {
-                        return cosmic::iced_core::event::Status::Ignored;
+                        return;
                     }
                 }
             }
@@ -1283,7 +1282,8 @@ where
 
                 if !inside_selector && !inside_toolbar {
                     shell.publish(self.emit(ScreenshotEvent::shape_popup_close()));
-                    return cosmic::iced_core::event::Status::Captured;
+                    shell.capture_event();
+                    return;
                 }
             }
 
@@ -1309,7 +1309,8 @@ where
 
                 if !inside_popup && !inside_toolbar {
                     shell.publish(self.emit(ScreenshotEvent::redact_popup_close()));
-                    return cosmic::iced_core::event::Status::Captured;
+                    shell.capture_event();
+                    return;
                 }
             }
 
@@ -1338,7 +1339,8 @@ where
 
                 if !inside_popup && !inside_toolbar {
                     shell.publish(self.emit(ScreenshotEvent::pencil_popup_close()));
-                    return cosmic::iced_core::event::Status::Captured;
+                    shell.capture_event();
+                    return;
                 }
             }
 
@@ -1357,7 +1359,8 @@ where
 
                 if !inside_drawer && !inside_toolbar {
                     shell.publish(self.emit(ScreenshotEvent::settings_drawer_toggle()));
-                    return cosmic::iced_core::event::Status::Captured;
+                    shell.capture_event();
+                    return;
                 }
             }
         }
@@ -1365,7 +1368,8 @@ where
         // Block mouse events on non-active outputs
         if !self.output_ctx.is_active_output && self.output_ctx.has_confirmed_selection {
             if matches!(&event, Event::Mouse(_)) {
-                return cosmic::iced_core::event::Status::Captured;
+                shell.capture_event();
+                return;
             }
         }
 
@@ -1410,7 +1414,8 @@ where
                     && pos.y <= button_y + button_size
                 {
                     shell.publish(self.emit(ScreenshotEvent::open_url(content.clone())));
-                    return cosmic::iced_core::event::Status::Captured;
+                    shell.capture_event();
+                    return;
                 }
             }
         }
@@ -1450,7 +1455,6 @@ where
             children.push(popup);
         }
 
-        let mut status = cosmic::iced_core::event::Status::Ignored;
         for (i, (child_layout, child)) in layout_children
             .into_iter()
             .zip(children.into_iter())
@@ -1464,9 +1468,9 @@ where
             }
 
             let child_tree = &mut tree.children[i];
-            status = child.as_widget_mut().on_event(
+            child.as_widget_mut().update(
                 child_tree,
-                event.clone(),
+                event,
                 child_layout,
                 cursor,
                 renderer,
@@ -1477,8 +1481,8 @@ where
             if matches!(event, cosmic::iced_core::event::Event::PlatformSpecific(_)) {
                 continue;
             }
-            if matches!(status, cosmic::iced_core::event::Status::Captured) {
-                return status;
+            if shell.is_event_captured() {
+                return;
             }
         }
 
@@ -1488,7 +1492,8 @@ where
         {
             // If click was inside toolbar, capture it even if no button handled it
             if click_inside_toolbar {
-                return cosmic::iced_core::event::Status::Captured;
+                shell.capture_event();
+                return;
             }
 
             if let Some(pos) = cursor.position() {
@@ -1504,7 +1509,8 @@ where
                     if layout_children.len() > selector_idx
                         && layout_children[selector_idx].bounds().contains(pos)
                     {
-                        return cosmic::iced_core::event::Status::Captured;
+                        shell.capture_event();
+                        return;
                     }
                 }
 
@@ -1520,7 +1526,8 @@ where
                     if layout_children.len() > popup_idx
                         && layout_children[popup_idx].bounds().contains(pos)
                     {
-                        return cosmic::iced_core::event::Status::Captured;
+                        shell.capture_event();
+                        return;
                     }
                 }
 
@@ -1539,14 +1546,16 @@ where
                     if layout_children.len() > popup_idx
                         && layout_children[popup_idx].bounds().contains(pos)
                     {
-                        return cosmic::iced_core::event::Status::Captured;
+                        shell.capture_event();
+                        return;
                     }
                 }
 
                 // Check settings drawer
                 if self.ui.settings_drawer_open {
                     if layout_children.len() > 4 && layout_children[4].bounds().contains(pos) {
-                        return cosmic::iced_core::event::Status::Captured;
+                        shell.capture_event();
+                        return;
                     }
                 }
             }
@@ -1594,7 +1603,8 @@ where
                                 self.emit(ScreenshotEvent::arrow_start(global_x, global_y)),
                             );
                         }
-                        return cosmic::iced_core::event::Status::Captured;
+                        shell.capture_event();
+                        return;
                     }
                     MouseEvent::ButtonReleased(Button::Left)
                         if self.annotations.arrow_drawing.is_some() =>
@@ -1607,7 +1617,8 @@ where
                             shell
                                 .publish(self.emit(ScreenshotEvent::arrow_end(global_x, global_y)));
                         }
-                        return cosmic::iced_core::event::Status::Captured;
+                        shell.capture_event();
+                        return;
                     }
                     _ => {}
                 }
@@ -1633,7 +1644,8 @@ where
                                 self.emit(ScreenshotEvent::redact_start(global_x, global_y)),
                             );
                         }
-                        return cosmic::iced_core::event::Status::Captured;
+                        shell.capture_event();
+                        return;
                     }
                     MouseEvent::ButtonReleased(Button::Left)
                         if self.annotations.redact_drawing.is_some() =>
@@ -1647,7 +1659,8 @@ where
                                 self.emit(ScreenshotEvent::redact_end(global_x, global_y)),
                             );
                         }
-                        return cosmic::iced_core::event::Status::Captured;
+                        shell.capture_event();
+                        return;
                     }
                     _ => {}
                 }
@@ -1673,7 +1686,8 @@ where
                                 self.emit(ScreenshotEvent::pixelate_start(global_x, global_y)),
                             );
                         }
-                        return cosmic::iced_core::event::Status::Captured;
+                        shell.capture_event();
+                        return;
                     }
                     MouseEvent::ButtonReleased(Button::Left)
                         if self.annotations.pixelate_drawing.is_some() =>
@@ -1687,14 +1701,13 @@ where
                                 self.emit(ScreenshotEvent::pixelate_end(global_x, global_y)),
                             );
                         }
-                        return cosmic::iced_core::event::Status::Captured;
+                        shell.capture_event();
+                        return;
                     }
                     _ => {}
                 }
             }
         }
-
-        status
     }
 
     fn mouse_interaction(
@@ -1821,8 +1834,9 @@ where
     fn overlay<'b>(
         &'b mut self,
         state: &'b mut Tree,
-        layout: Layout<'_>,
+        layout: Layout<'b>,
         renderer: &cosmic::Renderer,
+        viewport: &cosmic::iced_core::Rectangle,
         translation: iced::Vector,
     ) -> Option<overlay::Element<'b, Msg, cosmic::Theme, cosmic::Renderer>> {
         let mut elements: Vec<&mut Element<'_, Msg>> = vec![
@@ -1851,37 +1865,37 @@ where
             .filter_map(|((child, state), layout)| {
                 child
                     .as_widget_mut()
-                    .overlay(state, layout, renderer, translation)
+                    .overlay(state, layout, renderer, viewport, translation)
             })
             .collect::<Vec<_>>();
 
-        (!children.is_empty()).then(|| overlay::Group::with_children(children).overlay())
+        (!children.is_empty()).then(move || overlay::Group::with_children(children).overlay())
     }
 
     fn operate(
-        &self,
+        &mut self,
         tree: &mut Tree,
         layout: Layout<'_>,
         renderer: &cosmic::Renderer,
-        operation: &mut dyn cosmic::widget::Operation<()>,
+        operation: &mut dyn cosmic::widget::Operation,
     ) {
         let layout = layout.children().collect::<Vec<_>>();
-        let mut children: Vec<&Element<'_, Msg>> = vec![
-            &self.bg_element,
-            &self.fg_element,
-            &self.shapes_element,
-            &self.menu_element,
+        let mut children: Vec<&mut Element<'_, Msg>> = vec![
+            &mut self.bg_element,
+            &mut self.fg_element,
+            &mut self.shapes_element,
+            &mut self.menu_element,
         ];
-        if let Some(ref drawer) = self.settings_drawer_element {
+        if let Some(ref mut drawer) = self.settings_drawer_element {
             children.push(drawer);
         }
-        if let Some(ref selector) = self.shape_popup_element {
+        if let Some(ref mut selector) = self.shape_popup_element {
             children.push(selector);
         }
-        if let Some(ref popup) = self.redact_popup_element {
+        if let Some(ref mut popup) = self.redact_popup_element {
             children.push(popup);
         }
-        if let Some(ref popup) = self.pencil_popup_element {
+        if let Some(ref mut popup) = self.pencil_popup_element {
             children.push(popup);
         }
         for (i, (layout, child)) in layout
@@ -1891,7 +1905,7 @@ where
             .rev()
         {
             let tree = &mut tree.children[i];
-            child.as_widget().operate(tree, layout, renderer, operation);
+            child.as_widget_mut().operate(tree, layout, renderer, operation);
         }
     }
 

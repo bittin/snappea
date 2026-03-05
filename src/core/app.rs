@@ -233,12 +233,12 @@ impl cosmic::Application for App {
                 // Render the blinking recording indicator
                 render_recording_indicator(indicator, self.toolbar_visible)
             } else {
-                cosmic::widget::horizontal_space()
+                cosmic::iced::widget::space()
                     .width(cosmic::iced_core::Length::Fixed(1.0))
                     .into()
             }
         } else {
-            cosmic::widget::horizontal_space()
+            cosmic::iced::widget::space()
                 .width(cosmic::iced_core::Length::Fixed(1.0))
                 .into()
         }
@@ -791,20 +791,6 @@ impl cosmic::Application for App {
             );
         }
 
-        // Add timeline subscription for UI animations when screenshot UI is active
-        if let Some(args) = &self.screenshot_args {
-            subscriptions.push(
-                args.ui
-                    .timeline
-                    .as_subscription()
-                    .map(|(window_id, instant)| {
-                        Msg::Screenshot(crate::session::messages::Msg::timeline_tick(
-                            window_id, instant,
-                        ))
-                    }),
-            );
-        }
-
         Subscription::batch(subscriptions)
     }
 }
@@ -827,10 +813,21 @@ pub enum SubscriptionState {
 pub(crate) fn portal_subscription(
     helper: crate::wayland::WaylandHelper,
 ) -> cosmic::iced::Subscription<PortalEvent> {
-    struct PortalSubscription;
-    Subscription::run_with_id(
-        TypeId::of::<PortalSubscription>(),
-        cosmic::iced_futures::stream::channel(10, |mut output| async move {
+    #[derive(Clone)]
+    struct PortalSubscription(crate::wayland::WaylandHelper);
+
+    impl std::hash::Hash for PortalSubscription {
+        fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+            TypeId::of::<PortalSubscription>().hash(state);
+        }
+    }
+
+    Subscription::run_with(PortalSubscription(helper), |data| {
+        let helper = data.0.clone();
+
+        cosmic::iced_futures::stream::channel(
+            10,
+            move |mut output: cosmic::iced_futures::futures::channel::mpsc::Sender<PortalEvent>| async move {
             let mut state = SubscriptionState::Init;
             loop {
                 if let Err(err) = process_changes(&mut state, &mut output, &helper).await {
@@ -838,8 +835,9 @@ pub(crate) fn portal_subscription(
                     futures::future::pending::<()>().await;
                 }
             }
-        }),
-    )
+        },
+        )
+    })
 }
 
 pub(crate) async fn process_changes(
@@ -903,10 +901,21 @@ pub(crate) fn direct_screenshot_subscription(
     use crate::capture::image::ScreenshotImage;
     use crate::wayland::CaptureSource;
 
-    struct DirectScreenshotSubscription;
-    Subscription::run_with_id(
-        TypeId::of::<DirectScreenshotSubscription>(),
-        cosmic::iced_futures::stream::channel(10, |mut output| async move {
+    #[derive(Clone)]
+    struct DirectScreenshotSubscription(crate::wayland::WaylandHelper);
+
+    impl std::hash::Hash for DirectScreenshotSubscription {
+        fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+            TypeId::of::<DirectScreenshotSubscription>().hash(state);
+        }
+    }
+
+    Subscription::run_with(DirectScreenshotSubscription(helper), |data| {
+        let helper = data.0.clone();
+
+        cosmic::iced_futures::stream::channel(
+            10,
+            move |mut output: cosmic::iced_futures::futures::channel::mpsc::Sender<PortalEvent>| async move {
             use crate::config::SnapPeaConfig;
             use crate::core::portal::PortalResponse;
             use crate::domain::{Choice, DragState, Rect};
@@ -1074,7 +1083,6 @@ pub(crate) fn direct_screenshot_subscription(
                     pencil_fade_duration: config.pencil_fade_duration,
                     pencil_thickness: config.pencil_thickness,
                     toolbar_bounds: None,
-                    timeline: cosmic_time::Timeline::new(),
                     hide_toolbar_to_tray: config.hide_toolbar_to_tray,
                     move_offset: None,
                 },
@@ -1091,17 +1099,28 @@ pub(crate) fn direct_screenshot_subscription(
                     break;
                 }
             }
-        }),
-    )
+        },
+        )
+    })
 }
 
 /// Subscription for receiving tray actions
 fn tray_subscription(rx: CbReceiver<TrayAction>) -> Subscription<Msg> {
-    struct TraySub;
+    #[derive(Clone)]
+    struct TraySub(CbReceiver<TrayAction>);
 
-    Subscription::run_with_id(
-        TypeId::of::<TraySub>(),
-        cosmic::iced::stream::channel(10, move |mut output| async move {
+    impl std::hash::Hash for TraySub {
+        fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+            TypeId::of::<TraySub>().hash(state);
+        }
+    }
+
+    Subscription::run_with(TraySub(rx), |data| {
+        let rx = data.0.clone();
+
+        cosmic::iced::stream::channel(
+            10,
+            move |mut output: cosmic::iced_futures::futures::channel::mpsc::Sender<Msg>| async move {
             use cosmic::iced_futures::futures::StreamExt;
 
             // Bridge the blocking crossbeam receiver into an async stream
@@ -1119,8 +1138,9 @@ fn tray_subscription(rx: CbReceiver<TrayAction>) -> Subscription<Msg> {
                     break;
                 }
             }
-        }),
-    )
+        },
+        )
+    })
 }
 
 /// Render the recording indicator overlay - a blinking red border and annotations
@@ -1168,10 +1188,10 @@ fn render_recording_indicator(
         fn update(
             &self,
             state: &mut Self::State,
-            event: canvas::Event,
+            event: &cosmic::iced::Event,
             bounds: cosmic::iced_core::Rectangle,
             cursor: cosmic::iced_core::mouse::Cursor,
-        ) -> (canvas::event::Status, Option<Msg>) {
+        ) -> Option<canvas::Action<Msg>> {
             use cosmic::iced_core::mouse::{Button, Event as MouseEvent};
 
             // Update cursor position if available
@@ -1195,39 +1215,39 @@ fn render_recording_indicator(
 
                             // Close popup if clicking outside popup and toolbar
                             if !in_popup && !in_toolbar {
-                                return (
-                                    canvas::event::Status::Captured,
-                                    Some(Msg::Screenshot(crate::session::messages::Msg::Tool(
+                                return Some(canvas::Action::publish(
+                                    Msg::Screenshot(crate::session::messages::Msg::Tool(
                                         crate::session::messages::ToolMsg::PencilPopup(
                                             crate::session::messages::ToolPopupAction::Close,
                                         ),
-                                    ))),
-                                );
+                                    )),
+                                )
+                                .and_capture());
                             }
                         }
                     }
 
                     // Start drawing if in annotation mode (and popup not handling the click)
                     if self.annotation_mode && !self.pencil_popup_open {
-                        return (
-                            canvas::event::Status::Captured,
-                            Some(Msg::IndicatorMouse(
+                        return Some(canvas::Action::publish(Msg::IndicatorMouse(
                                 cosmic::iced::mouse::Event::ButtonPressed(
                                     cosmic::iced::mouse::Button::Left,
                                 ),
                                 state.cursor_position,
-                            )),
-                        );
+                            ))
+                            .and_capture());
                     }
                 }
                 canvas::Event::Mouse(MouseEvent::CursorMoved { position }) => {
-                    state.cursor_position = position;
+                    state.cursor_position = *position;
 
                     // Handle toolbar dragging - takes priority over annotation drawing
                     if self.toolbar_dragging {
-                        return (
-                            canvas::event::Status::Captured,
-                            Some(Msg::ToolbarDragMove(position.x, position.y)),
+                        return Some(
+                            canvas::Action::publish(Msg::ToolbarDragMove(
+                                position.x, position.y,
+                            ))
+                            .and_capture(),
                         );
                     }
 
@@ -1236,39 +1256,35 @@ fn render_recording_indicator(
                         && self.current_stroke.is_some()
                         && !self.pencil_popup_open
                     {
-                        return (
-                            canvas::event::Status::Captured,
-                            Some(Msg::IndicatorMouse(
-                                cosmic::iced::mouse::Event::CursorMoved { position },
-                                position,
-                            )),
-                        );
+                        return Some(canvas::Action::publish(Msg::IndicatorMouse(
+                                cosmic::iced::mouse::Event::CursorMoved { position: *position },
+                                *position,
+                            ))
+                            .and_capture());
                     }
                 }
                 canvas::Event::Mouse(MouseEvent::ButtonReleased(Button::Left)) => {
                     // Handle toolbar drag end - takes priority
                     if self.toolbar_dragging {
-                        return (canvas::event::Status::Captured, Some(Msg::ToolbarDragEnd));
+                        return Some(canvas::Action::publish(Msg::ToolbarDragEnd).and_capture());
                     }
 
                     // Don't capture release if popup is open (even mid-stroke)
                     if self.current_stroke.is_some() && !self.pencil_popup_open {
-                        return (
-                            canvas::event::Status::Captured,
-                            Some(Msg::IndicatorMouse(
+                        return Some(canvas::Action::publish(Msg::IndicatorMouse(
                                 cosmic::iced::mouse::Event::ButtonReleased(
                                     cosmic::iced::mouse::Button::Left,
                                 ),
                                 state.cursor_position,
-                            )),
-                        );
+                            ))
+                            .and_capture());
                     }
                 }
                 _ => {}
             }
 
             // Let events pass through when not drawing
-            (canvas::event::Status::Ignored, None)
+            None
         }
 
         fn draw(
@@ -1560,18 +1576,23 @@ fn render_recording_indicator(
 
     // Create horizontal spacer to position toolbar
     let left_space =
-        cosmic::widget::horizontal_space().width(Length::Fixed(toolbar_pos.0.max(0.0)));
-    let top_space = cosmic::widget::vertical_space().height(Length::Fixed(toolbar_pos.1.max(0.0)));
+        cosmic::iced::widget::space().width(Length::Fixed(toolbar_pos.0.max(0.0)));
+    let top_space =
+        cosmic::iced::widget::space().height(Length::Fixed(toolbar_pos.1.max(0.0)));
 
     // Build the positioned toolbar
     let toolbar_row = row![
         left_space,
         toolbar_with_bg,
-        cosmic::widget::horizontal_space()
+        cosmic::iced::widget::space().width(Length::Fill)
     ]
     .width(Length::Fill);
 
-    let toolbar_layer = column![top_space, toolbar_row, cosmic::widget::vertical_space()]
+    let toolbar_layer = column![
+        top_space,
+        toolbar_row,
+        cosmic::iced::widget::space().height(Length::Fill)
+    ]
         .width(Length::Fill)
         .height(Length::Fill);
 
@@ -1601,14 +1622,22 @@ fn render_recording_indicator(
             };
 
             let popup_left_space =
-                cosmic::widget::horizontal_space().width(Length::Fixed(toolbar_pos.0.max(0.0)));
+                cosmic::iced::widget::space().width(Length::Fixed(toolbar_pos.0.max(0.0)));
             let popup_top_space =
-                cosmic::widget::vertical_space().height(Length::Fixed(popup_y.max(0.0)));
+                cosmic::iced::widget::space().height(Length::Fixed(popup_y.max(0.0)));
 
-            let popup_row = row![popup_left_space, popup, cosmic::widget::horizontal_space()]
-                .width(Length::Fill);
+            let popup_row = row![
+                popup_left_space,
+                popup,
+                cosmic::iced::widget::space().width(Length::Fill)
+            ]
+            .width(Length::Fill);
 
-            let popup_layer = column![popup_top_space, popup_row, cosmic::widget::vertical_space()]
+            let popup_layer = column![
+                popup_top_space,
+                popup_row,
+                cosmic::iced::widget::space().height(Length::Fill)
+            ]
                 .width(Length::Fill)
                 .height(Length::Fill);
 
@@ -1636,9 +1665,10 @@ fn render_recording_indicator(
 pub(crate) fn control_subscription() -> Subscription<Msg> {
     struct ControlSub;
 
-    Subscription::run_with_id(
-        TypeId::of::<ControlSub>(),
-        cosmic::iced_futures::stream::channel(10, |mut output| async move {
+    Subscription::run_with(TypeId::of::<ControlSub>(), |_| {
+        cosmic::iced_futures::stream::channel(
+            10,
+            |mut output: cosmic::iced_futures::futures::channel::mpsc::Sender<Msg>| async move {
             let (cmd_tx, mut cmd_rx) = tokio::sync::mpsc::channel::<ControlCommand>(10);
 
             // Try to register the D-Bus control interface
@@ -1689,8 +1719,9 @@ pub(crate) fn control_subscription() -> Subscription<Msg> {
                 // No D-Bus connection, just keep the subscription alive
                 futures::future::pending::<()>().await;
             }
-        }),
-    )
+        },
+        )
+    })
 }
 
 /// Trigger a screenshot capture (called from D-Bus control command)
@@ -1815,7 +1846,6 @@ async fn trigger_screenshot(
             pencil_fade_duration: config.pencil_fade_duration,
             pencil_thickness: config.pencil_thickness,
             toolbar_bounds: None,
-            timeline: cosmic_time::Timeline::new(),
             hide_toolbar_to_tray: config.hide_toolbar_to_tray,
             move_offset: None,
         },

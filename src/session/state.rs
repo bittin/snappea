@@ -13,8 +13,6 @@ use crate::domain::{
 use crate::screencast::encoder::EncoderInfo;
 use crate::screenshot::portal::{ScreenshotOptions, ScreenshotResult};
 use cosmic::iced_core::Rectangle;
-
-use cosmic_time::Timeline;
 use std::collections::HashMap;
 use tokio::sync::mpsc::Sender;
 use zbus::zvariant;
@@ -249,8 +247,6 @@ pub struct UiState {
     pub pencil_thickness: f32,
     /// Last known toolbar bounds (output-local)
     pub toolbar_bounds: Option<Rectangle>,
-    /// Animation timeline for UI animations
-    pub timeline: Timeline,
     /// Whether to hide toolbar to system tray when recording
     pub hide_toolbar_to_tray: bool,
     /// Move offset for dragging selection rectangle (cursor pos relative to rect top-left when move started)
