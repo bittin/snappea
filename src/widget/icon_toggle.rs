@@ -6,6 +6,7 @@
 //! Supports smooth animation via cosmic-time.
 
 use cosmic::Element;
+use cosmic::iced::Animation;
 use cosmic::iced::Size;
 use cosmic::iced_core::{
     Background, Border, Color, Layout, Length, Rectangle, layout,
@@ -17,8 +18,11 @@ use cosmic::widget::icon;
 use std::rc::Rc;
 
 /// Get the current toggle position.
-pub fn get_toggle_percent(is_video_mode: bool) -> f32 {
-    if is_video_mode { 1.0 } else { 0.0 }
+pub fn get_toggle_percent(
+    animation: &Animation<bool>,
+    now: std::time::Instant,
+) -> f32 {
+    animation.interpolate(0.0, 1.0, now)
 }
 
 // Layout constants

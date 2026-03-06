@@ -302,15 +302,19 @@ where
             ui.is_recording,
             ui.recording_annotation_mode,
             ui.pencil_popup_open,
-            crate::widget::icon_toggle::get_toggle_percent(ui.is_video_mode),
+            crate::widget::icon_toggle::get_toggle_percent(
+                &ui.capture_mode_animation,
+                ui.now,
+            ),
             {
                 let on_event = on_event.clone();
                 move |is_video| on_event(ScreenshotEvent::capture_mode_toggle(is_video))
             },
             // Compute animated content opacity for toolbar fade effect
             crate::widget::toolbar::get_toolbar_opacity(
+                &ui.toolbar_hover_animation,
+                ui.now,
                 ui.toolbar_unhovered_opacity,
-                ui.toolbar_is_hovered,
             ),
             {
                 let on_event = on_event.clone();

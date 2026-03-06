@@ -6,6 +6,7 @@ use crate::session::messages;
 use crate::session::state::SettingsTab;
 use crate::tray::{self, TrayAction, TrayHandle};
 use cosmic::Task;
+use cosmic::iced::animation;
 use cosmic::iced_core::event::wayland::OutputEvent;
 use cosmic::widget::segmented_button;
 use cosmic::{
@@ -16,6 +17,7 @@ use cosmic::{
 use crossbeam_channel::{Receiver as CbReceiver, Sender as CbSender};
 use futures::SinkExt;
 use std::any::TypeId;
+use std::time::Instant;
 use wayland_client::protocol::wl_output::WlOutput;
 
 /// Flags for app initialization
@@ -791,6 +793,18 @@ impl cosmic::Application for App {
             );
         }
 
+        if let Some(args) = &self.screenshot_args
+            && args.ui.is_animating()
+        {
+            subscriptions.push(
+                cosmic::iced::window::frames().map(|(window_id, instant)| {
+                    Msg::Screenshot(crate::session::messages::Msg::timeline_tick(
+                        window_id, instant,
+                    ))
+                }),
+            );
+        }
+
         Subscription::batch(subscriptions)
     }
 }
@@ -1049,6 +1063,7 @@ pub(crate) fn direct_screenshot_subscription(
                 detection: DetectionState::default(),
                 annotations: AnnotationState::default(),
                 ui: UiState {
+                    now: Instant::now(),
                     toolbar_position: config.toolbar_position,
                     settings_drawer_open: false,
                     settings_tab: crate::session::state::SettingsTab::General,
@@ -1067,6 +1082,9 @@ pub(crate) fn direct_screenshot_subscription(
                     copy_to_clipboard_on_save: config.copy_to_clipboard_on_save,
                     toolbar_unhovered_opacity: config.toolbar_unhovered_opacity,
                     toolbar_is_hovered: false,
+                    toolbar_hover_animation: cosmic::iced::Animation::new(false)
+                        .quick()
+                        .easing(animation::Easing::EaseInOut),
                     toolbar_opacity_save_id: 0,
                     tesseract_available: crate::capture::ocr::is_tesseract_available(),
                     available_encoders: Vec::new(),
@@ -1076,6 +1094,9 @@ pub(crate) fn direct_screenshot_subscription(
                     video_framerate: config.video_framerate,
                     video_show_cursor: config.video_show_cursor,
                     is_video_mode: false,
+                    capture_mode_animation: cosmic::iced::Animation::new(false)
+                        .quick()
+                        .easing(animation::Easing::EaseInOut),
                     is_recording: false,
                     recording_annotation_mode: false,
                     pencil_popup_open: false,
@@ -1812,6 +1833,7 @@ async fn trigger_screenshot(
         detection: DetectionState::default(),
         annotations: AnnotationState::default(),
         ui: UiState {
+            now: Instant::now(),
             toolbar_position: config.toolbar_position,
             settings_drawer_open: false,
             settings_tab: crate::session::state::SettingsTab::General,
@@ -1830,6 +1852,9 @@ async fn trigger_screenshot(
             copy_to_clipboard_on_save: config.copy_to_clipboard_on_save,
             toolbar_unhovered_opacity: config.toolbar_unhovered_opacity,
             toolbar_is_hovered: false,
+            toolbar_hover_animation: cosmic::iced::Animation::new(false)
+                .quick()
+                .easing(animation::Easing::EaseInOut),
             toolbar_opacity_save_id: 0,
             tesseract_available: crate::capture::ocr::is_tesseract_available(),
             available_encoders: Vec::new(),
@@ -1839,6 +1864,9 @@ async fn trigger_screenshot(
             video_framerate: config.video_framerate,
             video_show_cursor: config.video_show_cursor,
             is_video_mode: false,
+            capture_mode_animation: cosmic::iced::Animation::new(false)
+                .quick()
+                .easing(animation::Easing::EaseInOut),
             is_recording: false,
             recording_annotation_mode: false,
             pencil_popup_open: false,

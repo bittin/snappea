@@ -2,6 +2,7 @@
 
 use std::rc::Rc;
 
+use cosmic::iced::Animation;
 use cosmic::iced::Length;
 use cosmic::iced_core::{layout, widget::Tree, Background, Border, Color, Layout, Size};
 use cosmic::iced_renderer::geometry::Renderer as GeometryRenderer;
@@ -10,8 +11,12 @@ use cosmic::widget::{button, icon, text, tooltip};
 use cosmic::Element;
 
 /// Returns full opacity while hovered and the configured base opacity otherwise.
-pub fn get_toolbar_opacity(base_opacity: f32, is_hovered: bool) -> f32 {
-    if is_hovered { 1.0 } else { base_opacity }
+pub fn get_toolbar_opacity(
+    animation: &Animation<bool>,
+    now: std::time::Instant,
+    base_opacity: f32,
+) -> f32 {
+    animation.interpolate(base_opacity, 1.0, now)
 }
 
 /// Helper to create an SVG icon with opacity support

@@ -1,4 +1,5 @@
 use cosmic::cosmic_config::CosmicConfigEntry;
+use cosmic::iced::animation;
 use cosmic::iced::clipboard::mime::AsMimeTypes;
 use cosmic::iced::{Limits, window};
 use cosmic::iced_core::Length;
@@ -11,6 +12,7 @@ use cosmic_client_toolkit::sctk::shell::wlr_layer::{Anchor, KeyboardInteractivit
 
 use image::RgbaImage;
 use std::borrow::Cow;
+use std::time::Instant;
 use std::{collections::HashMap, io, path::PathBuf};
 use tokio::sync::mpsc::Sender;
 
@@ -367,6 +369,7 @@ impl Screenshot {
                     // Start with empty encoders - they will be detected asynchronously
                     // This allows the UI to show immediately without waiting for GStreamer
                     UiState {
+                        now: Instant::now(),
                         toolbar_position: config.toolbar_position,
                         settings_drawer_open: false,
                         settings_tab: crate::session::state::SettingsTab::General,
@@ -385,6 +388,9 @@ impl Screenshot {
                         copy_to_clipboard_on_save: config.copy_to_clipboard_on_save,
                         toolbar_unhovered_opacity: config.toolbar_unhovered_opacity,
                         toolbar_is_hovered: false,
+                        toolbar_hover_animation: cosmic::iced::Animation::new(false)
+                            .quick()
+                            .easing(animation::Easing::EaseInOut),
                         toolbar_opacity_save_id: 0,
                         tesseract_available: is_tesseract_available(),
                         available_encoders: Vec::new(),
@@ -394,6 +400,9 @@ impl Screenshot {
                         video_framerate: config.video_framerate,
                         video_show_cursor: config.video_show_cursor,
                         is_video_mode: false,
+                        capture_mode_animation: cosmic::iced::Animation::new(false)
+                            .quick()
+                            .easing(animation::Easing::EaseInOut),
                         is_recording: false,
                         recording_annotation_mode: false,
                         pencil_popup_open: false,
@@ -849,7 +858,7 @@ fn handle_settings_msg(app: &mut App, msg: SettingsMsg) -> cosmic::Task<crate::c
             }
             SettingsMsg::ToolbarHoverChanged(is_hovered) => {
                 args.ui.toolbar_is_hovered = is_hovered;
-                // Start the appropriate animation
+                args.ui.toolbar_hover_animation.go_mut(is_hovered, args.ui.now);
                 cosmic::Task::none()
             }
             SettingsMsg::ToolbarBounds(bounds) => {
@@ -895,7 +904,10 @@ fn handle_settings_msg(app: &mut App, msg: SettingsMsg) -> cosmic::Task<crate::c
                 args.ui.encoder_displays = encoder_displays;
                 cosmic::Task::none()
             }
-            SettingsMsg::TimelineTick(_, _) => cosmic::Task::none(),
+            SettingsMsg::TimelineTick(_, instant) => {
+                args.ui.now = instant;
+                cosmic::Task::none()
+            }
             SettingsMsg::SetMoveOffset(offset) => {
                 args.ui.move_offset = offset;
                 cosmic::Task::none()
@@ -1306,6 +1318,7 @@ fn handle_capture_msg(app: &mut App, msg: CaptureMsg) -> cosmic::Task<crate::cor
         CaptureMsg::ToggleCaptureMode(is_video) => {
             log::info!("Capture mode toggled: is_video_mode = {}", is_video);
             if let Some(args) = app.screenshot_args.as_mut() {
+                args.ui.capture_mode_animation.go_mut(is_video, args.ui.now);
                 args.ui.is_video_mode = is_video;
                 // Reset UI state completely when switching modes
                 args.close_all_popups();
