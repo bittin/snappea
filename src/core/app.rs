@@ -140,7 +140,6 @@ pub struct OutputState {
     pub logical_pos: (i32, i32),
     pub scale_factor: i32,
     pub has_pointer: bool,
-    pub bg_source: Option<cosmic_bg_config::Source>,
 }
 
 #[allow(clippy::large_enum_variant)]
@@ -688,7 +687,6 @@ impl cosmic::Application for App {
                             logical_pos: info.logical_position.unwrap(),
                             scale_factor: info.scale_factor,
                             has_pointer: false,
-                            bg_source: None,
                         })
                     }
                     OutputEvent::Removed => self.outputs.retain(|o| o.output != wl_output),
@@ -719,7 +717,6 @@ impl cosmic::Application for App {
                                 logical_pos: info.logical_position.unwrap(),
                                 scale_factor: info.scale_factor,
                                 has_pointer: false,
-                                bg_source: None,
                             });
                         }
                     }

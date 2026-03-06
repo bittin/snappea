@@ -12,7 +12,6 @@ wgpu = ["cosmic/wgpu"]
 [dependencies]
 anyhow = "1.0.100"
 chrono = "0.4"
-cosmic-bg-config = { git = "https://github.com/pop-os/cosmic-bg" }
 cosmic-client-toolkit = { git = "https://github.com/pop-os/cosmic-protocols", branch = "main" }
 cosmic-config = { git = "https://github.com/pop-os/libcosmic" }
 cosmic-protocols = { git = "https://github.com/pop-os/cosmic-protocols", branch = "main" }

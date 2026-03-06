@@ -2266,34 +2266,6 @@ pub fn update_args(app: &mut App, args: Args) -> cosmic::Task<crate::core::app::
         return cosmic::Task::none();
     }
 
-    // update output bg sources
-    if let Ok(c) = cosmic::cosmic_config::Config::new_state(
-        cosmic_bg_config::NAME,
-        cosmic_bg_config::state::State::version(),
-    ) {
-        let bg_state = match cosmic_bg_config::state::State::get_entry(&c) {
-            Ok(state) => state,
-            Err((err, s)) => {
-                log::error!("Failed to get bg config state: {:?}", err);
-                s
-            }
-        };
-        for o in &mut app.outputs {
-            let source = bg_state.wallpapers.iter().find(|s| s.0 == o.name);
-            o.bg_source = Some(source.cloned().map(|s| s.1).unwrap_or_else(|| {
-                cosmic_bg_config::Source::Path(
-                    "/usr/share/backgrounds/pop/kate-hazen-COSMIC-desktop-wallpaper.png".into(),
-                )
-            }));
-        }
-    } else {
-        log::error!("Failed to get bg config state");
-        for o in &mut app.outputs {
-            o.bg_source = Some(cosmic_bg_config::Source::Path(
-                "/usr/share/backgrounds/pop/kate-hazen-COSMIC-desktop-wallpaper.png".into(),
-            ));
-        }
-    }
     app.location_options = vec![
         fl!("save-to", "clipboard"),
         fl!("save-to", "pictures"),
