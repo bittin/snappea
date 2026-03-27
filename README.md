@@ -59,7 +59,7 @@ To use SnapPea as the default screenshot tool (replacing the COSMIC screenshot t
 just install-portal
 ```
 
-This creates `~/.config/xdg-desktop-portal/portals.conf` to configure xdg-desktop-portal.
+This creates `~/.config/xdg-desktop-portal/cosmic-portals.conf` to configure xdg-desktop-portal.
 
 After installing, reload the portal:
 
@@ -68,6 +68,10 @@ systemctl --user restart xdg-desktop-portal
 ```
 
 Now pressing `Print Screen` will open SnapPea instead of the default screenshot tool.
+
+
+> [!IMPORTANT]
+> SnapPea used to install its config to `~/.config/xdg-desktop-portal/portals.conf`. This breaks theming in Flatpaks. The new `just install-portal` will delete the old file if you haven't changed it. But if you had the older version of SnapPea, make sure `portals.conf` is deleted.
 
 ### Optional: OCR Support
 
@@ -90,7 +94,7 @@ sudo pacman -S tesseract
 sudo just uninstall
 ```
 
-The uninstall command will warn you if `~/.config/xdg-desktop-portal/portals.conf` still contains SnapPea configuration.
+The uninstall command will warn you if `~/.config/xdg-desktop-portal/cosmic-portals.conf` still contains SnapPea configuration.
 
 ## Why SnapPea?
 It Snaps Pics and it's snappy!
