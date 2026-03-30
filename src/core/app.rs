@@ -75,6 +75,9 @@ pub struct App {
     pub toolbar_visible: bool,
     /// Whether running in direct screenshot mode (no D-Bus portal)
     pub direct_screenshot: bool,
+    /// True when screenshot args arrived before any Wayland outputs were known.
+    /// The OutputEvent::Created handler will create the layer surface on first output.
+    pub screenshot_windows_pending: bool,
     /// Dummy layer surface held so the app retains a Wayland surface for clipboard ownership
     pub dummy_id: window::Id,
 }
@@ -228,6 +231,7 @@ impl cosmic::Application for App {
                 tray_tx: Some(tray_tx),
                 toolbar_visible: true,
                 direct_screenshot: flags.direct_screenshot,
+                screenshot_windows_pending: false,
                 dummy_id,
             },
             get_layer_surface(SctkLayerSurfaceSettings {
@@ -718,7 +722,34 @@ impl cosmic::Application for App {
                             logical_pos: info.logical_position.unwrap(),
                             scale_factor: info.scale_factor,
                             has_pointer: false,
-                        })
+                        });
+
+                        // If screenshot args arrived before outputs were ready, create
+                        // the overlay window now that we have our first output.
+                        if self.screenshot_windows_pending {
+                            if let Some(output_state) = self.outputs.last_mut() {
+                                output_state.id = window::Id::unique();
+                                let surface_cmd = get_layer_surface(SctkLayerSurfaceSettings {
+                                    id: output_state.id,
+                                    layer: wlr_layer::Layer::Overlay,
+                                    keyboard_interactivity: wlr_layer::KeyboardInteractivity::Exclusive,
+                                    input_zone: None,
+                                    anchor: wlr_layer::Anchor::all(),
+                                    output: IcedOutput::Output(output_state.output.clone()),
+                                    namespace: "snappea".to_string(),
+                                    size: Some((None, None)),
+                                    exclusive_zone: -1,
+                                    size_limits: Limits::NONE.min_height(1.0).min_width(1.0),
+                                    ..Default::default()
+                                });
+                                log::info!(
+                                    "Deferred screenshot window creation triggered for output {:?}",
+                                    output_state.name
+                                );
+                                self.screenshot_windows_pending = false;
+                                return surface_cmd;
+                            }
+                        }
                     }
                     OutputEvent::Removed => self.outputs.retain(|o| o.output != wl_output),
                     OutputEvent::InfoUpdate(info)

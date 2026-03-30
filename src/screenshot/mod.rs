@@ -2345,6 +2345,18 @@ pub fn update_args(app: &mut App, args: Args) -> cosmic::Task<crate::core::app::
             output.id = window::Id::unique();
         }
 
+        // If outputs haven't arrived from the Wayland compositor yet, defer window
+        // creation.  The OutputEvent::Created handler will create the surface once
+        // the first output is advertised.
+        if app.outputs.is_empty() {
+            log::info!(
+                "Outputs not yet known — deferring window creation until OutputEvent::Created"
+            );
+            app.screenshot_windows_pending = true;
+            return indicator_cleanup;
+        }
+        app.screenshot_windows_pending = false;
+
         let cmds: Vec<_> = app
             .outputs
             .iter()
