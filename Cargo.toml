@@ -1,6 +1,6 @@
 [package]
 name = "snappea"
-version = "0.6.0"
+version = "0.6.2"
 edition = "2024"
 license = "GPL-3.0-or-later"
 description = "Screenshot and screen recording for COSMIC desktop"
@@ -85,6 +85,16 @@ assets = [
   [
     "data/logo.svg",
     "usr/share/icons/hicolor/scalable/apps/io.github.hojjatabdollahi.snappea.svg",
+    "644",
+  ],
+  [
+    "data/snappea.portal",
+    "usr/share/xdg-desktop-portal/portals/snappea.portal",
+    "644",
+  ],
+  [
+    "data/io.github.hojjatabdollahi.snappea.service",
+    "usr/share/dbus-1/services/io.github.hojjatabdollahi.snappea.service",
     "644",
   ],
   [

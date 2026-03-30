@@ -6,7 +6,9 @@
 
 use std::io::Write;
 
-use crate::config::{Container, SaveLocationChoice, SnapPeaConfig, ToolbarPosition, VideoSaveLocationChoice};
+use crate::config::{
+    Container, SaveLocationChoice, SnapPeaConfig, ToolbarPosition, VideoSaveLocationChoice,
+};
 use crate::screenshot::Args;
 use crate::screenshot::handlers::HandlerResult;
 
@@ -82,7 +84,10 @@ pub fn handle_set_custom_save_path(args: &mut Args, path: String) -> HandlerResu
 // to support hiding/restoring the overlay when the file dialog opens.
 
 /// Handle SetVideoSaveLocation message
-pub fn handle_set_video_save_location(args: &mut Args, loc: VideoSaveLocationChoice) -> HandlerResult {
+pub fn handle_set_video_save_location(
+    args: &mut Args,
+    loc: VideoSaveLocationChoice,
+) -> HandlerResult {
     args.ui.video_save_location_setting = loc;
     let mut config = SnapPeaConfig::load();
     config.video_save_location = loc;
@@ -186,26 +191,15 @@ pub fn handle_set_video_framerate(args: &mut Args, framerate: u32) -> HandlerRes
 
 /// Handle SetAsDefaultPortal toggle message
 ///
-/// - When enabling:
-///   1. Writes `~/.local/share/xdg-desktop-portal/portals/snappea.portal`
-///   2. Writes `~/.local/share/dbus-1/services/io.github.hojjatabdollahi.snappea.service`
-///      with Exec pointing to the currently running binary.
-///   3. Writes `~/.config/xdg-desktop-portal/cosmic-portals.conf`
-/// - When disabling: removes all three files (cleaning up portals.conf carefully).
+/// - When enabling: writes `~/.config/xdg-desktop-portal/cosmic-portals.conf`
+///   so snappea is the preferred Screenshot portal backend for the current user.
+/// - When disabling: removes the `org.freedesktop.impl.portal.Screenshot` line
+///   (or deletes the file if snappea wrote its entire content).
 /// Restarts the user's xdg-desktop-portal service to apply the change.
 pub fn handle_set_as_default_portal(args: &mut Args) -> HandlerResult {
     let enabling = !args.ui.is_default_portal;
 
     let result = (|| -> Result<(), Box<dyn std::error::Error>> {
-        let local_data_dir = dirs::data_local_dir().ok_or("could not determine local data dir")?;
-
-        let portal_dir = local_data_dir.join("xdg-desktop-portal/portals");
-        let portal_file = portal_dir.join("snappea.portal");
-
-        let service_dir = local_data_dir.join("dbus-1/services");
-        let service_file =
-            service_dir.join("io.github.hojjatabdollahi.snappea.service");
-
         let config_dir = dirs::config_dir()
             .ok_or("could not determine config directory")?
             .join("xdg-desktop-portal");
@@ -213,54 +207,21 @@ pub fn handle_set_as_default_portal(args: &mut Args) -> HandlerResult {
         let conf_path = config_dir.join("cosmic-portals.conf");
 
         if enabling {
-            // 1. Write user-local .portal file
-            std::fs::create_dir_all(&portal_dir)?;
-            std::fs::write(
-                &portal_file,
-                "[portal]\nDBusName=io.github.hojjatabdollahi.snappea\nInterfaces=org.freedesktop.impl.portal.Screenshot\nUseIn=COSMIC\n",
-            )?;
-            log::info!("snappea: portal file written to {}", portal_file.display());
-
-            // 2. Write user-local D-Bus session service file
-            std::fs::create_dir_all(&service_dir)?;
-            let exe = std::env::current_exe()
-                .unwrap_or_else(|_| std::path::PathBuf::from("snappea"));
-            let service_content = format!(
-                "[D-BUS Service]\nName=io.github.hojjatabdollahi.snappea\nExec={} --portal\n",
-                exe.display()
-            );
-            std::fs::write(&service_file, service_content)?;
-            log::info!("snappea: D-Bus service file written to {}", service_file.display());
-
-            // 3. Write portals.conf
             let mut file = std::fs::File::create(&conf_path)?;
             file.write_all(
                 b"[preferred]\ndefault=cosmic;gtk;\norg.freedesktop.impl.portal.Screenshot=snappea\n",
             )?;
             log::info!("snappea: portal config written to {}", conf_path.display());
         } else {
-            // Remove .portal file
-            if portal_file.exists() {
-                let _ = std::fs::remove_file(&portal_file);
-                log::info!("snappea: removed portal file {}", portal_file.display());
-            }
-
-            // Remove D-Bus service file
-            if service_file.exists() {
-                let _ = std::fs::remove_file(&service_file);
-                log::info!("snappea: removed D-Bus service file {}", service_file.display());
-            }
-
-            // Remove only the Screenshot line from portals.conf; delete file if nothing meaningful remains
+            // Remove only the Screenshot line; if the file becomes empty / header-only, delete it
             if conf_path.exists() {
                 let contents = std::fs::read_to_string(&conf_path)?;
                 let filtered: String = contents
                     .lines()
-                    .filter(|l| {
-                        l.trim() != "org.freedesktop.impl.portal.Screenshot=snappea"
-                    })
+                    .filter(|l| l.trim() != "org.freedesktop.impl.portal.Screenshot=snappea")
                     .map(|l| format!("{}\n", l))
                     .collect();
+                // If nothing meaningful remains beyond a bare [preferred] header, delete the file
                 let meaningful = filtered
                     .lines()
                     .any(|l| !l.trim().is_empty() && !l.trim().starts_with('['));
