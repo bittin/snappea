@@ -186,6 +186,10 @@ pub enum Msg {
     Control(ControlCommand),
     /// A layer surface was closed by the compositor (e.g. output disconnected)
     LayerClosed(window::Id),
+    /// Failsafe: fired ~500 ms after screenshot args arrive if windows still haven't been
+    /// created (e.g. OutputEvent::Created never came because the compositor already
+    /// advertised outputs before our subscription was active).
+    RetryPendingWindows,
 }
 
 impl cosmic::Application for App {
@@ -704,6 +708,54 @@ impl cosmic::Application for App {
                 })
             }
             Msg::LayerClosed(_) => cosmic::iced::Task::none(),
+            Msg::RetryPendingWindows => {
+                // Failsafe: if the flag is still set here it means OutputEvent::Created
+                // never fired after update_args deferred.  This happens when the
+                // compositor already advertised outputs *before* our subscription was
+                // active.  At this point app.outputs should be populated (the compositor
+                // re-sends output info on connect), so we can create windows directly.
+                if self.screenshot_windows_pending && !self.outputs.is_empty() {
+                    log::warn!(
+                        "Failsafe: creating screenshot windows after deferred creation \
+                         timed out ({} outputs available)",
+                        self.outputs.len()
+                    );
+                    self.screenshot_windows_pending = false;
+                    for output in &mut self.outputs {
+                        output.id = window::Id::unique();
+                    }
+                    let cmds: Vec<_> = self
+                        .outputs
+                        .iter()
+                        .map(|crate::core::app::OutputState { output, id, .. }| {
+                            get_layer_surface(SctkLayerSurfaceSettings {
+                                id: *id,
+                                layer: wlr_layer::Layer::Overlay,
+                                keyboard_interactivity: wlr_layer::KeyboardInteractivity::Exclusive,
+                                input_zone: None,
+                                anchor: wlr_layer::Anchor::all(),
+                                output: IcedOutput::Output(output.clone()),
+                                namespace: "snappea".to_string(),
+                                size: Some((None, None)),
+                                exclusive_zone: -1,
+                                size_limits: Limits::NONE.min_height(1.0).min_width(1.0),
+                                ..Default::default()
+                            })
+                        })
+                        .collect();
+                    return cosmic::Task::batch(cmds);
+                } else if self.screenshot_windows_pending {
+                    // Still no outputs — compositor may be slow.  Log and give up
+                    // gracefully rather than hanging forever.
+                    log::error!(
+                        "Failsafe: screenshot_windows_pending is true but outputs list \
+                         is still empty after 500 ms — cannot create overlay windows. \
+                         The compositor did not advertise any outputs."
+                    );
+                    self.screenshot_windows_pending = false;
+                }
+                cosmic::iced::Task::none()
+            }
             Msg::Output(o_event, wl_output) => {
                 match o_event {
                     OutputEvent::Created(Some(info))
@@ -870,6 +922,17 @@ impl cosmic::Application for App {
                         window_id, instant,
                     ))
                 }),
+            );
+        }
+
+        // Failsafe timer: if screenshot args arrived but no outputs were available,
+        // fire RetryPendingWindows after 500 ms so we don't hang forever if
+        // OutputEvent::Created never comes (e.g. outputs were already advertised
+        // before our Wayland subscription was active).
+        if self.screenshot_windows_pending {
+            subscriptions.push(
+                cosmic::iced::time::every(std::time::Duration::from_millis(500))
+                    .map(|_| Msg::RetryPendingWindows),
             );
         }
 
