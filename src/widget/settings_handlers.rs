@@ -4,7 +4,11 @@
 //!          SetSaveLocation, ToggleCopyOnSave, SetVideoEncoder, SetVideoContainer,
 //!          SetVideoFramerate
 
-use crate::config::{Container, SaveLocationChoice, SnapPeaConfig, ToolbarPosition, VideoSaveLocationChoice};
+use std::io::Write;
+
+use crate::config::{
+    Container, SaveLocationChoice, SnapPeaConfig, ToolbarPosition, VideoSaveLocationChoice,
+};
 use crate::screenshot::Args;
 use crate::screenshot::handlers::HandlerResult;
 
@@ -80,7 +84,10 @@ pub fn handle_set_custom_save_path(args: &mut Args, path: String) -> HandlerResu
 // to support hiding/restoring the overlay when the file dialog opens.
 
 /// Handle SetVideoSaveLocation message
-pub fn handle_set_video_save_location(args: &mut Args, loc: VideoSaveLocationChoice) -> HandlerResult {
+pub fn handle_set_video_save_location(
+    args: &mut Args,
+    loc: VideoSaveLocationChoice,
+) -> HandlerResult {
     args.ui.video_save_location_setting = loc;
     let mut config = SnapPeaConfig::load();
     config.video_save_location = loc;
@@ -179,5 +186,71 @@ pub fn handle_set_video_framerate(args: &mut Args, framerate: u32) -> HandlerRes
     let mut config = SnapPeaConfig::load();
     config.video_framerate = framerate;
     config.save();
+    cosmic::Task::none()
+}
+
+/// Handle SetAsDefaultPortal toggle message
+///
+/// - When enabling: writes `~/.config/xdg-desktop-portal/cosmic-portals.conf`
+///   so snappea is the preferred Screenshot portal backend for the current user.
+/// - When disabling: removes the `org.freedesktop.impl.portal.Screenshot` line
+///   (or deletes the file if snappea wrote its entire content).
+/// Restarts the user's xdg-desktop-portal service to apply the change.
+pub fn handle_set_as_default_portal(args: &mut Args) -> HandlerResult {
+    let enabling = !args.ui.is_default_portal;
+
+    let result = (|| -> Result<(), Box<dyn std::error::Error>> {
+        let config_dir = dirs::config_dir()
+            .ok_or("could not determine config directory")?
+            .join("xdg-desktop-portal");
+        std::fs::create_dir_all(&config_dir)?;
+        let conf_path = config_dir.join("cosmic-portals.conf");
+
+        if enabling {
+            let mut file = std::fs::File::create(&conf_path)?;
+            file.write_all(
+                b"[preferred]\ndefault=cosmic;gtk;\norg.freedesktop.impl.portal.Screenshot=snappea\n",
+            )?;
+            log::info!("snappea: portal config written to {}", conf_path.display());
+        } else {
+            // Remove only the Screenshot line; if the file becomes empty / header-only, delete it
+            if conf_path.exists() {
+                let contents = std::fs::read_to_string(&conf_path)?;
+                let filtered: String = contents
+                    .lines()
+                    .filter(|l| l.trim() != "org.freedesktop.impl.portal.Screenshot=snappea")
+                    .map(|l| format!("{}\n", l))
+                    .collect();
+                // If nothing meaningful remains beyond a bare [preferred] header, delete the file
+                let meaningful = filtered
+                    .lines()
+                    .any(|l| !l.trim().is_empty() && !l.trim().starts_with('['));
+                if meaningful {
+                    std::fs::write(&conf_path, filtered)?;
+                } else {
+                    std::fs::remove_file(&conf_path)?;
+                }
+            }
+            log::info!("snappea: removed default portal entry");
+        }
+
+        // Restart xdg-desktop-portal so the change takes effect immediately
+        let status = std::process::Command::new("systemctl")
+            .args(["--user", "restart", "xdg-desktop-portal"])
+            .status();
+        match status {
+            Ok(s) if s.success() => log::info!("snappea: xdg-desktop-portal restarted"),
+            Ok(s) => log::warn!("snappea: xdg-desktop-portal restart exited with {}", s),
+            Err(e) => log::warn!("snappea: could not restart xdg-desktop-portal: {}", e),
+        }
+
+        Ok(())
+    })();
+
+    match result {
+        Ok(()) => args.ui.is_default_portal = enabling,
+        Err(e) => log::error!("snappea: failed to toggle default portal: {}", e),
+    }
+
     cosmic::Task::none()
 }

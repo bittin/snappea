@@ -412,6 +412,7 @@ impl Screenshot {
                         toolbar_bounds: None,
                         hide_toolbar_to_tray: config.hide_toolbar_to_tray,
                         move_offset: None,
+                        is_default_portal: is_snappea_default_portal(),
                     }
                 },
             }))
@@ -911,6 +912,9 @@ fn handle_settings_msg(app: &mut App, msg: SettingsMsg) -> cosmic::Task<crate::c
             SettingsMsg::SetMoveOffset(offset) => {
                 args.ui.move_offset = offset;
                 cosmic::Task::none()
+            }
+            SettingsMsg::SetAsDefaultPortal => {
+                settings_handlers::handle_set_as_default_portal(args)
             }
         }
     })
@@ -1461,14 +1465,15 @@ fn handle_ocr_msg(app: &mut App, msg: OcrMsg) -> cosmic::Task<crate::core::app::
 // ============================================================================
 
 fn handle_capture_inner(app: &mut App) -> cosmic::Task<crate::core::app::Msg> {
-    let mut cmds: Vec<cosmic::Task<crate::core::app::Msg>> = app
+    let destroy_cmds: Vec<cosmic::Task<crate::core::app::Msg>> = app
         .outputs
         .iter()
         .map(|o| destroy_layer_surface(o.id))
         .collect();
+    let mut cmds: Vec<cosmic::Task<crate::core::app::Msg>> = Vec::new();
     let Some(args) = app.screenshot_args.take() else {
         log::error!("Failed to find screenshot Args for Capture message.");
-        return cosmic::Task::batch(cmds);
+        return cosmic::Task::batch(destroy_cmds);
     };
     let outputs = app.outputs.clone();
     let Args {
@@ -1759,6 +1764,13 @@ fn handle_capture_inner(app: &mut App) -> cosmic::Task<crate::core::app::Msg> {
             log::error!("Failed to send screenshot event");
         }
     });
+    // Clipboard writes must be sequenced BEFORE surface destroys.
+    // Wayland's wl_data_device.set_selection requires the client to hold keyboard
+    // focus at call time. The overlay surfaces have KeyboardInteractivity::Exclusive,
+    // so we must write to clipboard before destroying them (which releases focus).
+    // Since Task::batch sends all tasks concurrently, we put clipboard tasks first
+    // in the vec so they are dispatched before destroy messages on the same connection.
+    cmds.extend(destroy_cmds);
     cosmic::Task::batch(cmds)
 }
 
@@ -2228,6 +2240,26 @@ fn handle_qr_copy_and_close_inner(app: &mut App) -> cosmic::Task<crate::core::ap
     cosmic::Task::batch(cmds)
 }
 
+/// Check whether snappea is currently the default screenshot portal for the current user.
+///
+/// Reads `~/.config/xdg-desktop-portal/cosmic-portals.conf` and looks for
+/// `org.freedesktop.impl.portal.Screenshot=snappea`.
+pub fn is_snappea_default_portal() -> bool {
+    let Some(config_dir) = dirs::config_dir() else {
+        return false;
+    };
+    let conf_path = config_dir
+        .join("xdg-desktop-portal")
+        .join("cosmic-portals.conf");
+    std::fs::read_to_string(&conf_path)
+        .map(|contents| {
+            contents
+                .lines()
+                .any(|l| l.trim() == "org.freedesktop.impl.portal.Screenshot=snappea")
+        })
+        .unwrap_or(false)
+}
+
 fn handle_open_url_inner(app: &mut App, url: String) -> cosmic::Task<crate::core::app::Msg> {
     // Open URL using xdg-open and close the screenshot tool
     log::info!("Opening URL: {}", url);
@@ -2253,8 +2285,8 @@ fn handle_open_url_inner(app: &mut App, url: String) -> cosmic::Task<crate::core
 
 pub fn update_args(app: &mut App, args: Args) -> cosmic::Task<crate::core::app::Msg> {
     if app.outputs.len() != args.capture.output_images.len() {
-        log::error!(
-            "Screenshot output count mismatch: {} != {}",
+        log::warn!(
+            "Screenshot output count mismatch: {} outputs vs {} images — proceeding anyway (monitor reconnect?)",
             app.outputs.len(),
             args.capture.output_images.len()
         );
@@ -2263,7 +2295,6 @@ pub fn update_args(app: &mut App, args: Args) -> cosmic::Task<crate::core::app::
             "Screenshot images: {:?}",
             args.capture.output_images.keys().collect::<Vec<_>>()
         );
-        return cosmic::Task::none();
     }
 
     app.location_options = vec![
@@ -2313,6 +2344,18 @@ pub fn update_args(app: &mut App, args: Args) -> cosmic::Task<crate::core::app::
         for output in &mut app.outputs {
             output.id = window::Id::unique();
         }
+
+        // If outputs haven't arrived from the Wayland compositor yet, defer window
+        // creation.  The OutputEvent::Created handler will create the surface once
+        // the first output is advertised.
+        if app.outputs.is_empty() {
+            log::info!(
+                "Outputs not yet known — deferring window creation until OutputEvent::Created"
+            );
+            app.screenshot_windows_pending = true;
+            return indicator_cleanup;
+        }
+        app.screenshot_windows_pending = false;
 
         let cmds: Vec<_> = app
             .outputs

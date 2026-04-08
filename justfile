@@ -25,6 +25,7 @@ portal-dst := base-dir / 'share' / 'xdg-desktop-portal' / 'portals' / 'snappea.p
 service-src := 'data' / 'io.github.hojjatabdollahi.snappea.service'
 service-dst := base-dir / 'share' / 'dbus-1' / 'services' / 'io.github.hojjatabdollahi.snappea.service'
 
+
 icons-src := 'data' / 'icons'
 icons-dst := base-dir / 'share' / 'icons'
 
@@ -50,6 +51,12 @@ clean:
 run *args:
     cargo run {{args}}
 
+# Build a .deb package (works correctly in git worktrees)
+deb *args:
+    cargo build --release --locked {{args}}
+    SOURCE_DATE_EPOCH=$(git log -1 --format=%ct) cargo deb --no-build
+
+
 # Install files
 install:
     install -Dm0755 {{bin-src}} {{bin-dst}}
@@ -68,9 +75,17 @@ install:
 # Install portal config to use SnapPea as the default screenshot tool
 install-portal:
     mkdir -p ~/.config/xdg-desktop-portal
-    echo '[preferred]' > ~/.config/xdg-desktop-portal/portals.conf
-    echo 'org.freedesktop.impl.portal.Screenshot=snappea' >> ~/.config/xdg-desktop-portal/portals.conf
-    @echo "Portal config installed to ~/.config/xdg-desktop-portal/portals.conf"
+    @OLD_CONTENT="$(printf '[preferred]\norg.freedesktop.impl.portal.Screenshot=snappea\n')"; \
+    PORTALS_CONF=~/.config/xdg-desktop-portal/portals.conf; \
+    if [ -f "$$PORTALS_CONF" ]; then \
+        CURRENT="$$(cat "$$PORTALS_CONF")"; \
+        if [ "$$CURRENT" = "$$OLD_CONTENT" ]; then \
+            rm -f "$$PORTALS_CONF"; \
+            echo "Removed old portals.conf (migrating to cosmic-portals.conf)"; \
+        fi; \
+    fi
+    @printf '[preferred]\ndefault=cosmic;gtk;\norg.freedesktop.impl.portal.Screenshot=snappea\n' > ~/.config/xdg-desktop-portal/cosmic-portals.conf
+    @echo "Portal config installed to ~/.config/xdg-desktop-portal/cosmic-portals.conf"
     @echo "Run 'systemctl --user restart xdg-desktop-portal' to apply changes"
 
 # Uninstall files
@@ -87,8 +102,27 @@ uninstall:
     rm -f {{icons-dst}}/hicolor/scalable/actions/square-symbolic.svg
     rm -f {{icons-dst}}/hicolor/scalable/actions/redact-symbolic.svg
     rm -f {{icons-dst}}/hicolor/scalable/actions/pixelate-symbolic.svg
-    @if [ -f ~/.config/xdg-desktop-portal/portals.conf ] && grep -q "snappea" ~/.config/xdg-desktop-portal/portals.conf 2>/dev/null; then \
-        echo ""; \
-        echo "Note: Portal config file exists at ~/.config/xdg-desktop-portal/portals.conf"; \
-        echo "You may want to remove the snappea entry or delete the file if no longer needed."; \
+    @OLD_CONTENT="$(printf '[preferred]\norg.freedesktop.impl.portal.Screenshot=snappea\n')"; \
+    PORTALS_CONF=~/.config/xdg-desktop-portal/portals.conf; \
+    if [ -f "$$PORTALS_CONF" ]; then \
+        CURRENT="$$(cat "$$PORTALS_CONF")"; \
+        if [ "$$CURRENT" = "$$OLD_CONTENT" ]; then \
+            rm -f "$$PORTALS_CONF"; \
+            echo "Removed old portals.conf"; \
+        else \
+            echo ""; \
+            echo "Note: $$PORTALS_CONF exists with custom content — not removing."; \
+        fi; \
+    fi
+    @NEW_CONTENT="$(printf '[preferred]\ndefault=cosmic;gtk;\norg.freedesktop.impl.portal.Screenshot=snappea\n')"; \
+    COSMIC_CONF=~/.config/xdg-desktop-portal/cosmic-portals.conf; \
+    if [ -f "$$COSMIC_CONF" ]; then \
+        CURRENT="$$(cat "$$COSMIC_CONF")"; \
+        if [ "$$CURRENT" = "$$NEW_CONTENT" ]; then \
+            rm -f "$$COSMIC_CONF"; \
+            echo "Removed cosmic-portals.conf"; \
+        else \
+            echo ""; \
+            echo "Note: $$COSMIC_CONF exists with custom content — not removing."; \
+        fi; \
     fi

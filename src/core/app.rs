@@ -18,6 +18,12 @@ use crossbeam_channel::{Receiver as CbReceiver, Sender as CbSender};
 use futures::SinkExt;
 use std::any::TypeId;
 use std::time::Instant;
+use cosmic::cctk::sctk::shell::wlr_layer;
+use cosmic::iced_core::layout::Limits;
+use cosmic::iced_runtime::platform_specific::wayland::layer_surface::{
+    IcedMargin, IcedOutput, SctkLayerSurfaceSettings,
+};
+use cosmic::iced_winit::commands::layer_surface::get_layer_surface;
 use wayland_client::protocol::wl_output::WlOutput;
 
 /// Flags for app initialization
@@ -69,6 +75,11 @@ pub struct App {
     pub toolbar_visible: bool,
     /// Whether running in direct screenshot mode (no D-Bus portal)
     pub direct_screenshot: bool,
+    /// True when screenshot args arrived before any Wayland outputs were known.
+    /// The OutputEvent::Created handler will create the layer surface on first output.
+    pub screenshot_windows_pending: bool,
+    /// Dummy layer surface held so the app retains a Wayland surface for clipboard ownership
+    pub dummy_id: window::Id,
 }
 
 /// A single annotation stroke with fade state
@@ -173,6 +184,12 @@ pub enum Msg {
     TrayAction(TrayAction),
     /// D-Bus control command received
     Control(ControlCommand),
+    /// A layer surface was closed by the compositor (e.g. output disconnected)
+    LayerClosed(window::Id),
+    /// Failsafe: fired ~500 ms after screenshot args arrive if windows still haven't been
+    /// created (e.g. OutputEvent::Created never came because the compositor already
+    /// advertised outputs before our subscription was active).
+    RetryPendingWindows,
 }
 
 impl cosmic::Application for App {
@@ -200,6 +217,7 @@ impl cosmic::Application for App {
         let wayland_helper = crate::wayland::WaylandHelper::new(wayland_conn);
         // Create channel for tray communication
         let (tray_tx, tray_rx) = crossbeam_channel::unbounded::<TrayAction>();
+        let dummy_id = window::Id::unique();
 
         (
             Self {
@@ -217,8 +235,22 @@ impl cosmic::Application for App {
                 tray_tx: Some(tray_tx),
                 toolbar_visible: true,
                 direct_screenshot: flags.direct_screenshot,
+                screenshot_windows_pending: false,
+                dummy_id,
             },
-            cosmic::iced::Task::none(),
+            get_layer_surface(SctkLayerSurfaceSettings {
+                id: dummy_id,
+                layer: wlr_layer::Layer::Bottom,
+                keyboard_interactivity: wlr_layer::KeyboardInteractivity::OnDemand,
+                input_zone: Some(Vec::new()),
+                anchor: wlr_layer::Anchor::empty(),
+                output: IcedOutput::All,
+                namespace: "snappea_dummy".into(),
+                size: Some((Some(6), Some(6))),
+                exclusive_zone: -1,
+                size_limits: Limits::NONE,
+                ..Default::default()
+            }),
         )
     }
 
@@ -229,6 +261,11 @@ impl cosmic::Application for App {
     fn view_window(&self, id: window::Id) -> cosmic::Element<'_, Self::Message> {
         if self.outputs.iter().any(|o| o.id == id) {
             screenshot::view(self, id).map(Msg::Screenshot)
+        } else if id == self.dummy_id {
+            cosmic::iced::widget::Space::new()
+                .width(cosmic::iced_core::Length::Fill)
+                .height(cosmic::iced_core::Length::Fill)
+                .into()
         } else if let Some(indicator) = &self.recording_indicator {
             if indicator.window_id == id {
                 // Render the blinking recording indicator
@@ -409,16 +446,8 @@ impl cosmic::Application for App {
                     let wl_output = indicator.output.clone();
                     let annotation_mode = indicator.annotation_mode;
 
-                    use cosmic::iced_core::layout::Limits;
-                    use cosmic::iced_runtime::platform_specific::wayland::layer_surface::{
-                        IcedOutput, SctkLayerSurfaceSettings,
-                    };
-                    use cosmic::iced_winit::commands::layer_surface::{
-                        destroy_layer_surface, get_layer_surface,
-                    };
-                    use cosmic_client_toolkit::sctk::shell::wlr_layer::{
-                        Anchor, KeyboardInteractivity, Layer,
-                    };
+                    use cosmic::iced_winit::commands::layer_surface::destroy_layer_surface;
+                    use wlr_layer::{Anchor, KeyboardInteractivity, Layer};
 
                     let input_zone = if annotation_mode {
                         // Annotation mode: capture region for drawing + toolbar for controls
@@ -541,16 +570,8 @@ impl cosmic::Application for App {
                     let annotation_mode = indicator.annotation_mode;
                     let region = indicator.region;
 
-                    use cosmic::iced_core::layout::Limits;
-                    use cosmic::iced_runtime::platform_specific::wayland::layer_surface::{
-                        IcedOutput, SctkLayerSurfaceSettings,
-                    };
-                    use cosmic::iced_winit::commands::layer_surface::{
-                        destroy_layer_surface, get_layer_surface,
-                    };
-                    use cosmic_client_toolkit::sctk::shell::wlr_layer::{
-                        Anchor, KeyboardInteractivity, Layer,
-                    };
+                    use cosmic::iced_winit::commands::layer_surface::destroy_layer_surface;
+                    use wlr_layer::{Anchor, KeyboardInteractivity, Layer};
 
                     // Build input zones based on annotation mode
                     let input_zone = if annotation_mode {
@@ -669,6 +690,72 @@ impl cosmic::Application for App {
                 }
                 cosmic::iced::Task::none()
             }
+            Msg::LayerClosed(id) if id == self.dummy_id => {
+                log::warn!("Dummy layer surface was closed by compositor (output removed?), re-creating it");
+                self.dummy_id = window::Id::unique();
+                get_layer_surface(SctkLayerSurfaceSettings {
+                    id: self.dummy_id,
+                    layer: wlr_layer::Layer::Bottom,
+                    keyboard_interactivity: wlr_layer::KeyboardInteractivity::OnDemand,
+                    input_zone: Some(Vec::new()),
+                    anchor: wlr_layer::Anchor::empty(),
+                    output: IcedOutput::All,
+                    namespace: "snappea_dummy".into(),
+                    size: Some((Some(6), Some(6))),
+                    exclusive_zone: -1,
+                    size_limits: Limits::NONE,
+                    ..Default::default()
+                })
+            }
+            Msg::LayerClosed(_) => cosmic::iced::Task::none(),
+            Msg::RetryPendingWindows => {
+                // Failsafe: if the flag is still set here it means OutputEvent::Created
+                // never fired after update_args deferred.  This happens when the
+                // compositor already advertised outputs *before* our subscription was
+                // active.  At this point app.outputs should be populated (the compositor
+                // re-sends output info on connect), so we can create windows directly.
+                if self.screenshot_windows_pending && !self.outputs.is_empty() {
+                    log::warn!(
+                        "Failsafe: creating screenshot windows after deferred creation \
+                         timed out ({} outputs available)",
+                        self.outputs.len()
+                    );
+                    self.screenshot_windows_pending = false;
+                    for output in &mut self.outputs {
+                        output.id = window::Id::unique();
+                    }
+                    let cmds: Vec<_> = self
+                        .outputs
+                        .iter()
+                        .map(|crate::core::app::OutputState { output, id, .. }| {
+                            get_layer_surface(SctkLayerSurfaceSettings {
+                                id: *id,
+                                layer: wlr_layer::Layer::Overlay,
+                                keyboard_interactivity: wlr_layer::KeyboardInteractivity::Exclusive,
+                                input_zone: None,
+                                anchor: wlr_layer::Anchor::all(),
+                                output: IcedOutput::Output(output.clone()),
+                                namespace: "snappea".to_string(),
+                                size: Some((None, None)),
+                                exclusive_zone: -1,
+                                size_limits: Limits::NONE.min_height(1.0).min_width(1.0),
+                                ..Default::default()
+                            })
+                        })
+                        .collect();
+                    return cosmic::Task::batch(cmds);
+                } else if self.screenshot_windows_pending {
+                    // Still no outputs — compositor may be slow.  Log and give up
+                    // gracefully rather than hanging forever.
+                    log::error!(
+                        "Failsafe: screenshot_windows_pending is true but outputs list \
+                         is still empty after 500 ms — cannot create overlay windows. \
+                         The compositor did not advertise any outputs."
+                    );
+                    self.screenshot_windows_pending = false;
+                }
+                cosmic::iced::Task::none()
+            }
             Msg::Output(o_event, wl_output) => {
                 match o_event {
                     OutputEvent::Created(Some(info))
@@ -687,7 +774,34 @@ impl cosmic::Application for App {
                             logical_pos: info.logical_position.unwrap(),
                             scale_factor: info.scale_factor,
                             has_pointer: false,
-                        })
+                        });
+
+                        // If screenshot args arrived before outputs were ready, create
+                        // the overlay window now that we have our first output.
+                        if self.screenshot_windows_pending {
+                            if let Some(output_state) = self.outputs.last_mut() {
+                                output_state.id = window::Id::unique();
+                                let surface_cmd = get_layer_surface(SctkLayerSurfaceSettings {
+                                    id: output_state.id,
+                                    layer: wlr_layer::Layer::Overlay,
+                                    keyboard_interactivity: wlr_layer::KeyboardInteractivity::Exclusive,
+                                    input_zone: None,
+                                    anchor: wlr_layer::Anchor::all(),
+                                    output: IcedOutput::Output(output_state.output.clone()),
+                                    namespace: "snappea".to_string(),
+                                    size: Some((None, None)),
+                                    exclusive_zone: -1,
+                                    size_limits: Limits::NONE.min_height(1.0).min_width(1.0),
+                                    ..Default::default()
+                                });
+                                log::info!(
+                                    "Deferred screenshot window creation triggered for output {:?}",
+                                    output_state.name
+                                );
+                                self.screenshot_windows_pending = false;
+                                return surface_cmd;
+                            }
+                        }
                     }
                     OutputEvent::Removed => self.outputs.retain(|o| o.output != wl_output),
                     OutputEvent::InfoUpdate(info)
@@ -752,6 +866,15 @@ impl cosmic::Application for App {
                         cosmic::iced_core::event::wayland::Event::Output(o_event, wl_output),
                     ),
                 ) => Some(Msg::Output(o_event, wl_output)),
+                cosmic::iced_core::Event::PlatformSpecific(
+                    cosmic::iced_core::event::PlatformSpecific::Wayland(
+                        cosmic::iced_core::event::wayland::Event::Layer(
+                            cosmic::iced_core::event::wayland::LayerEvent::Done,
+                            _surface,
+                            id,
+                        ),
+                    ),
+                ) => Some(Msg::LayerClosed(id)),
                 cosmic::iced_core::Event::Keyboard(keyboard_event) => {
                     Some(Msg::Keyboard(keyboard_event))
                 }
@@ -799,6 +922,17 @@ impl cosmic::Application for App {
                         window_id, instant,
                     ))
                 }),
+            );
+        }
+
+        // Failsafe timer: if screenshot args arrived but no outputs were available,
+        // fire RetryPendingWindows after 500 ms so we don't hang forever if
+        // OutputEvent::Created never comes (e.g. outputs were already advertised
+        // before our Wayland subscription was active).
+        if self.screenshot_windows_pending {
+            subscriptions.push(
+                cosmic::iced::time::every(std::time::Duration::from_millis(500))
+                    .map(|_| Msg::RetryPendingWindows),
             );
         }
 
@@ -1103,6 +1237,7 @@ pub(crate) fn direct_screenshot_subscription(
                     toolbar_bounds: None,
                     hide_toolbar_to_tray: config.hide_toolbar_to_tray,
                     move_offset: None,
+                    is_default_portal: crate::screenshot::is_snappea_default_portal(),
                 },
             };
 
@@ -1873,6 +2008,7 @@ async fn trigger_screenshot(
             toolbar_bounds: None,
             hide_toolbar_to_tray: config.hide_toolbar_to_tray,
             move_offset: None,
+            is_default_portal: crate::screenshot::is_snappea_default_portal(),
         },
     };
 
