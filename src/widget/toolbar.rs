@@ -2,13 +2,13 @@
 
 use std::rc::Rc;
 
+use cosmic::Element;
 use cosmic::iced::Animation;
 use cosmic::iced::Length;
-use cosmic::iced_core::{layout, widget::Tree, Background, Border, Color, Layout, Size};
-use cosmic::iced_renderer::geometry::Renderer as GeometryRenderer;
-use cosmic::iced_widget::{canvas, column, container, row};
+use cosmic::iced::advanced::graphics::geometry::Renderer as GeometryRenderer;
+use cosmic::iced::core::{Background, Border, Color, Layout, Size, layout, widget::Tree};
+use cosmic::iced::widget::{canvas, column, container, row};
 use cosmic::widget::{button, icon, text, tooltip};
-use cosmic::Element;
 
 /// Returns full opacity while hovered and the configured base opacity otherwise.
 pub fn get_toolbar_opacity(
@@ -25,12 +25,12 @@ fn icon_with_opacity(
     icon_name: &str,
     size: u16,
     opacity: f32,
-) -> cosmic::iced_widget::svg::Svg<'_, cosmic::Theme> {
+) -> cosmic::iced::widget::svg::Svg<'_, cosmic::Theme> {
     let icon_handle = icon::Icon::from(icon::from_name(icon_name).size(size))
         .into_svg_handle()
         .expect("Icon should be SVG");
 
-    cosmic::iced_widget::svg::Svg::new(icon_handle)
+    cosmic::iced::widget::svg::Svg::new(icon_handle)
         .opacity(opacity)
         .symbolic(true)
 }
@@ -41,16 +41,16 @@ fn icon_with_opacity_and_color(
     size: u16,
     opacity: f32,
     color: Color,
-) -> cosmic::iced_widget::svg::Svg<'static, cosmic::Theme> {
+) -> cosmic::iced::widget::svg::Svg<'static, cosmic::Theme> {
     let icon_handle = icon::Icon::from(icon::from_name(icon_name).size(size))
         .into_svg_handle()
         .expect("Icon should be SVG");
 
-    cosmic::iced_widget::svg::Svg::new(icon_handle)
+    cosmic::iced::widget::svg::Svg::new(icon_handle)
         .opacity(opacity)
         .symbolic(true)
         .class(cosmic::theme::Svg::Custom(Rc::new(move |_theme| {
-            cosmic::iced_widget::svg::Style { color: Some(color) }
+            cosmic::iced::widget::svg::Style { color: Some(color) }
         })))
 }
 
@@ -60,13 +60,13 @@ fn suggested_button_class_with_opacity(opacity: f32) -> cosmic::theme::Button {
         active: Box::new(move |_focused, theme| {
             let cosmic_theme = theme.cosmic();
             cosmic::widget::button::Style {
-                background: Some(cosmic::iced_core::Background::Color({
-                    let mut color: cosmic::iced_core::Color = cosmic_theme.accent.base.into();
+                background: Some(cosmic::iced::core::Background::Color({
+                    let mut color: cosmic::iced::core::Color = cosmic_theme.accent.base.into();
                     color.a *= opacity;
                     color
                 })),
                 text_color: Some({
-                    let mut color: cosmic::iced_core::Color = cosmic_theme.accent.on.into();
+                    let mut color: cosmic::iced::core::Color = cosmic_theme.accent.on.into();
                     color.a *= opacity;
                     color
                 }),
@@ -77,13 +77,13 @@ fn suggested_button_class_with_opacity(opacity: f32) -> cosmic::theme::Button {
         disabled: Box::new(move |theme| {
             let cosmic_theme = theme.cosmic();
             cosmic::widget::button::Style {
-                background: Some(cosmic::iced_core::Background::Color({
-                    let mut color: cosmic::iced_core::Color = cosmic_theme.accent.base.into();
+                background: Some(cosmic::iced::core::Background::Color({
+                    let mut color: cosmic::iced::core::Color = cosmic_theme.accent.base.into();
                     color.a *= opacity * 0.5;
                     color
                 })),
                 text_color: Some({
-                    let mut color: cosmic::iced_core::Color = cosmic_theme.accent.on.into();
+                    let mut color: cosmic::iced::core::Color = cosmic_theme.accent.on.into();
                     color.a *= opacity * 0.5;
                     color
                 }),
@@ -94,13 +94,13 @@ fn suggested_button_class_with_opacity(opacity: f32) -> cosmic::theme::Button {
         hovered: Box::new(move |_focused, theme| {
             let cosmic_theme = theme.cosmic();
             cosmic::widget::button::Style {
-                background: Some(cosmic::iced_core::Background::Color({
-                    let mut color: cosmic::iced_core::Color = cosmic_theme.accent.base.into();
+                background: Some(cosmic::iced::core::Background::Color({
+                    let mut color: cosmic::iced::core::Color = cosmic_theme.accent.base.into();
                     color.a *= opacity;
                     color
                 })),
                 text_color: Some({
-                    let mut color: cosmic::iced_core::Color = cosmic_theme.accent.on.into();
+                    let mut color: cosmic::iced::core::Color = cosmic_theme.accent.on.into();
                     color.a *= opacity;
                     color
                 }),
@@ -111,13 +111,13 @@ fn suggested_button_class_with_opacity(opacity: f32) -> cosmic::theme::Button {
         pressed: Box::new(move |_focused, theme| {
             let cosmic_theme = theme.cosmic();
             cosmic::widget::button::Style {
-                background: Some(cosmic::iced_core::Background::Color({
-                    let mut color: cosmic::iced_core::Color = cosmic_theme.accent.base.into();
+                background: Some(cosmic::iced::core::Background::Color({
+                    let mut color: cosmic::iced::core::Color = cosmic_theme.accent.base.into();
                     color.a *= opacity;
                     color
                 })),
                 text_color: Some({
-                    let mut color: cosmic::iced_core::Color = cosmic_theme.accent.on.into();
+                    let mut color: cosmic::iced::core::Color = cosmic_theme.accent.on.into();
                     color.a *= opacity;
                     color
                 }),
@@ -129,7 +129,8 @@ fn suggested_button_class_with_opacity(opacity: f32) -> cosmic::theme::Button {
 }
 
 use super::icon_toggle::icon_toggle;
-use super::tool_button::{build_shape_button, build_tool_button};
+use super::lucide::{self, AppIcon};
+use super::tool_button::{build_shape_button, build_tool_button, build_tool_button_with_icon};
 use super::toolbar_position_selector::ToolbarPositionSelector;
 use crate::capture::qr::DetectedQrCode;
 use crate::config::{RedactTool, ShapeTool, ToolbarPosition};
@@ -180,9 +181,9 @@ struct HoverState {
 }
 
 fn rounded_rect_contains(
-    rect: cosmic::iced_core::Rectangle,
+    rect: cosmic::iced::core::Rectangle,
     radii: [f32; 4],
-    point: cosmic::iced_core::Point,
+    point: cosmic::iced::core::Point,
 ) -> bool {
     let right = rect.x + rect.width;
     let bottom = rect.y + rect.height;
@@ -235,10 +236,10 @@ fn rounded_rect_contains(
 
 fn hat_contains(
     placement: HatPlacement,
-    header_bounds: cosmic::iced_core::Rectangle,
-    body_bounds: cosmic::iced_core::Rectangle,
+    header_bounds: cosmic::iced::core::Rectangle,
+    body_bounds: cosmic::iced::core::Rectangle,
     radius: f32,
-    point: cosmic::iced_core::Point,
+    point: cosmic::iced::core::Point,
 ) -> bool {
     let body_radius: [f32; 4] = match placement {
         HatPlacement::HeaderTop => [0.0, 0.0, radius, radius],
@@ -266,26 +267,26 @@ fn hat_contains(
 
     let centers = match placement {
         HatPlacement::HeaderTop => [
-            cosmic::iced_core::Point::new(header_bounds.x, header_bounds.y + header_bounds.height),
-            cosmic::iced_core::Point::new(
+            cosmic::iced::core::Point::new(header_bounds.x, header_bounds.y + header_bounds.height),
+            cosmic::iced::core::Point::new(
                 header_bounds.x + header_bounds.width,
                 header_bounds.y + header_bounds.height,
             ),
         ],
         HatPlacement::HeaderBottom => [
-            cosmic::iced_core::Point::new(header_bounds.x, header_bounds.y),
-            cosmic::iced_core::Point::new(header_bounds.x + header_bounds.width, header_bounds.y),
+            cosmic::iced::core::Point::new(header_bounds.x, header_bounds.y),
+            cosmic::iced::core::Point::new(header_bounds.x + header_bounds.width, header_bounds.y),
         ],
         HatPlacement::HeaderLeft => [
-            cosmic::iced_core::Point::new(header_bounds.x + header_bounds.width, header_bounds.y),
-            cosmic::iced_core::Point::new(
+            cosmic::iced::core::Point::new(header_bounds.x + header_bounds.width, header_bounds.y),
+            cosmic::iced::core::Point::new(
                 header_bounds.x + header_bounds.width,
                 header_bounds.y + header_bounds.height,
             ),
         ],
         HatPlacement::HeaderRight => [
-            cosmic::iced_core::Point::new(header_bounds.x, header_bounds.y),
-            cosmic::iced_core::Point::new(header_bounds.x, header_bounds.y + header_bounds.height),
+            cosmic::iced::core::Point::new(header_bounds.x, header_bounds.y),
+            cosmic::iced::core::Point::new(header_bounds.x, header_bounds.y + header_bounds.height),
         ],
     };
 
@@ -298,8 +299,8 @@ fn hat_contains(
 
 fn build_hat_path(
     placement: HatPlacement,
-    header_bounds: cosmic::iced_core::Rectangle,
-    body_bounds: cosmic::iced_core::Rectangle,
+    header_bounds: cosmic::iced::core::Rectangle,
+    body_bounds: cosmic::iced::core::Rectangle,
     radius: f32,
 ) -> canvas::Path {
     let r = radius
@@ -320,209 +321,209 @@ fn build_hat_path(
 
     canvas::Path::new(|builder| match placement {
         HatPlacement::HeaderTop => {
-            builder.move_to(cosmic::iced_core::Point::new(h_left + r, h_top));
-            builder.line_to(cosmic::iced_core::Point::new(h_right - r, h_top));
+            builder.move_to(cosmic::iced::core::Point::new(h_left + r, h_top));
+            builder.line_to(cosmic::iced::core::Point::new(h_right - r, h_top));
             builder.arc_to(
-                cosmic::iced_core::Point::new(h_right, h_top),
-                cosmic::iced_core::Point::new(h_right, h_top + r),
+                cosmic::iced::core::Point::new(h_right, h_top),
+                cosmic::iced::core::Point::new(h_right, h_top + r),
                 r,
             );
-            builder.line_to(cosmic::iced_core::Point::new(h_right, h_bottom - r));
+            builder.line_to(cosmic::iced::core::Point::new(h_right, h_bottom - r));
             builder.arc_to(
-                cosmic::iced_core::Point::new(h_right, b_top),
-                cosmic::iced_core::Point::new(h_right + r, b_top),
+                cosmic::iced::core::Point::new(h_right, b_top),
+                cosmic::iced::core::Point::new(h_right + r, b_top),
                 r,
             );
-            builder.line_to(cosmic::iced_core::Point::new(b_right - r, b_top));
+            builder.line_to(cosmic::iced::core::Point::new(b_right - r, b_top));
             builder.arc_to(
-                cosmic::iced_core::Point::new(b_right, b_top),
-                cosmic::iced_core::Point::new(b_right, b_top + r),
+                cosmic::iced::core::Point::new(b_right, b_top),
+                cosmic::iced::core::Point::new(b_right, b_top + r),
                 r,
             );
-            builder.line_to(cosmic::iced_core::Point::new(b_right, b_bottom - r));
+            builder.line_to(cosmic::iced::core::Point::new(b_right, b_bottom - r));
             builder.arc_to(
-                cosmic::iced_core::Point::new(b_right, b_bottom),
-                cosmic::iced_core::Point::new(b_right - r, b_bottom),
+                cosmic::iced::core::Point::new(b_right, b_bottom),
+                cosmic::iced::core::Point::new(b_right - r, b_bottom),
                 r,
             );
-            builder.line_to(cosmic::iced_core::Point::new(b_left + r, b_bottom));
+            builder.line_to(cosmic::iced::core::Point::new(b_left + r, b_bottom));
             builder.arc_to(
-                cosmic::iced_core::Point::new(b_left, b_bottom),
-                cosmic::iced_core::Point::new(b_left, b_bottom - r),
+                cosmic::iced::core::Point::new(b_left, b_bottom),
+                cosmic::iced::core::Point::new(b_left, b_bottom - r),
                 r,
             );
-            builder.line_to(cosmic::iced_core::Point::new(b_left, b_top + r));
+            builder.line_to(cosmic::iced::core::Point::new(b_left, b_top + r));
             builder.arc_to(
-                cosmic::iced_core::Point::new(b_left, b_top),
-                cosmic::iced_core::Point::new(b_left + r, b_top),
+                cosmic::iced::core::Point::new(b_left, b_top),
+                cosmic::iced::core::Point::new(b_left + r, b_top),
                 r,
             );
-            builder.line_to(cosmic::iced_core::Point::new(h_left - r, b_top));
+            builder.line_to(cosmic::iced::core::Point::new(h_left - r, b_top));
             builder.arc_to(
-                cosmic::iced_core::Point::new(h_left, b_top),
-                cosmic::iced_core::Point::new(h_left, b_top - r),
+                cosmic::iced::core::Point::new(h_left, b_top),
+                cosmic::iced::core::Point::new(h_left, b_top - r),
                 r,
             );
-            builder.line_to(cosmic::iced_core::Point::new(h_left, h_top + r));
+            builder.line_to(cosmic::iced::core::Point::new(h_left, h_top + r));
             builder.arc_to(
-                cosmic::iced_core::Point::new(h_left, h_top),
-                cosmic::iced_core::Point::new(h_left + r, h_top),
+                cosmic::iced::core::Point::new(h_left, h_top),
+                cosmic::iced::core::Point::new(h_left + r, h_top),
                 r,
             );
             builder.close();
         }
         HatPlacement::HeaderBottom => {
-            builder.move_to(cosmic::iced_core::Point::new(b_left + r, b_top));
-            builder.line_to(cosmic::iced_core::Point::new(b_right - r, b_top));
+            builder.move_to(cosmic::iced::core::Point::new(b_left + r, b_top));
+            builder.line_to(cosmic::iced::core::Point::new(b_right - r, b_top));
             builder.arc_to(
-                cosmic::iced_core::Point::new(b_right, b_top),
-                cosmic::iced_core::Point::new(b_right, b_top + r),
+                cosmic::iced::core::Point::new(b_right, b_top),
+                cosmic::iced::core::Point::new(b_right, b_top + r),
                 r,
             );
-            builder.line_to(cosmic::iced_core::Point::new(b_right, b_bottom - r));
+            builder.line_to(cosmic::iced::core::Point::new(b_right, b_bottom - r));
             builder.arc_to(
-                cosmic::iced_core::Point::new(b_right, b_bottom),
-                cosmic::iced_core::Point::new(b_right - r, b_bottom),
+                cosmic::iced::core::Point::new(b_right, b_bottom),
+                cosmic::iced::core::Point::new(b_right - r, b_bottom),
                 r,
             );
-            builder.line_to(cosmic::iced_core::Point::new(h_right + r, b_bottom));
+            builder.line_to(cosmic::iced::core::Point::new(h_right + r, b_bottom));
             builder.arc_to(
-                cosmic::iced_core::Point::new(h_right, b_bottom),
-                cosmic::iced_core::Point::new(h_right, b_bottom + r),
+                cosmic::iced::core::Point::new(h_right, b_bottom),
+                cosmic::iced::core::Point::new(h_right, b_bottom + r),
                 r,
             );
-            builder.line_to(cosmic::iced_core::Point::new(h_right, h_bottom - r));
+            builder.line_to(cosmic::iced::core::Point::new(h_right, h_bottom - r));
             builder.arc_to(
-                cosmic::iced_core::Point::new(h_right, h_bottom),
-                cosmic::iced_core::Point::new(h_right - r, h_bottom),
+                cosmic::iced::core::Point::new(h_right, h_bottom),
+                cosmic::iced::core::Point::new(h_right - r, h_bottom),
                 r,
             );
-            builder.line_to(cosmic::iced_core::Point::new(h_left + r, h_bottom));
+            builder.line_to(cosmic::iced::core::Point::new(h_left + r, h_bottom));
             builder.arc_to(
-                cosmic::iced_core::Point::new(h_left, h_bottom),
-                cosmic::iced_core::Point::new(h_left, h_bottom - r),
+                cosmic::iced::core::Point::new(h_left, h_bottom),
+                cosmic::iced::core::Point::new(h_left, h_bottom - r),
                 r,
             );
-            builder.line_to(cosmic::iced_core::Point::new(h_left, h_top + r));
+            builder.line_to(cosmic::iced::core::Point::new(h_left, h_top + r));
             builder.arc_to(
-                cosmic::iced_core::Point::new(h_left, h_top),
-                cosmic::iced_core::Point::new(h_left - r, h_top),
+                cosmic::iced::core::Point::new(h_left, h_top),
+                cosmic::iced::core::Point::new(h_left - r, h_top),
                 r,
             );
-            builder.line_to(cosmic::iced_core::Point::new(b_left + r, h_top));
+            builder.line_to(cosmic::iced::core::Point::new(b_left + r, h_top));
             builder.arc_to(
-                cosmic::iced_core::Point::new(b_left, h_top),
-                cosmic::iced_core::Point::new(b_left, h_top - r),
+                cosmic::iced::core::Point::new(b_left, h_top),
+                cosmic::iced::core::Point::new(b_left, h_top - r),
                 r,
             );
-            builder.line_to(cosmic::iced_core::Point::new(b_left, b_top + r));
+            builder.line_to(cosmic::iced::core::Point::new(b_left, b_top + r));
             builder.arc_to(
-                cosmic::iced_core::Point::new(b_left, b_top),
-                cosmic::iced_core::Point::new(b_left + r, b_top),
+                cosmic::iced::core::Point::new(b_left, b_top),
+                cosmic::iced::core::Point::new(b_left + r, b_top),
                 r,
             );
             builder.close();
         }
         HatPlacement::HeaderLeft => {
-            builder.move_to(cosmic::iced_core::Point::new(b_left + r, b_top));
-            builder.line_to(cosmic::iced_core::Point::new(b_right - r, b_top));
+            builder.move_to(cosmic::iced::core::Point::new(b_left + r, b_top));
+            builder.line_to(cosmic::iced::core::Point::new(b_right - r, b_top));
             builder.arc_to(
-                cosmic::iced_core::Point::new(b_right, b_top),
-                cosmic::iced_core::Point::new(b_right, b_top + r),
+                cosmic::iced::core::Point::new(b_right, b_top),
+                cosmic::iced::core::Point::new(b_right, b_top + r),
                 r,
             );
-            builder.line_to(cosmic::iced_core::Point::new(b_right, b_bottom - r));
+            builder.line_to(cosmic::iced::core::Point::new(b_right, b_bottom - r));
             builder.arc_to(
-                cosmic::iced_core::Point::new(b_right, b_bottom),
-                cosmic::iced_core::Point::new(b_right - r, b_bottom),
+                cosmic::iced::core::Point::new(b_right, b_bottom),
+                cosmic::iced::core::Point::new(b_right - r, b_bottom),
                 r,
             );
-            builder.line_to(cosmic::iced_core::Point::new(b_left + r, b_bottom));
+            builder.line_to(cosmic::iced::core::Point::new(b_left + r, b_bottom));
             builder.arc_to(
-                cosmic::iced_core::Point::new(b_left, b_bottom),
-                cosmic::iced_core::Point::new(b_left, b_bottom - r),
+                cosmic::iced::core::Point::new(b_left, b_bottom),
+                cosmic::iced::core::Point::new(b_left, b_bottom - r),
                 r,
             );
-            builder.line_to(cosmic::iced_core::Point::new(b_left, h_bottom + r));
+            builder.line_to(cosmic::iced::core::Point::new(b_left, h_bottom + r));
             builder.arc_to(
-                cosmic::iced_core::Point::new(b_left, h_bottom),
-                cosmic::iced_core::Point::new(b_left - r, h_bottom),
+                cosmic::iced::core::Point::new(b_left, h_bottom),
+                cosmic::iced::core::Point::new(b_left - r, h_bottom),
                 r,
             );
-            builder.line_to(cosmic::iced_core::Point::new(h_left + r, h_bottom));
+            builder.line_to(cosmic::iced::core::Point::new(h_left + r, h_bottom));
             builder.arc_to(
-                cosmic::iced_core::Point::new(h_left, h_bottom),
-                cosmic::iced_core::Point::new(h_left, h_bottom - r),
+                cosmic::iced::core::Point::new(h_left, h_bottom),
+                cosmic::iced::core::Point::new(h_left, h_bottom - r),
                 r,
             );
-            builder.line_to(cosmic::iced_core::Point::new(h_left, h_top + r));
+            builder.line_to(cosmic::iced::core::Point::new(h_left, h_top + r));
             builder.arc_to(
-                cosmic::iced_core::Point::new(h_left, h_top),
-                cosmic::iced_core::Point::new(h_left + r, h_top),
+                cosmic::iced::core::Point::new(h_left, h_top),
+                cosmic::iced::core::Point::new(h_left + r, h_top),
                 r,
             );
-            builder.line_to(cosmic::iced_core::Point::new(b_left - r, h_top));
+            builder.line_to(cosmic::iced::core::Point::new(b_left - r, h_top));
             builder.arc_to(
-                cosmic::iced_core::Point::new(b_left, h_top),
-                cosmic::iced_core::Point::new(b_left, h_top - r),
+                cosmic::iced::core::Point::new(b_left, h_top),
+                cosmic::iced::core::Point::new(b_left, h_top - r),
                 r,
             );
-            builder.line_to(cosmic::iced_core::Point::new(b_left + r, b_top));
+            builder.line_to(cosmic::iced::core::Point::new(b_left + r, b_top));
             builder.arc_to(
-                cosmic::iced_core::Point::new(b_left, b_top),
-                cosmic::iced_core::Point::new(b_left + r, b_top),
+                cosmic::iced::core::Point::new(b_left, b_top),
+                cosmic::iced::core::Point::new(b_left + r, b_top),
                 r,
             );
             builder.close();
         }
         HatPlacement::HeaderRight => {
-            builder.move_to(cosmic::iced_core::Point::new(b_left + r, b_top));
-            builder.line_to(cosmic::iced_core::Point::new(b_right - r, b_top));
+            builder.move_to(cosmic::iced::core::Point::new(b_left + r, b_top));
+            builder.line_to(cosmic::iced::core::Point::new(b_right - r, b_top));
             builder.arc_to(
-                cosmic::iced_core::Point::new(b_right, b_top),
-                cosmic::iced_core::Point::new(b_right, b_top + r),
+                cosmic::iced::core::Point::new(b_right, b_top),
+                cosmic::iced::core::Point::new(b_right, b_top + r),
                 r,
             );
-            builder.line_to(cosmic::iced_core::Point::new(b_right, h_top - r));
+            builder.line_to(cosmic::iced::core::Point::new(b_right, h_top - r));
             builder.arc_to(
-                cosmic::iced_core::Point::new(b_right, h_top),
-                cosmic::iced_core::Point::new(b_right + r, h_top),
+                cosmic::iced::core::Point::new(b_right, h_top),
+                cosmic::iced::core::Point::new(b_right + r, h_top),
                 r,
             );
-            builder.line_to(cosmic::iced_core::Point::new(h_right - r, h_top));
+            builder.line_to(cosmic::iced::core::Point::new(h_right - r, h_top));
             builder.arc_to(
-                cosmic::iced_core::Point::new(h_right, h_top),
-                cosmic::iced_core::Point::new(h_right, h_top + r),
+                cosmic::iced::core::Point::new(h_right, h_top),
+                cosmic::iced::core::Point::new(h_right, h_top + r),
                 r,
             );
-            builder.line_to(cosmic::iced_core::Point::new(h_right, h_bottom - r));
+            builder.line_to(cosmic::iced::core::Point::new(h_right, h_bottom - r));
             builder.arc_to(
-                cosmic::iced_core::Point::new(h_right, h_bottom),
-                cosmic::iced_core::Point::new(h_right - r, h_bottom),
+                cosmic::iced::core::Point::new(h_right, h_bottom),
+                cosmic::iced::core::Point::new(h_right - r, h_bottom),
                 r,
             );
-            builder.line_to(cosmic::iced_core::Point::new(b_right + r, h_bottom));
+            builder.line_to(cosmic::iced::core::Point::new(b_right + r, h_bottom));
             builder.arc_to(
-                cosmic::iced_core::Point::new(b_right, h_bottom),
-                cosmic::iced_core::Point::new(b_right, h_bottom + r),
+                cosmic::iced::core::Point::new(b_right, h_bottom),
+                cosmic::iced::core::Point::new(b_right, h_bottom + r),
                 r,
             );
-            builder.line_to(cosmic::iced_core::Point::new(b_right, b_bottom - r));
+            builder.line_to(cosmic::iced::core::Point::new(b_right, b_bottom - r));
             builder.arc_to(
-                cosmic::iced_core::Point::new(b_right, b_bottom),
-                cosmic::iced_core::Point::new(b_right - r, b_bottom),
+                cosmic::iced::core::Point::new(b_right, b_bottom),
+                cosmic::iced::core::Point::new(b_right - r, b_bottom),
                 r,
             );
-            builder.line_to(cosmic::iced_core::Point::new(b_left + r, b_bottom));
+            builder.line_to(cosmic::iced::core::Point::new(b_left + r, b_bottom));
             builder.arc_to(
-                cosmic::iced_core::Point::new(b_left, b_bottom),
-                cosmic::iced_core::Point::new(b_left, b_bottom - r),
+                cosmic::iced::core::Point::new(b_left, b_bottom),
+                cosmic::iced::core::Point::new(b_left, b_bottom - r),
                 r,
             );
-            builder.line_to(cosmic::iced_core::Point::new(b_left, b_top + r));
+            builder.line_to(cosmic::iced::core::Point::new(b_left, b_top + r));
             builder.arc_to(
-                cosmic::iced_core::Point::new(b_left, b_top),
-                cosmic::iced_core::Point::new(b_left + r, b_top),
+                cosmic::iced::core::Point::new(b_left, b_top),
+                cosmic::iced::core::Point::new(b_left + r, b_top),
                 r,
             );
             builder.close();
@@ -614,8 +615,8 @@ impl<'a, Msg: Clone + 'static> cosmic::widget::Widget<Msg, cosmic::Theme, cosmic
         self.content.as_widget().size()
     }
 
-    fn state(&self) -> cosmic::iced_core::widget::tree::State {
-        cosmic::iced_core::widget::tree::State::new(HoverState::default())
+    fn state(&self) -> cosmic::iced::core::widget::tree::State {
+        cosmic::iced::core::widget::tree::State::new(HoverState::default())
     }
 
     fn layout(
@@ -642,12 +643,12 @@ impl<'a, Msg: Clone + 'static> cosmic::widget::Widget<Msg, cosmic::Theme, cosmic
         tree: &Tree,
         renderer: &mut cosmic::Renderer,
         theme: &cosmic::Theme,
-        style: &cosmic::iced_core::renderer::Style,
+        style: &cosmic::iced::core::renderer::Style,
         layout: Layout<'_>,
-        cursor: cosmic::iced_core::mouse::Cursor,
-        viewport: &cosmic::iced_core::Rectangle,
+        cursor: cosmic::iced::core::mouse::Cursor,
+        viewport: &cosmic::iced::core::Rectangle,
     ) {
-        use cosmic::iced_core::Renderer as _;
+        use cosmic::iced::core::Renderer as _;
 
         let bounds = layout.bounds();
         let is_hovered = cursor
@@ -668,13 +669,13 @@ impl<'a, Msg: Clone + 'static> cosmic::widget::Widget<Msg, cosmic::Theme, cosmic
         bg_color.a *= opacity;
 
         renderer.fill_quad(
-            cosmic::iced_core::renderer::Quad {
+            cosmic::iced::core::renderer::Quad {
                 bounds,
                 border: Border {
                     radius: radius.into(),
                     ..Default::default()
                 },
-                shadow: cosmic::iced_core::Shadow::default(),
+                shadow: cosmic::iced::core::Shadow::default(),
                 snap: false,
             },
             Background::Color(bg_color),
@@ -701,7 +702,7 @@ impl<'a, Msg: Clone + 'static> cosmic::widget::Widget<Msg, cosmic::Theme, cosmic
         tree: &mut Tree,
         layout: Layout<'_>,
         renderer: &cosmic::Renderer,
-        operation: &mut dyn cosmic::iced_core::widget::Operation,
+        operation: &mut dyn cosmic::iced::core::widget::Operation,
     ) {
         self.content
             .as_widget_mut()
@@ -711,16 +712,16 @@ impl<'a, Msg: Clone + 'static> cosmic::widget::Widget<Msg, cosmic::Theme, cosmic
     fn update(
         &mut self,
         tree: &mut Tree,
-        event: &cosmic::iced_core::Event,
+        event: &cosmic::iced::core::Event,
         layout: Layout<'_>,
-        cursor: cosmic::iced_core::mouse::Cursor,
+        cursor: cosmic::iced::core::mouse::Cursor,
         renderer: &cosmic::Renderer,
-        clipboard: &mut dyn cosmic::iced_core::Clipboard,
-        shell: &mut cosmic::iced_core::Shell<'_, Msg>,
-        viewport: &cosmic::iced_core::Rectangle,
+        clipboard: &mut dyn cosmic::iced::core::Clipboard,
+        shell: &mut cosmic::iced::core::Shell<'_, Msg>,
+        viewport: &cosmic::iced::core::Rectangle,
     ) {
         // Check for hover state changes on any mouse event
-        if let cosmic::iced_core::Event::Mouse(_) = &event {
+        if let cosmic::iced::core::Event::Mouse(_) = &event {
             if let Some(ref on_hover_change) = self.on_hover_change {
                 let bounds = layout.bounds();
                 let is_hovered = cursor
@@ -752,10 +753,10 @@ impl<'a, Msg: Clone + 'static> cosmic::widget::Widget<Msg, cosmic::Theme, cosmic
         &self,
         tree: &Tree,
         layout: Layout<'_>,
-        cursor: cosmic::iced_core::mouse::Cursor,
-        viewport: &cosmic::iced_core::Rectangle,
+        cursor: cosmic::iced::core::mouse::Cursor,
+        viewport: &cosmic::iced::core::Rectangle,
         renderer: &cosmic::Renderer,
-    ) -> cosmic::iced_core::mouse::Interaction {
+    ) -> cosmic::iced::core::mouse::Interaction {
         self.content.as_widget().mouse_interaction(
             &tree.children[0],
             layout,
@@ -770,12 +771,17 @@ impl<'a, Msg: Clone + 'static> cosmic::widget::Widget<Msg, cosmic::Theme, cosmic
         tree: &'b mut Tree,
         layout: Layout<'b>,
         renderer: &cosmic::Renderer,
-        viewport: &cosmic::iced_core::Rectangle,
+        viewport: &cosmic::iced::core::Rectangle,
         translation: cosmic::iced::Vector,
-    ) -> Option<cosmic::iced_core::overlay::Element<'b, Msg, cosmic::Theme, cosmic::Renderer>> {
-        self.content
-            .as_widget_mut()
-            .overlay(&mut tree.children[0], layout, renderer, viewport, translation)
+    ) -> Option<cosmic::iced::core::overlay::Element<'b, Msg, cosmic::Theme, cosmic::Renderer>>
+    {
+        self.content.as_widget_mut().overlay(
+            &mut tree.children[0],
+            layout,
+            renderer,
+            viewport,
+            translation,
+        )
     }
 }
 
@@ -786,8 +792,8 @@ impl<'a, Msg: Clone + 'static> cosmic::widget::Widget<Msg, cosmic::Theme, cosmic
         Size::new(Length::Shrink, Length::Shrink)
     }
 
-    fn state(&self) -> cosmic::iced_core::widget::tree::State {
-        cosmic::iced_core::widget::tree::State::new(HoverState::default())
+    fn state(&self) -> cosmic::iced::core::widget::tree::State {
+        cosmic::iced::core::widget::tree::State::new(HoverState::default())
     }
 
     fn layout(
@@ -796,10 +802,10 @@ impl<'a, Msg: Clone + 'static> cosmic::widget::Widget<Msg, cosmic::Theme, cosmic
         renderer: &cosmic::Renderer,
         limits: &cosmic::iced::Limits,
     ) -> layout::Node {
-        let header_node = self
-            .header
-            .as_widget_mut()
-            .layout(&mut tree.children[0], renderer, limits);
+        let header_node =
+            self.header
+                .as_widget_mut()
+                .layout(&mut tree.children[0], renderer, limits);
         let body_node = self
             .body
             .as_widget_mut()
@@ -858,12 +864,12 @@ impl<'a, Msg: Clone + 'static> cosmic::widget::Widget<Msg, cosmic::Theme, cosmic
         tree: &Tree,
         renderer: &mut cosmic::Renderer,
         theme: &cosmic::Theme,
-        style: &cosmic::iced_core::renderer::Style,
+        style: &cosmic::iced::core::renderer::Style,
         layout: Layout<'_>,
-        cursor: cosmic::iced_core::mouse::Cursor,
-        viewport: &cosmic::iced_core::Rectangle,
+        cursor: cosmic::iced::core::mouse::Cursor,
+        viewport: &cosmic::iced::core::Rectangle,
     ) {
-        use cosmic::iced_core::Renderer as _;
+        use cosmic::iced::core::Renderer as _;
 
         let cosmic_theme = theme.cosmic();
         let radius = cosmic_theme.corner_radii.radius_s[0];
@@ -896,13 +902,13 @@ impl<'a, Msg: Clone + 'static> cosmic::widget::Widget<Msg, cosmic::Theme, cosmic
 
         if let (Some(header_bounds), Some(body_bounds)) = (header_bounds, body_bounds) {
             let bounds = layout.bounds();
-            let header_bounds = cosmic::iced_core::Rectangle {
+            let header_bounds = cosmic::iced::core::Rectangle {
                 x: header_bounds.x - bounds.x,
                 y: header_bounds.y - bounds.y,
                 width: header_bounds.width,
                 height: header_bounds.height,
             };
-            let body_bounds = cosmic::iced_core::Rectangle {
+            let body_bounds = cosmic::iced::core::Rectangle {
                 x: body_bounds.x - bounds.x,
                 y: body_bounds.y - bounds.y,
                 width: body_bounds.width,
@@ -949,7 +955,7 @@ impl<'a, Msg: Clone + 'static> cosmic::widget::Widget<Msg, cosmic::Theme, cosmic
         tree: &mut Tree,
         layout: Layout<'_>,
         renderer: &cosmic::Renderer,
-        operation: &mut dyn cosmic::iced_core::widget::Operation,
+        operation: &mut dyn cosmic::iced::core::widget::Operation,
     ) {
         let mut children = layout.children();
         let header_layout = children.next();
@@ -965,29 +971,32 @@ impl<'a, Msg: Clone + 'static> cosmic::widget::Widget<Msg, cosmic::Theme, cosmic
         }
 
         if let Some(body_layout) = body_layout {
-            self.body
-                .as_widget_mut()
-                .operate(&mut tree.children[1], body_layout, renderer, operation);
+            self.body.as_widget_mut().operate(
+                &mut tree.children[1],
+                body_layout,
+                renderer,
+                operation,
+            );
         }
     }
 
     fn update(
         &mut self,
         tree: &mut Tree,
-        event: &cosmic::iced_core::Event,
+        event: &cosmic::iced::core::Event,
         layout: Layout<'_>,
-        cursor: cosmic::iced_core::mouse::Cursor,
+        cursor: cosmic::iced::core::mouse::Cursor,
         renderer: &cosmic::Renderer,
-        clipboard: &mut dyn cosmic::iced_core::Clipboard,
-        shell: &mut cosmic::iced_core::Shell<'_, Msg>,
-        viewport: &cosmic::iced_core::Rectangle,
+        clipboard: &mut dyn cosmic::iced::core::Clipboard,
+        shell: &mut cosmic::iced::core::Shell<'_, Msg>,
+        viewport: &cosmic::iced::core::Rectangle,
     ) {
         let mut children = layout.children();
         let header_layout = children.next();
         let body_layout = children.next();
 
         // Check for hover state changes on any mouse event
-        if matches!(event, cosmic::iced_core::Event::Mouse(_)) {
+        if matches!(event, cosmic::iced::core::Event::Mouse(_)) {
             if let (Some(header_layout), Some(body_layout)) = (header_layout, body_layout) {
                 let header_bounds = header_layout.bounds();
                 let body_bounds = body_layout.bounds();
@@ -1010,7 +1019,7 @@ impl<'a, Msg: Clone + 'static> cosmic::widget::Widget<Msg, cosmic::Theme, cosmic
                 // Don't block events when not hovered - allow clicks through
                 // The hover state is only for visual feedback (opacity animation)
                 // if !is_hovered {
-                //     return cosmic::iced_core::event::Status::Ignored;
+                //     return cosmic::iced::core::event::Status::Ignored;
                 // }
             }
         }
@@ -1053,10 +1062,10 @@ impl<'a, Msg: Clone + 'static> cosmic::widget::Widget<Msg, cosmic::Theme, cosmic
         &self,
         tree: &Tree,
         layout: Layout<'_>,
-        cursor: cosmic::iced_core::mouse::Cursor,
-        viewport: &cosmic::iced_core::Rectangle,
+        cursor: cosmic::iced::core::mouse::Cursor,
+        viewport: &cosmic::iced::core::Rectangle,
         renderer: &cosmic::Renderer,
-    ) -> cosmic::iced_core::mouse::Interaction {
+    ) -> cosmic::iced::core::mouse::Interaction {
         let mut children = layout.children();
         let header_layout = children.next();
         let body_layout = children.next();
@@ -1072,12 +1081,12 @@ impl<'a, Msg: Clone + 'static> cosmic::widget::Widget<Msg, cosmic::Theme, cosmic
                 radius,
                 position,
             ) {
-                return cosmic::iced_core::mouse::Interaction::Idle;
+                return cosmic::iced::core::mouse::Interaction::Idle;
             }
         }
 
         let header_interaction = header_layout.map_or(
-            cosmic::iced_core::mouse::Interaction::Idle,
+            cosmic::iced::core::mouse::Interaction::Idle,
             |header_layout| {
                 self.header.as_widget().mouse_interaction(
                     &tree.children[0],
@@ -1088,8 +1097,9 @@ impl<'a, Msg: Clone + 'static> cosmic::widget::Widget<Msg, cosmic::Theme, cosmic
                 )
             },
         );
-        let body_interaction =
-            body_layout.map_or(cosmic::iced_core::mouse::Interaction::Idle, |body_layout| {
+        let body_interaction = body_layout.map_or(
+            cosmic::iced::core::mouse::Interaction::Idle,
+            |body_layout| {
                 self.body.as_widget().mouse_interaction(
                     &tree.children[1],
                     body_layout,
@@ -1097,7 +1107,8 @@ impl<'a, Msg: Clone + 'static> cosmic::widget::Widget<Msg, cosmic::Theme, cosmic
                     viewport,
                     renderer,
                 )
-            });
+            },
+        );
 
         header_interaction.max(body_interaction)
     }
@@ -1107,10 +1118,11 @@ impl<'a, Msg: Clone + 'static> cosmic::widget::Widget<Msg, cosmic::Theme, cosmic
         tree: &'b mut Tree,
         layout: Layout<'b>,
         renderer: &cosmic::Renderer,
-        viewport: &cosmic::iced_core::Rectangle,
+        viewport: &cosmic::iced::core::Rectangle,
         translation: cosmic::iced::Vector,
-    ) -> Option<cosmic::iced_core::overlay::Element<'b, Msg, cosmic::Theme, cosmic::Renderer>> {
-        use cosmic::iced_core::overlay;
+    ) -> Option<cosmic::iced::core::overlay::Element<'b, Msg, cosmic::Theme, cosmic::Renderer>>
+    {
+        use cosmic::iced::core::overlay;
 
         let mut children = layout.children();
         let header_layout = children.next();
@@ -1380,8 +1392,8 @@ pub fn build_toolbar<'a, Msg: Clone + 'static>(
     .padding(8)
     .width(Length::Fixed(40.0))
     .height(Length::Fixed(40.0))
-    .align_x(cosmic::iced_core::alignment::Horizontal::Center)
-    .align_y(cosmic::iced_core::alignment::Vertical::Center);
+    .align_x(cosmic::iced::core::alignment::Horizontal::Center)
+    .align_y(cosmic::iced::core::alignment::Vertical::Center);
 
     let record_tooltip = if has_selection {
         fl!("record-selection")
@@ -1434,8 +1446,8 @@ pub fn build_toolbar<'a, Msg: Clone + 'static>(
     .padding(8)
     .width(Length::Fixed(40.0))
     .height(Length::Fixed(40.0))
-    .align_x(cosmic::iced_core::alignment::Horizontal::Center)
-    .align_y(cosmic::iced_core::alignment::Vertical::Center);
+    .align_x(cosmic::iced::core::alignment::Horizontal::Center)
+    .align_y(cosmic::iced::core::alignment::Vertical::Center);
 
     let btn_stop_recording = tooltip(
         button::custom(stop_icon)
@@ -1479,8 +1491,16 @@ pub fn build_toolbar<'a, Msg: Clone + 'static>(
     );
 
     // Redact/Pixelate tool button (combined)
-    let btn_redact = build_tool_button(
-        primary_redact_tool.icon_name(),
+    let btn_redact = build_tool_button_with_icon(
+        lucide::icon_with_opacity(
+            match primary_redact_tool {
+                RedactTool::Redact => AppIcon::Redact,
+                RedactTool::Pixelate => AppIcon::Pixelate,
+            },
+            34.0,
+            content_opacity,
+            redact_mode_active || redact_popup_open,
+        ),
         primary_redact_tool.tooltip(),
         2, // 2 options: Redact and Pixelate
         primary_redact_tool.index(),
@@ -1509,11 +1529,12 @@ pub fn build_toolbar<'a, Msg: Clone + 'static>(
         )
     } else if tesseract_available {
         tooltip(
-            button::custom(
-                icon_with_opacity("ocr-symbolic", 64, content_opacity)
-                    .width(Length::Fixed(40.0))
-                    .height(Length::Fixed(40.0)),
-            )
+            button::custom(lucide::icon_with_opacity(
+                AppIcon::Ocr,
+                34.0,
+                content_opacity,
+                false,
+            ))
             .class(cosmic::theme::Button::Icon)
             .on_press_maybe(has_selection.then_some(on_ocr.clone()))
             .padding(space_xs),
@@ -1522,11 +1543,12 @@ pub fn build_toolbar<'a, Msg: Clone + 'static>(
         )
     } else {
         tooltip(
-            button::custom(
-                icon_with_opacity("ocr-symbolic", 64, content_opacity)
-                    .width(Length::Fixed(40.0))
-                    .height(Length::Fixed(40.0)),
-            )
+            button::custom(lucide::icon_with_opacity(
+                AppIcon::Ocr,
+                34.0,
+                content_opacity,
+                false,
+            ))
             .class(cosmic::theme::Button::Icon)
             .on_press_maybe(None)
             .padding(space_xs),
@@ -1552,11 +1574,12 @@ pub fn build_toolbar<'a, Msg: Clone + 'static>(
         )
     } else {
         tooltip(
-            button::custom(
-                icon_with_opacity("qr-symbolic", 64, content_opacity)
-                    .width(Length::Fixed(40.0))
-                    .height(Length::Fixed(40.0)),
-            )
+            button::custom(lucide::icon_with_opacity(
+                AppIcon::Qr,
+                34.0,
+                content_opacity,
+                false,
+            ))
             .class(cosmic::theme::Button::Icon)
             .on_press_maybe(has_selection.then_some(on_qr.clone()))
             .padding(space_xs),
@@ -1609,13 +1632,13 @@ pub fn build_toolbar<'a, Msg: Clone + 'static>(
                 horizontal::light().width(Length::Fixed(64.0)),
                 column![btn_recording_annotate]
                     .spacing(space_s)
-                    .align_x(cosmic::iced_core::Alignment::Center),
+                    .align_x(cosmic::iced::core::Alignment::Center),
                 horizontal::light().width(Length::Fixed(64.0)),
                 column![btn_stop_recording]
                     .spacing(space_s)
-                    .align_x(cosmic::iced_core::Alignment::Center),
+                    .align_x(cosmic::iced::core::Alignment::Center),
             ]
-            .align_x(cosmic::iced_core::Alignment::Center)
+            .align_x(cosmic::iced::core::Alignment::Center)
             .spacing(space_s)
             .padding([space_s, space_xxs, space_s, space_xxs])
             .into()
@@ -1625,43 +1648,43 @@ pub fn build_toolbar<'a, Msg: Clone + 'static>(
                 horizontal::light().width(Length::Fixed(64.0)),
                 column![btn_region, btn_screen]
                     .spacing(space_s)
-                    .align_x(cosmic::iced_core::Alignment::Center),
+                    .align_x(cosmic::iced::core::Alignment::Center),
                 horizontal::light().width(Length::Fixed(64.0)),
                 column![btn_record]
                     .spacing(space_s)
-                    .align_x(cosmic::iced_core::Alignment::Center),
+                    .align_x(cosmic::iced::core::Alignment::Center),
                 horizontal::light().width(Length::Fixed(64.0)),
                 column![btn_settings, btn_close]
                     .spacing(space_s)
-                    .align_x(cosmic::iced_core::Alignment::Center),
+                    .align_x(cosmic::iced::core::Alignment::Center),
             ]
-            .align_x(cosmic::iced_core::Alignment::Center)
+            .align_x(cosmic::iced::core::Alignment::Center)
             .spacing(space_s)
             .padding([space_s, space_xxs, space_s, space_xxs])
             .into()
         } else if has_selection {
             let tool_buttons = column![btn_shapes, btn_redact, btn_ocr, btn_qr]
                 .spacing(space_s)
-                .align_x(cosmic::iced_core::Alignment::Center);
+                .align_x(cosmic::iced::core::Alignment::Center);
 
             column![
                 position_selector,
                 horizontal::light().width(Length::Fixed(64.0)),
                 column![btn_region, btn_screen]
                     .spacing(space_s)
-                    .align_x(cosmic::iced_core::Alignment::Center),
+                    .align_x(cosmic::iced::core::Alignment::Center),
                 horizontal::light().width(Length::Fixed(64.0)),
                 tool_buttons,
                 horizontal::light().width(Length::Fixed(64.0)),
                 column![btn_copy, btn_save]
                     .spacing(space_s)
-                    .align_x(cosmic::iced_core::Alignment::Center),
+                    .align_x(cosmic::iced::core::Alignment::Center),
                 horizontal::light().width(Length::Fixed(64.0)),
                 column![btn_settings, btn_close]
                     .spacing(space_s)
-                    .align_x(cosmic::iced_core::Alignment::Center),
+                    .align_x(cosmic::iced::core::Alignment::Center),
             ]
-            .align_x(cosmic::iced_core::Alignment::Center)
+            .align_x(cosmic::iced::core::Alignment::Center)
             .spacing(space_s)
             .padding([space_s, space_xxs, space_s, space_xxs])
             .into()
@@ -1671,17 +1694,17 @@ pub fn build_toolbar<'a, Msg: Clone + 'static>(
                 horizontal::light().width(Length::Fixed(64.0)),
                 column![btn_region, btn_screen]
                     .spacing(space_s)
-                    .align_x(cosmic::iced_core::Alignment::Center),
+                    .align_x(cosmic::iced::core::Alignment::Center),
                 horizontal::light().width(Length::Fixed(64.0)),
                 column![btn_copy, btn_save]
                     .spacing(space_s)
-                    .align_x(cosmic::iced_core::Alignment::Center),
+                    .align_x(cosmic::iced::core::Alignment::Center),
                 horizontal::light().width(Length::Fixed(64.0)),
                 column![btn_settings, btn_close]
                     .spacing(space_s)
-                    .align_x(cosmic::iced_core::Alignment::Center),
+                    .align_x(cosmic::iced::core::Alignment::Center),
             ]
-            .align_x(cosmic::iced_core::Alignment::Center)
+            .align_x(cosmic::iced::core::Alignment::Center)
             .spacing(space_s)
             .padding([space_s, space_xxs, space_s, space_xxs])
             .into()
@@ -1695,13 +1718,13 @@ pub fn build_toolbar<'a, Msg: Clone + 'static>(
                 vertical::light().height(Length::Fixed(64.0)),
                 row![btn_recording_annotate]
                     .spacing(space_s)
-                    .align_y(cosmic::iced_core::Alignment::Center),
+                    .align_y(cosmic::iced::core::Alignment::Center),
                 vertical::light().height(Length::Fixed(64.0)),
                 row![btn_stop_recording]
                     .spacing(space_s)
-                    .align_y(cosmic::iced_core::Alignment::Center),
+                    .align_y(cosmic::iced::core::Alignment::Center),
             ]
-            .align_y(cosmic::iced_core::Alignment::Center)
+            .align_y(cosmic::iced::core::Alignment::Center)
             .spacing(space_s)
             .padding([space_xxs, space_s, space_xxs, space_s])
             .into()
@@ -1711,43 +1734,43 @@ pub fn build_toolbar<'a, Msg: Clone + 'static>(
                 vertical::light().height(Length::Fixed(64.0)),
                 row![btn_region, btn_screen]
                     .spacing(space_s)
-                    .align_y(cosmic::iced_core::Alignment::Center),
+                    .align_y(cosmic::iced::core::Alignment::Center),
                 vertical::light().height(Length::Fixed(64.0)),
                 row![btn_record]
                     .spacing(space_s)
-                    .align_y(cosmic::iced_core::Alignment::Center),
+                    .align_y(cosmic::iced::core::Alignment::Center),
                 vertical::light().height(Length::Fixed(64.0)),
                 row![btn_settings, btn_close]
                     .spacing(space_s)
-                    .align_y(cosmic::iced_core::Alignment::Center),
+                    .align_y(cosmic::iced::core::Alignment::Center),
             ]
-            .align_y(cosmic::iced_core::Alignment::Center)
+            .align_y(cosmic::iced::core::Alignment::Center)
             .spacing(space_s)
             .padding([space_xxs, space_s, space_xxs, space_s])
             .into()
         } else if has_selection {
             let tool_buttons = row![btn_shapes, btn_redact, btn_ocr, btn_qr]
                 .spacing(space_s)
-                .align_y(cosmic::iced_core::Alignment::Center);
+                .align_y(cosmic::iced::core::Alignment::Center);
 
             row![
                 position_selector,
                 vertical::light().height(Length::Fixed(64.0)),
                 row![btn_region, btn_screen]
                     .spacing(space_s)
-                    .align_y(cosmic::iced_core::Alignment::Center),
+                    .align_y(cosmic::iced::core::Alignment::Center),
                 vertical::light().height(Length::Fixed(64.0)),
                 tool_buttons,
                 vertical::light().height(Length::Fixed(64.0)),
                 row![btn_copy, btn_save]
                     .spacing(space_s)
-                    .align_y(cosmic::iced_core::Alignment::Center),
+                    .align_y(cosmic::iced::core::Alignment::Center),
                 vertical::light().height(Length::Fixed(64.0)),
                 row![btn_settings, btn_close]
                     .spacing(space_s)
-                    .align_y(cosmic::iced_core::Alignment::Center),
+                    .align_y(cosmic::iced::core::Alignment::Center),
             ]
-            .align_y(cosmic::iced_core::Alignment::Center)
+            .align_y(cosmic::iced::core::Alignment::Center)
             .spacing(space_s)
             .padding([space_xxs, space_s, space_xxs, space_s])
             .into()
@@ -1757,17 +1780,17 @@ pub fn build_toolbar<'a, Msg: Clone + 'static>(
                 vertical::light().height(Length::Fixed(64.0)),
                 row![btn_region, btn_screen]
                     .spacing(space_s)
-                    .align_y(cosmic::iced_core::Alignment::Center),
+                    .align_y(cosmic::iced::core::Alignment::Center),
                 vertical::light().height(Length::Fixed(64.0)),
                 row![btn_copy, btn_save]
                     .spacing(space_s)
-                    .align_y(cosmic::iced_core::Alignment::Center),
+                    .align_y(cosmic::iced::core::Alignment::Center),
                 vertical::light().height(Length::Fixed(64.0)),
                 row![btn_settings, btn_close]
                     .spacing(space_s)
-                    .align_y(cosmic::iced_core::Alignment::Center),
+                    .align_y(cosmic::iced::core::Alignment::Center),
             ]
-            .align_y(cosmic::iced_core::Alignment::Center)
+            .align_y(cosmic::iced::core::Alignment::Center)
             .spacing(space_s)
             .padding([space_xxs, space_s, space_xxs, space_s])
             .into()

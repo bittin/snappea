@@ -1,7 +1,7 @@
 //! Magnifier widget for zoomed preview during selection
 
 use cosmic::iced::Color;
-use cosmic::iced_core::{Border, Point, Rectangle, Shadow, Size, renderer::Quad};
+use cosmic::iced::core::{Border, Point, Rectangle, Shadow, Size, renderer::Quad};
 use image::RgbaImage;
 
 /// Magnifier radius in pixels
@@ -32,7 +32,7 @@ pub fn draw_magnifier(
     outer_rect: Rectangle,
     accent: Color,
 ) {
-    use cosmic::iced_core::Renderer as _;
+    use cosmic::iced::core::Renderer as _;
 
     renderer.with_layer(Rectangle::new(Point::ORIGIN, outer_size), |renderer| {
         // Convert to widget-local coordinates

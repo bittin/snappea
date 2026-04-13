@@ -1,10 +1,10 @@
 //! Settings drawer widget that opens relative to the toolbar
 
-use cosmic::iced::Length;
-use cosmic::iced_core::Border;
-use cosmic::iced_widget::{column, row, toggler};
-use cosmic::widget::{container, dropdown, radio, segmented_button, tab_bar, text};
 use cosmic::Element;
+use cosmic::iced::Length;
+use cosmic::iced::core::Border;
+use cosmic::iced::widget::{column, row, toggler};
+use cosmic::widget::{container, dropdown, radio, segmented_button, tab_bar, text};
 
 use super::toolbar::HoverOpacity;
 use crate::config::{Container, SaveLocationChoice, ToolbarPosition, VideoSaveLocationChoice};
@@ -81,7 +81,7 @@ where
             .size(24.0),
     ]
     .spacing(space_s)
-    .align_y(cosmic::iced_core::Alignment::Center)
+    .align_y(cosmic::iced::core::Alignment::Center)
     .width(Length::Fill);
 
     // Save location section
@@ -123,7 +123,7 @@ where
             .on_press(on_browse_save_location.clone());
         row![path_display, browse_button]
             .spacing(space_s)
-            .align_y(cosmic::iced_core::Alignment::Center)
+            .align_y(cosmic::iced::core::Alignment::Center)
             .width(Length::Fill)
             .into()
     } else {
@@ -139,7 +139,7 @@ where
             .size(24.0),
     ]
     .spacing(space_s)
-    .align_y(cosmic::iced_core::Alignment::Center)
+    .align_y(cosmic::iced::core::Alignment::Center)
     .width(Length::Fill);
 
     let opacity_percent = (toolbar_unhovered_opacity.clamp(0.1, 1.0) * 100.0).round() as i32;
@@ -183,7 +183,7 @@ where
                 .on_press(on_browse_video_save_location.clone());
             row![path_display, browse_button]
                 .spacing(space_s)
-                .align_y(cosmic::iced_core::Alignment::Center)
+                .align_y(cosmic::iced::core::Alignment::Center)
                 .width(Length::Fill)
                 .into()
         } else {
@@ -261,7 +261,7 @@ where
             .size(20.0),
     ]
     .spacing(space_s)
-    .align_y(cosmic::iced_core::Alignment::Center)
+    .align_y(cosmic::iced::core::Alignment::Center)
     .width(Length::Fill);
 
     // Hide to system tray toggle
@@ -273,13 +273,11 @@ where
             .size(20.0),
     ]
     .spacing(space_s)
-    .align_y(cosmic::iced_core::Alignment::Center)
+    .align_y(cosmic::iced::core::Alignment::Center)
     .width(Length::Fill);
 
     // About section
     const SNAPPEA_LOGO: &[u8] = include_bytes!("../../data/logo.svg");
-    const GITHUB_ICON: &[u8] =
-        include_bytes!("../../data/icons/hicolor/scalable/actions/github.svg");
 
     let version = env!("CARGO_PKG_VERSION");
     let git_hash = env!("GIT_HASH");
@@ -297,22 +295,26 @@ where
                 text::caption(format!("v{} ({})", version, git_hash)),
             ]
             .spacing(space_xs)
-            .align_y(cosmic::iced_core::Alignment::Center),
+            .align_y(cosmic::iced::core::Alignment::Center),
             row![
                 text::caption(fl!("app-author")),
-                cosmic::widget::button::icon(
-                    cosmic::widget::icon::from_svg_bytes(GITHUB_ICON).symbolic(true)
-                )
-                .extra_small()
-                .on_press(on_github_click),
+                cosmic::widget::button::custom(crate::widget::lucide::icon_with_opacity(
+                    crate::widget::lucide::AppIcon::Github,
+                    18.0,
+                    1.0,
+                    false,
+                ))
+                .class(cosmic::theme::Button::Icon)
+                .on_press(on_github_click)
+                .padding(4),
             ]
             .spacing(space_xs)
-            .align_y(cosmic::iced_core::Alignment::Center),
+            .align_y(cosmic::iced::core::Alignment::Center),
         ]
         .spacing(space_xs)
     ]
     .spacing(space_s)
-    .align_y(cosmic::iced_core::Alignment::Center);
+    .align_y(cosmic::iced::core::Alignment::Center);
 
     let picture_tab_content: Element<'_, Msg> = column![
         save_location_label,
@@ -331,7 +333,7 @@ where
         encoder_dropdown,
     ]
     .spacing(space_s)
-    .align_y(cosmic::iced_core::Alignment::Center)
+    .align_y(cosmic::iced::core::Alignment::Center)
     .width(Length::Fill);
 
     let container_row = row![
@@ -340,7 +342,7 @@ where
         container_dropdown,
     ]
     .spacing(space_s)
-    .align_y(cosmic::iced_core::Alignment::Center)
+    .align_y(cosmic::iced::core::Alignment::Center)
     .width(Length::Fill);
 
     let framerate_row = row![
@@ -349,7 +351,7 @@ where
         framerate_dropdown,
     ]
     .spacing(space_s)
-    .align_y(cosmic::iced_core::Alignment::Center)
+    .align_y(cosmic::iced::core::Alignment::Center)
     .width(Length::Fill);
 
     let video_tab_content: Element<'_, Msg> = column![
@@ -379,10 +381,9 @@ where
                 .size(24.0),
         ]
         .spacing(space_s)
-        .align_y(cosmic::iced_core::Alignment::Center)
+        .align_y(cosmic::iced::core::Alignment::Center)
         .width(Length::Fill),
-        text::caption(fl!("set-as-default-portal-description"))
-            .width(Length::Fill),
+        text::caption(fl!("set-as-default-portal-description")).width(Length::Fill),
     ]
     .spacing(space_xs)
     .width(Length::Fill);

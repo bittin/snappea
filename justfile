@@ -13,6 +13,9 @@ export INSTALL_DIR := base-dir / 'share'
 bin-src := 'target' / 'release' / name
 bin-dst := base-dir / 'bin' / name
 
+edit-bin-src := 'target' / 'release' / 'snappea-edit'
+edit-bin-dst := base-dir / 'bin' / 'snappea-edit'
+
 desktop-src := 'data' / 'io.github.hojjatabdollahi.snappea.desktop'
 desktop-dst := base-dir / 'share' / 'applications' / 'io.github.hojjatabdollahi.snappea.desktop'
 
@@ -24,10 +27,6 @@ portal-dst := base-dir / 'share' / 'xdg-desktop-portal' / 'portals' / 'snappea.p
 
 service-src := 'data' / 'io.github.hojjatabdollahi.snappea.service'
 service-dst := base-dir / 'share' / 'dbus-1' / 'services' / 'io.github.hojjatabdollahi.snappea.service'
-
-
-icons-src := 'data' / 'icons'
-icons-dst := base-dir / 'share' / 'icons'
 
 default: build-release
 
@@ -60,17 +59,11 @@ deb *args:
 # Install files
 install:
     install -Dm0755 {{bin-src}} {{bin-dst}}
+    install -Dm0755 {{edit-bin-src}} {{edit-bin-dst}}
     install -Dm0644 {{desktop-src}} {{desktop-dst}}
     install -Dm0644 {{appicon-src}} {{appicon-dst}}
     install -Dm0644 {{portal-src}} {{portal-dst}}
     install -Dm0644 {{service-src}} {{service-dst}}
-    install -Dm0644 {{icons-src}}/hicolor/scalable/actions/ocr-symbolic.svg {{icons-dst}}/hicolor/scalable/actions/ocr-symbolic.svg
-    install -Dm0644 {{icons-src}}/hicolor/scalable/actions/qr-symbolic.svg {{icons-dst}}/hicolor/scalable/actions/qr-symbolic.svg
-    install -Dm0644 {{icons-src}}/hicolor/scalable/actions/arrow-symbolic.svg {{icons-dst}}/hicolor/scalable/actions/arrow-symbolic.svg
-    install -Dm0644 {{icons-src}}/hicolor/scalable/actions/circle-symbolic.svg {{icons-dst}}/hicolor/scalable/actions/circle-symbolic.svg
-    install -Dm0644 {{icons-src}}/hicolor/scalable/actions/square-symbolic.svg {{icons-dst}}/hicolor/scalable/actions/square-symbolic.svg
-    install -Dm0644 {{icons-src}}/hicolor/scalable/actions/redact-symbolic.svg {{icons-dst}}/hicolor/scalable/actions/redact-symbolic.svg
-    install -Dm0644 {{icons-src}}/hicolor/scalable/actions/pixelate-symbolic.svg {{icons-dst}}/hicolor/scalable/actions/pixelate-symbolic.svg
 
 # Install portal config to use SnapPea as the default screenshot tool
 install-portal:
@@ -91,17 +84,11 @@ install-portal:
 # Uninstall files
 uninstall:
     rm -f {{bin-dst}}
+    rm -f {{edit-bin-dst}}
     rm -f {{desktop-dst}}
     rm -f {{appicon-dst}}
     rm -f {{portal-dst}}
     rm -f {{service-dst}}
-    rm -f {{icons-dst}}/hicolor/scalable/actions/ocr-symbolic.svg
-    rm -f {{icons-dst}}/hicolor/scalable/actions/qr-symbolic.svg
-    rm -f {{icons-dst}}/hicolor/scalable/actions/arrow-symbolic.svg
-    rm -f {{icons-dst}}/hicolor/scalable/actions/circle-symbolic.svg
-    rm -f {{icons-dst}}/hicolor/scalable/actions/square-symbolic.svg
-    rm -f {{icons-dst}}/hicolor/scalable/actions/redact-symbolic.svg
-    rm -f {{icons-dst}}/hicolor/scalable/actions/pixelate-symbolic.svg
     @OLD_CONTENT="$(printf '[preferred]\norg.freedesktop.impl.portal.Screenshot=snappea\n')"; \
     PORTALS_CONF=~/.config/xdg-desktop-portal/portals.conf; \
     if [ -f "$$PORTALS_CONF" ]; then \

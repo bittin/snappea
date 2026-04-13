@@ -11,9 +11,7 @@ use gstreamer_video as gst_video;
 use std::os::fd::AsRawFd;
 use std::path::{Path, PathBuf};
 
-use super::dmabuf::{
-    DmabufBuffer, drm_format_to_gst_format, drm_format_to_gst_video_format,
-};
+use super::dmabuf::{DmabufBuffer, drm_format_to_gst_format, drm_format_to_gst_video_format};
 use super::encoder::EncoderInfo;
 use crate::config::Container;
 
@@ -382,11 +380,11 @@ impl Pipeline {
             .build()
             .context("Failed to create filesink element")?;
 
-        let (clamped_left, clamped_top, clamped_width, clamped_height, right, bottom) =
-            crop.as_ref().map_or(
-                (0, 0, capture_width, capture_height, 0, 0),
-                |region| calculate_aligned_crop(region, capture_width, capture_height),
-            );
+        let (clamped_left, clamped_top, clamped_width, clamped_height, right, bottom) = crop
+            .as_ref()
+            .map_or((0, 0, capture_width, capture_height, 0, 0), |region| {
+                calculate_aligned_crop(region, capture_width, capture_height)
+            });
 
         if crop.is_some() {
             log::info!(
@@ -410,8 +408,11 @@ impl Pipeline {
             .field("height", capture_height as i32)
             .field("framerate", gst::Fraction::new(framerate as i32, 1))
             .build();
-        let input_caps: gst::Caps =
-            [(input_structure, gst_allocators::CAPS_FEATURES_MEMORY_DMABUF.clone())].into();
+        let input_caps: gst::Caps = [(
+            input_structure,
+            gst_allocators::CAPS_FEATURES_MEMORY_DMABUF.clone(),
+        )]
+        .into();
         appsrc.set_caps(Some(&input_caps));
 
         let output_structure = gst::Structure::builder("video/x-raw")
@@ -420,8 +421,11 @@ impl Pipeline {
             .field("height", clamped_height as i32)
             .field("framerate", gst::Fraction::new(framerate as i32, 1))
             .build();
-        let output_caps: gst::Caps =
-            [(output_structure, gst::CapsFeatures::new(["memory:VASurface"]))].into();
+        let output_caps: gst::Caps = [(
+            output_structure,
+            gst::CapsFeatures::new(["memory:VASurface"]),
+        )]
+        .into();
         let capsfilter = gst::ElementFactory::make("capsfilter")
             .property("caps", &output_caps)
             .build()
@@ -430,13 +434,23 @@ impl Pipeline {
         log::info!("Zero-copy input caps: {}", input_caps);
         log::info!("Zero-copy output caps (postproc->encoder): {}", output_caps);
 
-        pipeline.add_many([appsrc.upcast_ref(), &vaapipostproc, &capsfilter, &encoder_elem])?;
+        pipeline.add_many([
+            appsrc.upcast_ref(),
+            &vaapipostproc,
+            &capsfilter,
+            &encoder_elem,
+        ])?;
         if let Some(ref parser) = parser_elem {
             pipeline.add(parser)?;
         }
         pipeline.add_many([&muxer, &filesink])?;
 
-        gst::Element::link_many([appsrc.upcast_ref(), &vaapipostproc, &capsfilter, &encoder_elem])?;
+        gst::Element::link_many([
+            appsrc.upcast_ref(),
+            &vaapipostproc,
+            &capsfilter,
+            &encoder_elem,
+        ])?;
         if let Some(ref parser) = parser_elem {
             encoder_elem.link(parser)?;
             parser.link(&muxer)?;
@@ -510,10 +524,8 @@ impl Pipeline {
             return Err(anyhow::anyhow!("Failed to dup DMA-BUF fd for GStreamer"));
         }
 
-        let memory = unsafe {
-            allocator.alloc_dmabuf(owned_fd, dmabuf.size)
-        }
-        .context("Failed to wrap DMA-BUF fd as GStreamer memory")?;
+        let memory = unsafe { allocator.alloc_dmabuf(owned_fd, dmabuf.size) }
+            .context("Failed to wrap DMA-BUF fd as GStreamer memory")?;
 
         let mut buffer = gst::Buffer::new();
         {

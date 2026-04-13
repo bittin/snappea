@@ -9,12 +9,13 @@
 
 use cosmic::Element;
 use cosmic::iced::Size;
-use cosmic::iced_core::{
+use cosmic::iced::core::{
     Background, Border, Layout, Length, Rectangle, layout, mouse, widget::Tree,
 };
-use cosmic::iced_widget::{column, row};
+use cosmic::iced::widget::{column, row};
 use cosmic::widget::{button, container, icon, text, toggler, tooltip};
 
+use super::lucide::{self, AppIcon};
 use crate::config::{RedactTool, ShapeColor, ShapeTool};
 use crate::fl;
 
@@ -66,9 +67,9 @@ impl<'a, Msg: Clone + 'static> cosmic::widget::Widget<Msg, cosmic::Theme, cosmic
         tree: &Tree,
         renderer: &mut cosmic::Renderer,
         theme: &cosmic::Theme,
-        style: &cosmic::iced_core::renderer::Style,
+        style: &cosmic::iced::core::renderer::Style,
         layout: Layout<'_>,
-        cursor: cosmic::iced_core::mouse::Cursor,
+        cursor: cosmic::iced::core::mouse::Cursor,
         viewport: &Rectangle,
     ) {
         self.content.as_widget().draw(
@@ -85,16 +86,16 @@ impl<'a, Msg: Clone + 'static> cosmic::widget::Widget<Msg, cosmic::Theme, cosmic
     fn update(
         &mut self,
         tree: &mut Tree,
-        event: &cosmic::iced_core::Event,
+        event: &cosmic::iced::core::Event,
         layout: Layout<'_>,
-        cursor: cosmic::iced_core::mouse::Cursor,
+        cursor: cosmic::iced::core::mouse::Cursor,
         renderer: &cosmic::Renderer,
-        clipboard: &mut dyn cosmic::iced_core::Clipboard,
-        shell: &mut cosmic::iced_core::Shell<'_, Msg>,
+        clipboard: &mut dyn cosmic::iced::core::Clipboard,
+        shell: &mut cosmic::iced::core::Shell<'_, Msg>,
         viewport: &Rectangle,
     ) {
         // Check for right-click
-        if let cosmic::iced_core::Event::Mouse(mouse::Event::ButtonPressed(mouse::Button::Right)) =
+        if let cosmic::iced::core::Event::Mouse(mouse::Event::ButtonPressed(mouse::Button::Right)) =
             event
             && let Some(pos) = cursor.position()
             && layout.bounds().contains(pos)
@@ -106,7 +107,7 @@ impl<'a, Msg: Clone + 'static> cosmic::widget::Widget<Msg, cosmic::Theme, cosmic
         }
 
         // Track press start for long-press detection
-        if let cosmic::iced_core::Event::Mouse(mouse::Event::ButtonPressed(mouse::Button::Left)) =
+        if let cosmic::iced::core::Event::Mouse(mouse::Event::ButtonPressed(mouse::Button::Left)) =
             event
             && let Some(pos) = cursor.position()
             && layout.bounds().contains(pos)
@@ -115,7 +116,7 @@ impl<'a, Msg: Clone + 'static> cosmic::widget::Widget<Msg, cosmic::Theme, cosmic
         }
 
         // Check for long-press on release (500ms threshold)
-        if let cosmic::iced_core::Event::Mouse(mouse::Event::ButtonReleased(mouse::Button::Left)) =
+        if let cosmic::iced::core::Event::Mouse(mouse::Event::ButtonReleased(mouse::Button::Left)) =
             event
             && let Some(start) = self.press_start.take()
             && start.elapsed() >= std::time::Duration::from_millis(500)
@@ -145,10 +146,10 @@ impl<'a, Msg: Clone + 'static> cosmic::widget::Widget<Msg, cosmic::Theme, cosmic
         &self,
         tree: &Tree,
         layout: Layout<'_>,
-        cursor: cosmic::iced_core::mouse::Cursor,
+        cursor: cosmic::iced::core::mouse::Cursor,
         viewport: &Rectangle,
         renderer: &cosmic::Renderer,
-    ) -> cosmic::iced_core::mouse::Interaction {
+    ) -> cosmic::iced::core::mouse::Interaction {
         self.content.as_widget().mouse_interaction(
             &tree.children[0],
             layout,
@@ -163,7 +164,7 @@ impl<'a, Msg: Clone + 'static> cosmic::widget::Widget<Msg, cosmic::Theme, cosmic
         tree: &mut Tree,
         layout: Layout<'_>,
         renderer: &cosmic::Renderer,
-        operation: &mut dyn cosmic::iced_core::widget::Operation,
+        operation: &mut dyn cosmic::iced::core::widget::Operation,
     ) {
         self.content
             .as_widget_mut()
@@ -177,10 +178,15 @@ impl<'a, Msg: Clone + 'static> cosmic::widget::Widget<Msg, cosmic::Theme, cosmic
         renderer: &cosmic::Renderer,
         viewport: &Rectangle,
         translation: cosmic::iced::Vector,
-    ) -> Option<cosmic::iced_core::overlay::Element<'b, Msg, cosmic::Theme, cosmic::Renderer>> {
-        self.content
-            .as_widget_mut()
-            .overlay(&mut tree.children[0], layout, renderer, viewport, translation)
+    ) -> Option<cosmic::iced::core::overlay::Element<'b, Msg, cosmic::Theme, cosmic::Renderer>>
+    {
+        self.content.as_widget_mut().overlay(
+            &mut tree.children[0],
+            layout,
+            renderer,
+            viewport,
+            translation,
+        )
     }
 }
 
@@ -250,25 +256,9 @@ pub fn color_name(index: usize) -> String {
 }
 
 /// Build a generic tool button with indicator dots.
-///
-/// This is a reusable button widget that can be used for any multi-option tool.
-/// - Normal click (left button): triggers `on_press`
-/// - Right click or long press: triggers `on_right_click`
-///
-/// # Arguments
-/// * `icon_name` - The icon to display on the button
-/// * `tooltip_text` - Tooltip text shown on hover
-/// * `num_options` - Number of indicator dots to show
-/// * `current_option_index` - Which dot should be highlighted (0-based)
-/// * `is_active` - Whether the tool is currently active
-/// * `is_popup_open` - Whether the settings popup is open
-/// * `is_enabled` - Whether the button is enabled
-/// * `on_press` - Callback for normal click
-/// * `on_right_click` - Callback for right-click/long-press
-/// * `padding` - Button padding
 #[allow(clippy::too_many_arguments)]
-pub fn build_tool_button<'a, Msg: Clone + 'static>(
-    icon_name: &'a str,
+pub fn build_tool_button_with_icon<'a, Msg: Clone + 'static>(
+    icon: impl Into<Element<'a, Msg>>,
     tooltip_text: impl AsRef<str>,
     num_options: usize,
     current_option_index: usize,
@@ -280,8 +270,6 @@ pub fn build_tool_button<'a, Msg: Clone + 'static>(
     padding: u16,
     content_opacity: f32,
 ) -> Element<'a, Msg> {
-    use std::rc::Rc;
-
     let main_size = 40.0;
     let dot_size = 6.0_f32;
     let dot_spacing = 4.0_f32;
@@ -292,34 +280,10 @@ pub fn build_tool_button<'a, Msg: Clone + 'static>(
         cosmic::theme::Button::Icon
     };
 
-    // Create icon using iced's Svg with native opacity support
-    let icon_svg_handle = icon::Icon::from(icon::from_name(icon_name).size(64))
-        .into_svg_handle()
-        .expect("Icon should be SVG");
-
-    // Standard button like all other toolbar buttons
-    let main_button = if is_enabled {
-        button::custom(
-            cosmic::iced_widget::svg::Svg::new(icon_svg_handle.clone())
-                .width(Length::Fixed(main_size))
-                .height(Length::Fixed(main_size))
-                .opacity(content_opacity)
-                .symbolic(true),
-        )
+    let main_button = button::custom(icon)
         .class(button_class)
-        .on_press_maybe(on_press.clone())
-        .padding(padding)
-    } else {
-        button::custom(
-            cosmic::iced_widget::svg::Svg::new(icon_svg_handle.clone())
-                .width(Length::Fixed(main_size))
-                .height(Length::Fixed(main_size))
-                .opacity(content_opacity)
-                .symbolic(true),
-        )
-        .class(button_class)
-        .padding(padding)
-    };
+        .on_press_maybe(if is_enabled { on_press.clone() } else { None })
+        .padding(padding);
 
     // Wrap button in a right-click handler
     let main_button_with_events = RightClickWrapper::new(main_button, on_right_click);
@@ -359,23 +323,23 @@ pub fn build_tool_button<'a, Msg: Clone + 'static>(
     }
     let dots_row = row(dots)
         .spacing(dot_spacing as u16)
-        .align_y(cosmic::iced_core::Alignment::Center);
+        .align_y(cosmic::iced::core::Alignment::Center);
 
     // Wrap dots in a container for centering
     let dots_container = container(dots_row)
         .width(Length::Fixed(main_size + (padding as f32 * 2.0)))
         .height(Length::Fixed(dot_size))
-        .align_x(cosmic::iced_core::alignment::Horizontal::Center);
+        .align_x(cosmic::iced::core::alignment::Horizontal::Center);
 
     // Stack button (with right-click wrapper) and dots vertically
     let combined = column![Element::from(main_button_with_events), dots_container]
         .spacing(2)
-        .align_x(cosmic::iced_core::Alignment::Center);
+        .align_x(cosmic::iced::core::Alignment::Center);
 
     // Wrap in a container that aligns the top of the button with other buttons
     let aligned_container = container(combined)
-        .align_x(cosmic::iced_core::alignment::Horizontal::Center)
-        .align_y(cosmic::iced_core::alignment::Vertical::Top);
+        .align_x(cosmic::iced::core::alignment::Horizontal::Center)
+        .align_y(cosmic::iced::core::alignment::Vertical::Top);
 
     let tooltip_string = tooltip_text.as_ref().to_string();
     tooltip(
@@ -384,6 +348,44 @@ pub fn build_tool_button<'a, Msg: Clone + 'static>(
         tooltip::Position::Bottom,
     )
     .into()
+}
+
+/// Build a generic tool button backed by a themed system icon.
+#[allow(clippy::too_many_arguments)]
+pub fn build_tool_button<'a, Msg: Clone + 'static>(
+    icon_name: &'a str,
+    tooltip_text: impl AsRef<str>,
+    num_options: usize,
+    current_option_index: usize,
+    is_active: bool,
+    is_popup_open: bool,
+    is_enabled: bool,
+    on_press: Option<Msg>,
+    on_right_click: Option<Msg>,
+    padding: u16,
+    content_opacity: f32,
+) -> Element<'a, Msg> {
+    let icon_svg_handle = icon::Icon::from(icon::from_name(icon_name).size(64))
+        .into_svg_handle()
+        .expect("Icon should be SVG");
+
+    build_tool_button_with_icon(
+        cosmic::iced::widget::svg::Svg::new(icon_svg_handle)
+            .width(Length::Fixed(40.0))
+            .height(Length::Fixed(40.0))
+            .opacity(content_opacity)
+            .symbolic(true),
+        tooltip_text,
+        num_options,
+        current_option_index,
+        is_active,
+        is_popup_open,
+        is_enabled,
+        on_press,
+        on_right_click,
+        padding,
+        content_opacity,
+    )
 }
 
 /// Build the shape tool button (convenience wrapper around `build_tool_button`).
@@ -405,8 +407,14 @@ pub fn build_shape_button<'a, Msg: Clone + 'static>(
         ShapeTool::Rectangle => 2,
     };
 
-    build_tool_button(
-        current_tool.icon_name(),
+    let icon = match current_tool {
+        ShapeTool::Arrow => AppIcon::Arrow,
+        ShapeTool::Circle => AppIcon::Circle,
+        ShapeTool::Rectangle => AppIcon::Square,
+    };
+
+    build_tool_button_with_icon(
+        lucide::icon_with_opacity(icon, 34.0, content_opacity, is_active || is_popup_open),
         current_tool.tooltip(),
         3, // 3 shape options
         option_index,
@@ -440,11 +448,12 @@ pub fn build_shape_popup<'a, Msg: Clone + 'static>(
 
     // Shape selection buttons in a row
     let btn_arrow = tooltip(
-        button::custom(
-            icon::Icon::from(icon::from_name("arrow-symbolic").size(48))
-                .width(Length::Fixed(icon_size))
-                .height(Length::Fixed(icon_size)),
-        )
+        button::custom(lucide::icon_with_opacity(
+            AppIcon::Arrow,
+            icon_size,
+            1.0,
+            current_tool == ShapeTool::Arrow,
+        ))
         .class(if current_tool == ShapeTool::Arrow {
             cosmic::theme::Button::Suggested
         } else {
@@ -457,11 +466,12 @@ pub fn build_shape_popup<'a, Msg: Clone + 'static>(
     );
 
     let btn_circle = tooltip(
-        button::custom(
-            icon::Icon::from(icon::from_name("circle-symbolic").size(48))
-                .width(Length::Fixed(icon_size))
-                .height(Length::Fixed(icon_size)),
-        )
+        button::custom(lucide::icon_with_opacity(
+            AppIcon::Circle,
+            icon_size,
+            1.0,
+            current_tool == ShapeTool::Circle,
+        ))
         .class(if current_tool == ShapeTool::Circle {
             cosmic::theme::Button::Suggested
         } else {
@@ -474,11 +484,12 @@ pub fn build_shape_popup<'a, Msg: Clone + 'static>(
     );
 
     let btn_rectangle = tooltip(
-        button::custom(
-            icon::Icon::from(icon::from_name("square-symbolic").size(48))
-                .width(Length::Fixed(icon_size))
-                .height(Length::Fixed(icon_size)),
-        )
+        button::custom(lucide::icon_with_opacity(
+            AppIcon::Square,
+            icon_size,
+            1.0,
+            current_tool == ShapeTool::Rectangle,
+        ))
         .class(if current_tool == ShapeTool::Rectangle {
             cosmic::theme::Button::Suggested
         } else {
@@ -494,17 +505,17 @@ pub fn build_shape_popup<'a, Msg: Clone + 'static>(
     let shape_buttons = container(
         row![btn_arrow, btn_circle, btn_rectangle]
             .spacing(space_xs)
-            .align_y(cosmic::iced_core::Alignment::Center),
+            .align_y(cosmic::iced::core::Alignment::Center),
     )
     .width(Length::Fill)
-    .align_x(cosmic::iced_core::alignment::Horizontal::Center);
+    .align_x(cosmic::iced::core::alignment::Horizontal::Center);
 
     // Subtitle with keyboard shortcuts
     let shape_subtitle = container(text::caption(fl!("shape-cycle-hint")).class(
         cosmic::theme::Text::Color(cosmic::iced::Color::from_rgba(0.6, 0.6, 0.6, 1.0)),
     ))
     .width(Length::Fill)
-    .align_x(cosmic::iced_core::alignment::Horizontal::Center);
+    .align_x(cosmic::iced::core::alignment::Horizontal::Center);
 
     // Color picker - 2 rows of 4 color swatches each to avoid clipping
     let make_color_swatch = |color: &ShapeColor, name: String| {
@@ -551,7 +562,7 @@ pub fn build_shape_popup<'a, Msg: Clone + 'static>(
         make_color_swatch(&COLOR_PRESETS[3], color_name(3)),
     ]
     .spacing(space_xs)
-    .align_y(cosmic::iced_core::Alignment::Center);
+    .align_y(cosmic::iced::core::Alignment::Center);
 
     // Second row: Orange, Purple, White, Black
     let color_row2 = row![
@@ -561,16 +572,16 @@ pub fn build_shape_popup<'a, Msg: Clone + 'static>(
         make_color_swatch(&COLOR_PRESETS[7], color_name(7)),
     ]
     .spacing(space_xs)
-    .align_y(cosmic::iced_core::Alignment::Center);
+    .align_y(cosmic::iced::core::Alignment::Center);
 
     // Center the color rows
     let color_row1_centered = container(color_row1)
         .width(Length::Fill)
-        .align_x(cosmic::iced_core::alignment::Horizontal::Center);
+        .align_x(cosmic::iced::core::alignment::Horizontal::Center);
 
     let color_row2_centered = container(color_row2)
         .width(Length::Fill)
-        .align_x(cosmic::iced_core::alignment::Horizontal::Center);
+        .align_x(cosmic::iced::core::alignment::Horizontal::Center);
 
     let color_section = column![
         text::body(fl!("color")),
@@ -578,7 +589,7 @@ pub fn build_shape_popup<'a, Msg: Clone + 'static>(
         color_row2_centered
     ]
     .spacing(space_xs)
-    .align_x(cosmic::iced_core::Alignment::Start);
+    .align_x(cosmic::iced::core::Alignment::Start);
 
     // Shadow toggle
     let shadow_row = row![
@@ -589,7 +600,7 @@ pub fn build_shape_popup<'a, Msg: Clone + 'static>(
             .size(20.0),
     ]
     .spacing(space_s)
-    .align_y(cosmic::iced_core::Alignment::Center)
+    .align_y(cosmic::iced::core::Alignment::Center)
     .width(Length::Fill);
 
     // Clear button (full width)
@@ -602,10 +613,10 @@ pub fn build_shape_popup<'a, Msg: Clone + 'static>(
                 text::body(fl!("clear-annotations")),
             ]
             .spacing(space_xs)
-            .align_y(cosmic::iced_core::Alignment::Center),
+            .align_y(cosmic::iced::core::Alignment::Center),
         )
         .width(Length::Fill)
-        .align_x(cosmic::iced_core::alignment::Horizontal::Center),
+        .align_x(cosmic::iced::core::alignment::Horizontal::Center),
     )
     .class(cosmic::theme::Button::Destructive)
     .on_press_maybe(has_annotations.then_some(on_clear))
@@ -667,11 +678,12 @@ pub fn build_redact_popup<'a, Msg: Clone + 'static>(
 
     // Tool selection buttons in a row
     let btn_redact = tooltip(
-        button::custom(
-            icon::Icon::from(icon::from_name("redact-symbolic").size(48))
-                .width(Length::Fixed(icon_size))
-                .height(Length::Fixed(icon_size)),
-        )
+        button::custom(lucide::icon_with_opacity(
+            AppIcon::Redact,
+            icon_size,
+            1.0,
+            current_tool == RedactTool::Redact,
+        ))
         .class(if current_tool == RedactTool::Redact {
             cosmic::theme::Button::Suggested
         } else {
@@ -684,11 +696,12 @@ pub fn build_redact_popup<'a, Msg: Clone + 'static>(
     );
 
     let btn_pixelate = tooltip(
-        button::custom(
-            icon::Icon::from(icon::from_name("pixelate-symbolic").size(48))
-                .width(Length::Fixed(icon_size))
-                .height(Length::Fixed(icon_size)),
-        )
+        button::custom(lucide::icon_with_opacity(
+            AppIcon::Pixelate,
+            icon_size,
+            1.0,
+            current_tool == RedactTool::Pixelate,
+        ))
         .class(if current_tool == RedactTool::Pixelate {
             cosmic::theme::Button::Suggested
         } else {
@@ -704,17 +717,17 @@ pub fn build_redact_popup<'a, Msg: Clone + 'static>(
     let tool_buttons = container(
         row![btn_redact, btn_pixelate]
             .spacing(space_xs)
-            .align_y(cosmic::iced_core::Alignment::Center),
+            .align_y(cosmic::iced::core::Alignment::Center),
     )
     .width(Length::Fill)
-    .align_x(cosmic::iced_core::alignment::Horizontal::Center);
+    .align_x(cosmic::iced::core::alignment::Horizontal::Center);
 
     // Subtitle with keyboard shortcuts
     let redact_subtitle = container(text::caption(fl!("redact-cycle-hint")).class(
         cosmic::theme::Text::Color(cosmic::iced::Color::from_rgba(0.6, 0.6, 0.6, 1.0)),
     ))
     .width(Length::Fill)
-    .align_x(cosmic::iced_core::alignment::Horizontal::Center);
+    .align_x(cosmic::iced::core::alignment::Horizontal::Center);
 
     // Pixelation size slider
     let pixelation_label = text::body(fl!("pixelation-size", size = pixelation_block_size));
@@ -740,10 +753,10 @@ pub fn build_redact_popup<'a, Msg: Clone + 'static>(
                 text::body(fl!("clear-redactions")),
             ]
             .spacing(space_xs)
-            .align_y(cosmic::iced_core::Alignment::Center),
+            .align_y(cosmic::iced::core::Alignment::Center),
         )
         .width(Length::Fill)
-        .align_x(cosmic::iced_core::alignment::Horizontal::Center),
+        .align_x(cosmic::iced::core::alignment::Horizontal::Center),
     )
     .class(cosmic::theme::Button::Destructive)
     .on_press_maybe(has_redactions.then_some(on_clear))
@@ -845,7 +858,7 @@ pub fn build_pencil_popup<'a, Msg: Clone + 'static>(
         make_color_swatch(&COLOR_PRESETS[3], color_name(3)),
     ]
     .spacing(space_xs)
-    .align_y(cosmic::iced_core::Alignment::Center);
+    .align_y(cosmic::iced::core::Alignment::Center);
 
     // Second row: Orange, Purple, White, Black
     let color_row2 = row![
@@ -855,16 +868,16 @@ pub fn build_pencil_popup<'a, Msg: Clone + 'static>(
         make_color_swatch(&COLOR_PRESETS[7], color_name(7)),
     ]
     .spacing(space_xs)
-    .align_y(cosmic::iced_core::Alignment::Center);
+    .align_y(cosmic::iced::core::Alignment::Center);
 
     // Center the color rows
     let color_row1_centered = container(color_row1)
         .width(Length::Fill)
-        .align_x(cosmic::iced_core::alignment::Horizontal::Center);
+        .align_x(cosmic::iced::core::alignment::Horizontal::Center);
 
     let color_row2_centered = container(color_row2)
         .width(Length::Fill)
-        .align_x(cosmic::iced_core::alignment::Horizontal::Center);
+        .align_x(cosmic::iced::core::alignment::Horizontal::Center);
 
     let color_section = column![
         text::body(fl!("color")),
@@ -872,7 +885,7 @@ pub fn build_pencil_popup<'a, Msg: Clone + 'static>(
         color_row2_centered
     ]
     .spacing(space_xs)
-    .align_x(cosmic::iced_core::Alignment::Start);
+    .align_x(cosmic::iced::core::Alignment::Start);
 
     // Thickness slider (1-10 pixels) - updates during drag, saves on release
     let thickness_label = text::body(fl!("thickness", size = (thickness as u32)));
@@ -908,10 +921,10 @@ pub fn build_pencil_popup<'a, Msg: Clone + 'static>(
                 text::body(fl!("clear-drawings")),
             ]
             .spacing(space_xs)
-            .align_y(cosmic::iced_core::Alignment::Center),
+            .align_y(cosmic::iced::core::Alignment::Center),
         )
         .width(Length::Fill)
-        .align_x(cosmic::iced_core::alignment::Horizontal::Center),
+        .align_x(cosmic::iced::core::alignment::Horizontal::Center),
     )
     .class(cosmic::theme::Button::Destructive)
     .on_press_maybe(has_annotations.then_some(on_clear))

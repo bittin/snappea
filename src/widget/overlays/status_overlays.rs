@@ -6,11 +6,11 @@
 //! - OCR status indicator  
 //! - OCR text region overlays
 
-use cosmic::iced::{Color, Point, Size};
-use cosmic::iced_core::{
+use cosmic::iced::core::{
     Background, Border, Rectangle, alignment,
     text::{Renderer as TextRenderer, Text},
 };
+use cosmic::iced::{Color, Point, Size};
 
 use crate::capture::ocr::OcrStatus;
 
@@ -46,17 +46,17 @@ pub fn draw_status_badge(
         height: bg_height,
     };
 
-    use cosmic::iced_core::Renderer as RendererTrait;
+    use cosmic::iced::core::Renderer as RendererTrait;
     renderer.with_layer(*viewport, |renderer| {
         renderer.fill_quad(
-            cosmic::iced_core::renderer::Quad {
+            cosmic::iced::core::renderer::Quad {
                 bounds: bg_rect,
                 border: Border {
                     radius: corner_radius.into(),
                     width: 2.0,
                     color: border_color,
                 },
-                shadow: cosmic::iced_core::Shadow::default(),
+                shadow: cosmic::iced::core::Shadow::default(),
                 snap: false,
             },
             Background::Color(Color::from_rgba(0.0, 0.0, 0.0, 0.80)),
@@ -66,13 +66,13 @@ pub fn draw_status_badge(
             content: text.to_string(),
             bounds: Size::new(bg_width, bg_height),
             size: cosmic::iced::Pixels(font_size),
-            line_height: cosmic::iced_core::text::LineHeight::default(),
+            line_height: cosmic::iced::core::text::LineHeight::default(),
             font: cosmic::iced::Font::default(),
             align_x: alignment::Horizontal::Center.into(),
             align_y: alignment::Vertical::Center,
-            shaping: cosmic::iced_core::text::Shaping::Advanced,
-            wrapping: cosmic::iced_core::text::Wrapping::None,
-            ellipsize: cosmic::iced_core::text::Ellipsize::default(),
+            shaping: cosmic::iced::core::text::Shaping::Advanced,
+            wrapping: cosmic::iced::core::text::Wrapping::None,
+            ellipsize: cosmic::iced::core::text::Ellipsize::default(),
         };
 
         renderer.fill_text(
@@ -166,7 +166,7 @@ pub fn draw_qr_code_overlays(
     let (sel_x, sel_y, sel_w, sel_h) = selection_rect;
     let button_size = 28.0_f32;
 
-    use cosmic::iced_core::Renderer as RendererTrait;
+    use cosmic::iced::core::Renderer as RendererTrait;
 
     for (x, y, content) in qr_codes {
         let font_size = 14.0_f32;
@@ -210,14 +210,14 @@ pub fn draw_qr_code_overlays(
         renderer.with_layer(*viewport, |renderer| {
             // Draw background
             renderer.fill_quad(
-                cosmic::iced_core::renderer::Quad {
+                cosmic::iced::core::renderer::Quad {
                     bounds: bg_rect,
                     border: Border {
                         radius: corner_radius.into(),
                         width: 2.0,
                         color: accent_color,
                     },
-                    shadow: cosmic::iced_core::Shadow::default(),
+                    shadow: cosmic::iced::core::Shadow::default(),
                     snap: false,
                 },
                 Background::Color(Color::from_rgba(0.0, 0.0, 0.0, 0.80)),
@@ -228,13 +228,13 @@ pub fn draw_qr_code_overlays(
                 content: content.clone(),
                 bounds: Size::new(max_label_width, text_height),
                 size: cosmic::iced::Pixels(font_size),
-                line_height: cosmic::iced_core::text::LineHeight::Relative(1.3),
+                line_height: cosmic::iced::core::text::LineHeight::Relative(1.3),
                 font: cosmic::iced::Font::default(),
                 align_x: alignment::Horizontal::Left.into(),
                 align_y: alignment::Vertical::Top,
-                shaping: cosmic::iced_core::text::Shaping::Advanced,
-                wrapping: cosmic::iced_core::text::Wrapping::Word,
-                ellipsize: cosmic::iced_core::text::Ellipsize::default(),
+                shaping: cosmic::iced::core::text::Shaping::Advanced,
+                wrapping: cosmic::iced::core::text::Wrapping::Word,
+                ellipsize: cosmic::iced::core::text::Ellipsize::default(),
             };
 
             renderer.fill_text(
@@ -257,14 +257,14 @@ pub fn draw_qr_code_overlays(
                 };
 
                 renderer.fill_quad(
-                    cosmic::iced_core::renderer::Quad {
+                    cosmic::iced::core::renderer::Quad {
                         bounds: button_rect,
                         border: Border {
                             radius: (button_size / 4.0).into(),
                             width: 1.0,
                             color: accent_color,
                         },
-                        shadow: cosmic::iced_core::Shadow::default(),
+                        shadow: cosmic::iced::core::Shadow::default(),
                         snap: false,
                     },
                     Background::Color(accent_color),
@@ -274,13 +274,13 @@ pub fn draw_qr_code_overlays(
                     content: "🔗".to_string(),
                     bounds: Size::new(button_size, button_size),
                     size: cosmic::iced::Pixels(16.0),
-                    line_height: cosmic::iced_core::text::LineHeight::default(),
+                    line_height: cosmic::iced::core::text::LineHeight::default(),
                     font: cosmic::iced::Font::default(),
                     align_x: alignment::Horizontal::Center.into(),
                     align_y: alignment::Vertical::Center,
-                    shaping: cosmic::iced_core::text::Shaping::Advanced,
-                    wrapping: cosmic::iced_core::text::Wrapping::None,
-                    ellipsize: cosmic::iced_core::text::Ellipsize::default(),
+                    shaping: cosmic::iced::core::text::Shaping::Advanced,
+                    wrapping: cosmic::iced::core::text::Wrapping::None,
+                    ellipsize: cosmic::iced::core::text::Ellipsize::default(),
                 };
 
                 renderer.fill_text(
@@ -312,7 +312,7 @@ pub fn draw_ocr_overlays(
     viewport: &Rectangle,
     ocr_overlays: &[(f32, f32, f32, f32, i32)], // (left, top, width, height, block_num)
 ) {
-    use cosmic::iced_core::Renderer as RendererTrait;
+    use cosmic::iced::core::Renderer as RendererTrait;
 
     for (left, top, width, height, block_num) in ocr_overlays {
         let color_idx = (*block_num as usize) % OCR_BLOCK_COLORS.len();
@@ -327,14 +327,14 @@ pub fn draw_ocr_overlays(
 
         renderer.with_layer(*viewport, |renderer| {
             renderer.fill_quad(
-                cosmic::iced_core::renderer::Quad {
+                cosmic::iced::core::renderer::Quad {
                     bounds: rect,
                     border: Border {
                         radius: 2.0.into(),
                         width: 2.0,
                         color: border_color,
                     },
-                    shadow: cosmic::iced_core::Shadow::default(),
+                    shadow: cosmic::iced::core::Shadow::default(),
                     snap: false,
                 },
                 Background::Color(Color::TRANSPARENT),

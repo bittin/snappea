@@ -1,0 +1,13 @@
+module = "lucide_icon"
+
+[icons]
+arrow = "arrow-up-right"
+circle = "circle"
+square = "square"
+redact = "square-slash"
+pixelate = "boxes"
+ocr = "scan-text"
+qr = "qr-code"
+drag = "move"
+minimize = "minimize-2"
+github = "github"

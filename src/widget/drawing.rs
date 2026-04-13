@@ -2,7 +2,7 @@
 //!
 //! This module contains reusable drawing functions used across multiple widgets.
 
-use cosmic::iced_core::{
+use cosmic::iced::core::{
     Background, Border, Color, Point, Rectangle, Renderer as _, Shadow, Size, renderer::Quad,
 };
 
@@ -110,7 +110,7 @@ pub fn draw_inactive_overlay_with_hint(
     hint_text: &str,
     overlay_opacity: f32,
 ) {
-    use cosmic::iced_core::text::{Renderer as TextRenderer, Text};
+    use cosmic::iced::core::text::{Renderer as TextRenderer, Text};
 
     // Draw dark overlay
     let dark_overlay = Color::from_rgba(0.0, 0.0, 0.0, overlay_opacity);
@@ -160,17 +160,17 @@ pub fn draw_inactive_overlay_with_hint(
         Text {
             content: hint_text.to_string(),
             bounds: Size::new(box_width, box_height),
-            size: cosmic::iced_core::Pixels(font_size),
-            line_height: cosmic::iced_core::text::LineHeight::Relative(1.0),
-            font: cosmic::iced_core::Font {
-                weight: cosmic::iced_core::font::Weight::Medium,
+            size: cosmic::iced::core::Pixels(font_size),
+            line_height: cosmic::iced::core::text::LineHeight::Relative(1.0),
+            font: cosmic::iced::core::Font {
+                weight: cosmic::iced::core::font::Weight::Medium,
                 ..Default::default()
             },
             align_x: cosmic::iced::alignment::Horizontal::Center.into(),
             align_y: cosmic::iced::alignment::Vertical::Center,
-            shaping: cosmic::iced_core::text::Shaping::Advanced,
-            wrapping: cosmic::iced_core::text::Wrapping::None,
-            ellipsize: cosmic::iced_core::text::Ellipsize::default(),
+            shaping: cosmic::iced::core::text::Shaping::Advanced,
+            wrapping: cosmic::iced::core::text::Wrapping::None,
+            ellipsize: cosmic::iced::core::text::Ellipsize::default(),
         },
         Point::new(box_x + box_width / 2.0, box_y + box_height / 2.0),
         Color::WHITE,

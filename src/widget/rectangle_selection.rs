@@ -6,12 +6,11 @@ use cosmic::{
             dnd::{self, DndAction, DndDestinationRectangle, DndEvent, OfferEvent, SourceEvent},
             mime::{AllowedMimeTypes, AsMimeTypes},
         },
+        core::{
+            self, Border, Color, Length, Point, Rectangle, Renderer, Shadow, Size,
+            clipboard::DndSource, layout::Node, renderer::Quad,
+        },
         mouse,
-    },
-    iced_core::Renderer,
-    iced_core::{
-        self, clipboard::DndSource, layout::Node, renderer::Quad, Border, Color, Length, Point,
-        Rectangle, Shadow, Size,
     },
     widget::{self, Widget},
 };
@@ -54,7 +53,7 @@ const CORNER_DIAMETER: f32 = 16.0;
 pub struct RectangleSelection<'a, Msg> {
     output_rect: Rect,
     rectangle_selection: Rect,
-    window_id: iced_core::window::Id,
+    window_id: core::window::Id,
     on_rectangle: Box<dyn Fn(DragState, Rect) -> Msg>,
     on_move_offset: Box<dyn Fn(Option<(i32, i32)>) -> Msg>,
     drag_state: DragState,
@@ -91,7 +90,7 @@ impl<'a, Msg: Clone> RectangleSelection<'a, Msg> {
         output_rect: Rect,
         rectangle_selection: Rect,
         drag_direction: DragState,
-        window_id: iced_core::window::Id,
+        window_id: core::window::Id,
         drag_id: u128,
         on_rectangle: impl Fn(DragState, Rect) -> Msg + 'static,
         on_move_offset: impl Fn(Option<(i32, i32)>) -> Msg + 'static,
@@ -243,7 +242,7 @@ impl<'a, Msg: Clone> RectangleSelection<'a, Msg> {
         DragState::None
     }
 
-    fn handle_drag_pos(&mut self, x: i32, y: i32, shell: &mut iced_core::Shell<'_, Msg>) {
+    fn handle_drag_pos(&mut self, x: i32, y: i32, shell: &mut core::Shell<'_, Msg>) {
         let prev = self.rectangle_selection;
 
         let d_x = self.output_rect.left + x;
@@ -359,43 +358,43 @@ impl<'a, Msg: 'static + Clone> Widget<Msg, cosmic::Theme, cosmic::Renderer>
 
     fn layout(
         &mut self,
-        _tree: &mut cosmic::iced_core::widget::Tree,
+        _tree: &mut core::widget::Tree,
         _renderer: &cosmic::Renderer,
-        limits: &cosmic::iced_core::layout::Limits,
-    ) -> cosmic::iced_core::layout::Node {
+        limits: &core::layout::Limits,
+    ) -> core::layout::Node {
         Node::new(limits.width(Length::Fill).height(Length::Fill).resolve(
             Length::Fill,
             Length::Fill,
-            cosmic::iced_core::Size::ZERO,
+            core::Size::ZERO,
         ))
     }
 
-    fn tag(&self) -> iced_core::widget::tree::Tag {
+    fn tag(&self) -> core::widget::tree::Tag {
         struct MyState;
-        iced_core::widget::tree::Tag::of::<MyState>()
+        core::widget::tree::Tag::of::<MyState>()
     }
 
     fn mouse_interaction(
         &self,
-        _state: &iced_core::widget::Tree,
-        _layout: iced_core::Layout<'_>,
-        cursor: iced_core::mouse::Cursor,
+        _state: &core::widget::Tree,
+        _layout: core::Layout<'_>,
+        cursor: core::mouse::Cursor,
         _viewport: &Rectangle,
         _renderer: &cosmic::Renderer,
-    ) -> iced_core::mouse::Interaction {
+    ) -> core::mouse::Interaction {
         if self.is_recording {
-            return iced_core::mouse::Interaction::default();
+            return core::mouse::Interaction::default();
         }
 
         // If actively dragging, show the appropriate dragging cursor regardless of cursor position
         // This prevents cursor flickering when cursor moves fast during drag
         if self.drag_state != DragState::None {
             return match self.drag_state {
-                DragState::Move => iced_core::mouse::Interaction::Grabbing,
-                DragState::N | DragState::S => iced_core::mouse::Interaction::ResizingVertically,
-                DragState::E | DragState::W => iced_core::mouse::Interaction::ResizingHorizontally,
+                DragState::Move => core::mouse::Interaction::Grabbing,
+                DragState::N | DragState::S => core::mouse::Interaction::ResizingVertically,
+                DragState::E | DragState::W => core::mouse::Interaction::ResizingHorizontally,
                 DragState::NW | DragState::NE | DragState::SE | DragState::SW => {
-                    iced_core::mouse::Interaction::Grabbing
+                    core::mouse::Interaction::Grabbing
                 }
                 DragState::None => unreachable!(),
             };
@@ -403,32 +402,32 @@ impl<'a, Msg: 'static + Clone> Widget<Msg, cosmic::Theme, cosmic::Renderer>
 
         // Not dragging - show cursor based on what we're hovering over
         match self.drag_state(cursor) {
-            DragState::None => iced_core::mouse::Interaction::Crosshair,
+            DragState::None => core::mouse::Interaction::Crosshair,
             DragState::NW | DragState::NE | DragState::SE | DragState::SW => {
-                iced_core::mouse::Interaction::Grab
+                core::mouse::Interaction::Grab
             }
-            DragState::N | DragState::S => iced_core::mouse::Interaction::ResizingVertically,
-            DragState::E | DragState::W => iced_core::mouse::Interaction::ResizingHorizontally,
-            DragState::Move => iced_core::mouse::Interaction::Grab,
+            DragState::N | DragState::S => core::mouse::Interaction::ResizingVertically,
+            DragState::E | DragState::W => core::mouse::Interaction::ResizingHorizontally,
+            DragState::Move => core::mouse::Interaction::Grab,
         }
     }
 
     fn update(
         &mut self,
-        _state: &mut iced_core::widget::Tree,
-        event: &iced_core::Event,
-        layout: iced_core::Layout<'_>,
-        cursor: iced_core::mouse::Cursor,
+        _state: &mut core::widget::Tree,
+        event: &core::Event,
+        layout: core::Layout<'_>,
+        cursor: core::mouse::Cursor,
         _renderer: &cosmic::Renderer,
-        _clipboard: &mut dyn iced_core::Clipboard,
-        shell: &mut iced_core::Shell<'_, Msg>,
+        _clipboard: &mut dyn core::Clipboard,
+        shell: &mut core::Shell<'_, Msg>,
         _viewport: &Rectangle,
     ) {
         if self.is_recording {
             return;
         }
         match event {
-            cosmic::iced_core::Event::Mouse(e) => {
+            core::Event::Mouse(e) => {
                 if !cursor.is_over(layout.bounds()) {
                     return;
                 }
@@ -445,7 +444,7 @@ impl<'a, Msg: 'static + Clone> Widget<Msg, cosmic::Theme, cosmic::Renderer>
                 }
 
                 match e {
-                    iced_core::mouse::Event::ButtonPressed(iced_core::mouse::Button::Left) => {
+                    core::mouse::Event::ButtonPressed(core::mouse::Button::Left) => {
                         let s = self.drag_state(cursor);
 
                         if s == DragState::Move {
@@ -485,7 +484,7 @@ impl<'a, Msg: 'static + Clone> Widget<Msg, cosmic::Theme, cosmic::Renderer>
                         }
                         shell.capture_event();
                     }
-                    iced_core::mouse::Event::CursorMoved { .. } => {
+                    core::mouse::Event::CursorMoved { .. } => {
                         // Handle all drag operations without DnD for proper cursor control
                         if self.drag_state != DragState::None {
                             if let Some(pos) = cursor.position() {
@@ -497,7 +496,7 @@ impl<'a, Msg: 'static + Clone> Widget<Msg, cosmic::Theme, cosmic::Renderer>
                             return;
                         }
                     }
-                    iced_core::mouse::Event::ButtonReleased(iced_core::mouse::Button::Left) => {
+                    core::mouse::Event::ButtonReleased(core::mouse::Button::Left) => {
                         // End any drag operation
                         if self.drag_state != DragState::None {
                             self.drag_state = DragState::None;
@@ -526,13 +525,13 @@ impl<'a, Msg: 'static + Clone> Widget<Msg, cosmic::Theme, cosmic::Renderer>
 
     fn draw(
         &self,
-        _tree: &cosmic::iced_core::widget::Tree,
+        _tree: &core::widget::Tree,
         renderer: &mut cosmic::Renderer,
         theme: &cosmic::Theme,
-        _style: &cosmic::iced_core::renderer::Style,
-        _layout: cosmic::iced_core::Layout<'_>,
-        _cursor: cosmic::iced_core::mouse::Cursor,
-        _viewport: &cosmic::iced_core::Rectangle,
+        _style: &core::renderer::Style,
+        _layout: core::Layout<'_>,
+        _cursor: core::mouse::Cursor,
+        _viewport: &core::Rectangle,
     ) {
         if self.is_recording {
             return;
@@ -673,10 +672,10 @@ impl<'a, Msg: 'static + Clone> Widget<Msg, cosmic::Theme, cosmic::Renderer>
 
     fn drag_destinations(
         &self,
-        _state: &iced_core::widget::Tree,
-        layout: iced_core::Layout<'_>,
+        _state: &core::widget::Tree,
+        layout: core::Layout<'_>,
         _renderer: &cosmic::Renderer,
-        dnd_rectangles: &mut iced_core::clipboard::DndDestinationRectangles,
+        dnd_rectangles: &mut core::clipboard::DndDestinationRectangles,
     ) {
         let bounds = layout.bounds();
         dnd_rectangles.push(DndDestinationRectangle {

@@ -3,12 +3,12 @@
 //! These functions build vertex/index buffers for anti-aliased rendering on screen.
 
 use cosmic::iced::Color;
-use cosmic::iced_core::Rectangle;
-use cosmic::iced_widget::graphics::{
+use cosmic::iced::advanced::graphics::{
     Mesh,
     color::{Packed, pack},
     mesh::{Indexed, Renderer as MeshRenderer, SolidVertex2D},
 };
+use cosmic::iced::core::Rectangle;
 
 use super::geometry::{arrow, mesh as mesh_const};
 
@@ -316,7 +316,7 @@ pub fn draw_arrows(
     arrows: &[ArrowAnnotation],
     output_offset: (f32, f32),
 ) {
-    use cosmic::iced_core::Renderer as CoreRenderer;
+    use cosmic::iced::core::Renderer as CoreRenderer;
 
     let (offset_x, offset_y) = output_offset;
 
@@ -344,7 +344,7 @@ pub fn draw_arrows(
             renderer.with_layer(*viewport, |renderer| {
                 renderer.draw_mesh(Mesh::Solid {
                     buffers: Indexed { vertices, indices },
-                    transformation: cosmic::iced_core::Transformation::IDENTITY,
+                    transformation: cosmic::iced::core::Transformation::IDENTITY,
                     clip_bounds: *viewport,
                 });
             });
@@ -362,7 +362,7 @@ pub fn draw_arrows(
             renderer.with_layer(*viewport, |renderer| {
                 renderer.draw_mesh(Mesh::Solid {
                     buffers: Indexed { vertices, indices },
-                    transformation: cosmic::iced_core::Transformation::IDENTITY,
+                    transformation: cosmic::iced::core::Transformation::IDENTITY,
                     clip_bounds: *viewport,
                 });
             });
@@ -387,7 +387,7 @@ pub fn draw_arrow_preview(
     color: Color,
     with_shadow: bool,
 ) {
-    use cosmic::iced_core::Renderer as CoreRenderer;
+    use cosmic::iced::core::Renderer as CoreRenderer;
 
     let (start_x, start_y) = start;
     let (end_x, end_y) = end;
@@ -410,7 +410,7 @@ pub fn draw_arrow_preview(
         renderer.with_layer(*viewport, |renderer| {
             renderer.draw_mesh(Mesh::Solid {
                 buffers: Indexed { vertices, indices },
-                transformation: cosmic::iced_core::Transformation::IDENTITY,
+                transformation: cosmic::iced::core::Transformation::IDENTITY,
                 clip_bounds: *viewport,
             });
         });
@@ -428,7 +428,7 @@ pub fn draw_arrow_preview(
         renderer.with_layer(*viewport, |renderer| {
             renderer.draw_mesh(Mesh::Solid {
                 buffers: Indexed { vertices, indices },
-                transformation: cosmic::iced_core::Transformation::IDENTITY,
+                transformation: cosmic::iced::core::Transformation::IDENTITY,
                 clip_bounds: *viewport,
             });
         });

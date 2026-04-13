@@ -13,7 +13,7 @@ use crate::domain::{
 use crate::screencast::encoder::EncoderInfo;
 use crate::screenshot::portal::{ScreenshotOptions, ScreenshotResult};
 use cosmic::iced::Animation;
-use cosmic::iced_core::Rectangle;
+use cosmic::iced::core::Rectangle;
 use std::collections::HashMap;
 use std::time::Instant;
 use tokio::sync::mpsc::Sender;

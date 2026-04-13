@@ -10,9 +10,9 @@ use crate::capture::ocr::OcrStatus;
 use crate::capture::qr::DetectedQrCode;
 use crate::config::{Container, RedactTool, ShapeColor, ShapeTool, ToolbarPosition};
 use crate::domain::Choice;
+use cosmic::iced::core::Rectangle;
 use cosmic::iced::time::Instant;
 use cosmic::iced::window;
-use cosmic::iced_core::Rectangle;
 use cosmic::widget::segmented_button;
 
 // ============================================================================
