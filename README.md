@@ -37,7 +37,11 @@ Disclaimer: This project is based on xdg-desktop-portal-cosmic with added featur
 
 ### From the Cloudsmith Debian Repository (recommended)
 
-SnapPea is published to a Cloudsmith apt repository for Ubuntu/Pop!_OS 24.04 (Noble):
+<img alt="Static Badge" src="https://img.shields.io/badge/OSS%20hosting%20by-cloudsmith-blue?logo=cloudsmith&style=flat-square&link=https%3A%2F%2Fcloudsmith.com"> </img>
+
+SnapPea repository hosting is graciously provided by [Cloudsmith](https://cloudsmith.com).
+
+For Ubuntu/Pop!_OS 24.04 (Noble):
 
 ```sh
 # Add the Cloudsmith repository
