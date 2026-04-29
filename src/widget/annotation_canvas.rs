@@ -7,17 +7,17 @@
 
 use cosmic::{
     Element,
-    iced::{Color, mouse},
-    iced_core::{
+    iced::advanced::graphics::{
+        Mesh,
+        mesh::{Indexed, Renderer as MeshRenderer},
+    },
+    iced::core::{
         Background, Border, Clipboard, Layout, Length, Rectangle, Shell, Size, Widget, event,
         layout, overlay,
         renderer::Renderer as RendererTrait,
         widget::{Tree, tree},
     },
-    iced_widget::graphics::{
-        Mesh,
-        mesh::{Indexed, Renderer as MeshRenderer},
-    },
+    iced::{Color, mouse},
 };
 use image::RgbaImage;
 
@@ -196,7 +196,7 @@ impl<'a, Msg: Clone + 'static> Widget<Msg, cosmic::Theme, cosmic::Renderer>
         _tree: &Tree,
         renderer: &mut cosmic::Renderer,
         _theme: &cosmic::Theme,
-        _style: &cosmic::iced_core::renderer::Style,
+        _style: &cosmic::iced::core::renderer::Style,
         layout: Layout<'_>,
         cursor: mouse::Cursor,
         _viewport: &Rectangle,
@@ -213,7 +213,7 @@ impl<'a, Msg: Clone + 'static> Widget<Msg, cosmic::Theme, cosmic::Renderer>
             let (min_y, max_y) = if y1 < y2 { (y1, y2) } else { (y2, y1) };
 
             renderer.fill_quad(
-                cosmic::iced_core::renderer::Quad {
+                cosmic::iced::core::renderer::Quad {
                     bounds: Rectangle {
                         x: min_x,
                         y: min_y,
@@ -221,7 +221,7 @@ impl<'a, Msg: Clone + 'static> Widget<Msg, cosmic::Theme, cosmic::Renderer>
                         height: max_y - min_y,
                     },
                     border: Border::default(),
-                    shadow: cosmic::iced_core::Shadow::default(),
+                    shadow: cosmic::iced::core::Shadow::default(),
                     snap: false,
                 },
                 Background::Color(Color::BLACK),
@@ -290,7 +290,7 @@ impl<'a, Msg: Clone + 'static> Widget<Msg, cosmic::Theme, cosmic::Renderer>
     fn update(
         &mut self,
         _tree: &mut Tree,
-        event: &cosmic::iced_core::Event,
+        event: &cosmic::iced::core::Event,
         layout: Layout<'_>,
         cursor: mouse::Cursor,
         _renderer: &cosmic::Renderer,
@@ -325,7 +325,7 @@ impl<'a, Msg: Clone + 'static> Widget<Msg, cosmic::Theme, cosmic::Renderer>
         };
 
         match event {
-            cosmic::iced_core::Event::Mouse(mouse::Event::ButtonPressed(mouse::Button::Left)) => {
+            cosmic::iced::core::Event::Mouse(mouse::Event::ButtonPressed(mouse::Button::Left)) => {
                 if let Some(pos) = cursor.position_in(bounds) {
                     // Only start drawing if inside selection
                     if !is_inside_selection(pos.x, pos.y) {
@@ -362,7 +362,7 @@ impl<'a, Msg: Clone + 'static> Widget<Msg, cosmic::Theme, cosmic::Renderer>
                     }
                 }
             }
-            cosmic::iced_core::Event::Mouse(mouse::Event::ButtonReleased(mouse::Button::Left)) => {
+            cosmic::iced::core::Event::Mouse(mouse::Event::ButtonReleased(mouse::Button::Left)) => {
                 if self.config.drawing_start.is_some()
                     && let Some(pos) = cursor.position()
                 {
@@ -457,7 +457,7 @@ impl<'a, Msg: Clone + 'static> AnnotationCanvas<'a, Msg> {
                 renderer.with_layer(*viewport, |renderer| {
                     renderer.draw_mesh(Mesh::Solid {
                         buffers: Indexed { vertices, indices },
-                        transformation: cosmic::iced_core::Transformation::IDENTITY,
+                        transformation: cosmic::iced::core::Transformation::IDENTITY,
                         clip_bounds: *viewport,
                     });
                 });
@@ -476,7 +476,7 @@ impl<'a, Msg: Clone + 'static> AnnotationCanvas<'a, Msg> {
                 renderer.with_layer(*viewport, |renderer| {
                     renderer.draw_mesh(Mesh::Solid {
                         buffers: Indexed { vertices, indices },
-                        transformation: cosmic::iced_core::Transformation::IDENTITY,
+                        transformation: cosmic::iced::core::Transformation::IDENTITY,
                         clip_bounds: *viewport,
                     });
                 });
@@ -516,7 +516,7 @@ impl<'a, Msg: Clone + 'static> AnnotationCanvas<'a, Msg> {
             renderer.with_layer(*viewport, |renderer| {
                 renderer.draw_mesh(Mesh::Solid {
                     buffers: Indexed { vertices, indices },
-                    transformation: cosmic::iced_core::Transformation::IDENTITY,
+                    transformation: cosmic::iced::core::Transformation::IDENTITY,
                     clip_bounds: *viewport,
                 });
             });
@@ -535,7 +535,7 @@ impl<'a, Msg: Clone + 'static> AnnotationCanvas<'a, Msg> {
             renderer.with_layer(*viewport, |renderer| {
                 renderer.draw_mesh(Mesh::Solid {
                     buffers: Indexed { vertices, indices },
-                    transformation: cosmic::iced_core::Transformation::IDENTITY,
+                    transformation: cosmic::iced::core::Transformation::IDENTITY,
                     clip_bounds: *viewport,
                 });
             });
@@ -646,7 +646,7 @@ impl<'a, Msg: Clone + 'static> AnnotationCanvas<'a, Msg> {
             let max_y = (y1 + ny).max(y1 - ny).max(y2 + ny).max(y2 - ny);
 
             renderer.fill_quad(
-                cosmic::iced_core::renderer::Quad {
+                cosmic::iced::core::renderer::Quad {
                     bounds: Rectangle {
                         x: min_x,
                         y: min_y,
@@ -654,7 +654,7 @@ impl<'a, Msg: Clone + 'static> AnnotationCanvas<'a, Msg> {
                         height: max_y - min_y,
                     },
                     border: Border::default(),
-                    shadow: cosmic::iced_core::Shadow::default(),
+                    shadow: cosmic::iced::core::Shadow::default(),
                     snap: false,
                 },
                 Background::Color(color),
@@ -765,7 +765,7 @@ impl<'a, Msg: Clone + 'static> AnnotationCanvas<'a, Msg> {
 
         // Top edge
         renderer.fill_quad(
-            cosmic::iced_core::renderer::Quad {
+            cosmic::iced::core::renderer::Quad {
                 bounds: Rectangle {
                     x: x - half_stroke,
                     y: y - half_stroke,
@@ -773,7 +773,7 @@ impl<'a, Msg: Clone + 'static> AnnotationCanvas<'a, Msg> {
                     height: stroke_width,
                 },
                 border: Border::default(),
-                shadow: cosmic::iced_core::Shadow::default(),
+                shadow: cosmic::iced::core::Shadow::default(),
                 snap: false,
             },
             Background::Color(color),
@@ -781,7 +781,7 @@ impl<'a, Msg: Clone + 'static> AnnotationCanvas<'a, Msg> {
 
         // Bottom edge
         renderer.fill_quad(
-            cosmic::iced_core::renderer::Quad {
+            cosmic::iced::core::renderer::Quad {
                 bounds: Rectangle {
                     x: x - half_stroke,
                     y: y + height - half_stroke,
@@ -789,7 +789,7 @@ impl<'a, Msg: Clone + 'static> AnnotationCanvas<'a, Msg> {
                     height: stroke_width,
                 },
                 border: Border::default(),
-                shadow: cosmic::iced_core::Shadow::default(),
+                shadow: cosmic::iced::core::Shadow::default(),
                 snap: false,
             },
             Background::Color(color),
@@ -797,7 +797,7 @@ impl<'a, Msg: Clone + 'static> AnnotationCanvas<'a, Msg> {
 
         // Left edge
         renderer.fill_quad(
-            cosmic::iced_core::renderer::Quad {
+            cosmic::iced::core::renderer::Quad {
                 bounds: Rectangle {
                     x: x - half_stroke,
                     y: y + half_stroke,
@@ -805,7 +805,7 @@ impl<'a, Msg: Clone + 'static> AnnotationCanvas<'a, Msg> {
                     height: height - stroke_width,
                 },
                 border: Border::default(),
-                shadow: cosmic::iced_core::Shadow::default(),
+                shadow: cosmic::iced::core::Shadow::default(),
                 snap: false,
             },
             Background::Color(color),
@@ -813,7 +813,7 @@ impl<'a, Msg: Clone + 'static> AnnotationCanvas<'a, Msg> {
 
         // Right edge
         renderer.fill_quad(
-            cosmic::iced_core::renderer::Quad {
+            cosmic::iced::core::renderer::Quad {
                 bounds: Rectangle {
                     x: x + width - half_stroke,
                     y: y + half_stroke,
@@ -821,7 +821,7 @@ impl<'a, Msg: Clone + 'static> AnnotationCanvas<'a, Msg> {
                     height: height - stroke_width,
                 },
                 border: Border::default(),
-                shadow: cosmic::iced_core::Shadow::default(),
+                shadow: cosmic::iced::core::Shadow::default(),
                 snap: false,
             },
             Background::Color(color),
@@ -848,7 +848,7 @@ impl<'a, Msg: Clone + 'static> AnnotationCanvas<'a, Msg> {
         };
 
         renderer.fill_quad(
-            cosmic::iced_core::renderer::Quad {
+            cosmic::iced::core::renderer::Quad {
                 bounds: Rectangle {
                     x: min_x,
                     y: min_y,
@@ -858,9 +858,9 @@ impl<'a, Msg: Clone + 'static> AnnotationCanvas<'a, Msg> {
                 border: Border {
                     color: Color::WHITE,
                     width: 1.0,
-                    radius: cosmic::iced_core::border::Radius::from(0.0),
+                    radius: cosmic::iced::core::border::Radius::from(0.0),
                 },
-                shadow: cosmic::iced_core::Shadow::default(),
+                shadow: cosmic::iced::core::Shadow::default(),
                 snap: false,
             },
             Background::Color(Color::from_rgba(0.0, 0.0, 0.0, 0.7)),
@@ -926,14 +926,14 @@ impl<'a, Msg: Clone + 'static> AnnotationCanvas<'a, Msg> {
 
         // Draw border
         renderer.fill_quad(
-            cosmic::iced_core::renderer::Quad {
+            cosmic::iced::core::renderer::Quad {
                 bounds: viewport,
                 border: Border {
                     color: Color::WHITE,
                     width: 1.0,
-                    radius: cosmic::iced_core::border::Radius::from(0.0),
+                    radius: cosmic::iced::core::border::Radius::from(0.0),
                 },
-                shadow: cosmic::iced_core::Shadow::default(),
+                shadow: cosmic::iced::core::Shadow::default(),
                 snap: false,
             },
             Background::Color(Color::TRANSPARENT),
@@ -982,7 +982,7 @@ impl<'a, Msg: Clone + 'static> AnnotationCanvas<'a, Msg> {
                         )
                     {
                         renderer.fill_quad(
-                            cosmic::iced_core::renderer::Quad {
+                            cosmic::iced::core::renderer::Quad {
                                 bounds: Rectangle {
                                     x,
                                     y,
@@ -990,7 +990,7 @@ impl<'a, Msg: Clone + 'static> AnnotationCanvas<'a, Msg> {
                                     height: block_h,
                                 },
                                 border: Border::default(),
-                                shadow: cosmic::iced_core::Shadow::default(),
+                                shadow: cosmic::iced::core::Shadow::default(),
                                 snap: false,
                             },
                             Background::Color(color),
@@ -1022,7 +1022,7 @@ impl<'a, Msg: Clone + 'static> AnnotationCanvas<'a, Msg> {
                         img_y2,
                     ) {
                         renderer.fill_quad(
-                            cosmic::iced_core::renderer::Quad {
+                            cosmic::iced::core::renderer::Quad {
                                 bounds: Rectangle {
                                     x,
                                     y,
@@ -1030,7 +1030,7 @@ impl<'a, Msg: Clone + 'static> AnnotationCanvas<'a, Msg> {
                                     height: block_h,
                                 },
                                 border: Border::default(),
-                                shadow: cosmic::iced_core::Shadow::default(),
+                                shadow: cosmic::iced::core::Shadow::default(),
                                 snap: false,
                             },
                             Background::Color(color),

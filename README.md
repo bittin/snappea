@@ -22,6 +22,9 @@ Disclaimer: This project is based on xdg-desktop-portal-cosmic with added featur
   - Hardware encoder selection
   - Cursor visibility toggle
   - Live annotations while recording
+- Video editor
+  - Trim recorded video
+  - Save as gif
 - Annotation tools: arrows, circles, squares, freehand drawing
 - Text recognition (OCR)
 - QR code detection
@@ -34,7 +37,11 @@ Disclaimer: This project is based on xdg-desktop-portal-cosmic with added featur
 
 ### From the Cloudsmith Debian Repository (recommended)
 
-SnapPea is published to a Cloudsmith apt repository for Ubuntu/Pop!_OS 24.04 (Noble):
+<img alt="Static Badge" src="https://img.shields.io/badge/OSS%20hosting%20by-cloudsmith-blue?logo=cloudsmith&style=flat-square&link=https%3A%2F%2Fcloudsmith.com"> </img>
+
+SnapPea repository hosting is graciously provided by [Cloudsmith](https://cloudsmith.com).
+
+For Ubuntu/Pop!_OS 24.04 (Noble):
 
 ```sh
 # Add the Cloudsmith repository
@@ -79,6 +86,9 @@ This automatically registers SnapPea as the preferred screenshot portal for your
 
 > [!IMPORTANT]
 > SnapPea used to install its config to `~/.config/xdg-desktop-portal/portals.conf`. This breaks theming in Flatpaks. If you had an older version of SnapPea, make sure `portals.conf` is deleted.
+
+### Optional: Better gif quality
+To get better gif quality install [gifski](https://gif.ski/).
 
 ### Optional: OCR Support
 

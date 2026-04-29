@@ -6,7 +6,7 @@
 
 use crate::config::{Container, RedactTool, ShapeColor, ShapeTool, ToolbarPosition};
 use crate::domain::Choice;
-use cosmic::iced_core::Rectangle;
+use cosmic::iced::core::Rectangle;
 use cosmic::widget::segmented_button;
 use wayland_client::protocol::wl_output::WlOutput;
 

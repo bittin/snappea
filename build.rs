@@ -1,4 +1,7 @@
 fn main() {
+    println!("cargo:rerun-if-changed=fonts/icons.toml");
+    iced_lucide::build("fonts/icons.toml").expect("Build lucide icon module");
+
     let hash = std::process::Command::new("git")
         .args(["rev-parse", "--short", "HEAD"])
         .output()

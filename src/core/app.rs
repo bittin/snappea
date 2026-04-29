@@ -1,4 +1,4 @@
-use crate::core::control::{ControlCommand, ControlInterface, CONTROL_PATH};
+use crate::core::control::{CONTROL_PATH, ControlCommand, ControlInterface};
 use crate::core::portal::{DBUS_NAME, DBUS_PATH};
 use crate::fl;
 use crate::screenshot;
@@ -6,24 +6,24 @@ use crate::session::messages;
 use crate::session::state::SettingsTab;
 use crate::tray::{self, TrayAction, TrayHandle};
 use cosmic::Task;
+use cosmic::cctk::sctk::shell::wlr_layer;
 use cosmic::iced::animation;
-use cosmic::iced_core::event::wayland::OutputEvent;
+use cosmic::iced::core::event::wayland::OutputEvent;
+use cosmic::iced::core::layout::Limits;
+use cosmic::iced::platform_specific::runtime::wayland::layer_surface::{
+    IcedMargin, IcedOutput, SctkLayerSurfaceSettings,
+};
+use cosmic::iced::platform_specific::shell::commands::layer_surface::get_layer_surface;
 use cosmic::widget::segmented_button;
 use cosmic::{
     app,
     iced::window,
-    iced_futures::{Subscription, event::listen_with},
+    iced::{Subscription, event::listen_with},
 };
 use crossbeam_channel::{Receiver as CbReceiver, Sender as CbSender};
 use futures::SinkExt;
 use std::any::TypeId;
 use std::time::Instant;
-use cosmic::cctk::sctk::shell::wlr_layer;
-use cosmic::iced_core::layout::Limits;
-use cosmic::iced_runtime::platform_specific::wayland::layer_surface::{
-    IcedMargin, IcedOutput, SctkLayerSurfaceSettings,
-};
-use cosmic::iced_winit::commands::layer_surface::get_layer_surface;
 use wayland_client::protocol::wl_output::WlOutput;
 
 /// Flags for app initialization
@@ -129,7 +129,7 @@ pub struct RecordingIndicator {
     /// Pencil line thickness in pixels
     pub pencil_thickness: f32,
     /// Toolbar bounds from main UI (output-local coords)
-    pub toolbar_bounds: Option<cosmic::iced_core::Rectangle>,
+    pub toolbar_bounds: Option<cosmic::iced::core::Rectangle>,
     /// Toolbar position (top-left corner)
     pub toolbar_pos: (f32, f32),
     /// Whether toolbar is being dragged
@@ -139,7 +139,7 @@ pub struct RecordingIndicator {
     /// Whether pencil popup is open
     pub pencil_popup_open: bool,
     /// Pencil popup bounds for input zone calculation
-    pub pencil_popup_bounds: Option<cosmic::iced_core::Rectangle>,
+    pub pencil_popup_bounds: Option<cosmic::iced::core::Rectangle>,
 }
 
 #[derive(Debug, Clone)]
@@ -210,7 +210,7 @@ impl cosmic::Application for App {
     }
 
     fn init(
-        core: app::Core,
+        mut core: app::Core,
         flags: Self::Flags,
     ) -> (Self, cosmic::iced::Task<cosmic::Action<Self::Message>>) {
         let wayland_conn = wayland_client::Connection::connect_to_env().unwrap();
@@ -263,8 +263,8 @@ impl cosmic::Application for App {
             screenshot::view(self, id).map(Msg::Screenshot)
         } else if id == self.dummy_id {
             cosmic::iced::widget::Space::new()
-                .width(cosmic::iced_core::Length::Fill)
-                .height(cosmic::iced_core::Length::Fill)
+                .width(cosmic::iced::core::Length::Fill)
+                .height(cosmic::iced::core::Length::Fill)
                 .into()
         } else if let Some(indicator) = &self.recording_indicator {
             if indicator.window_id == id {
@@ -272,12 +272,12 @@ impl cosmic::Application for App {
                 render_recording_indicator(indicator, self.toolbar_visible)
             } else {
                 cosmic::iced::widget::space()
-                    .width(cosmic::iced_core::Length::Fixed(1.0))
+                    .width(cosmic::iced::core::Length::Fixed(1.0))
                     .into()
             }
         } else {
             cosmic::iced::widget::space()
-                .width(cosmic::iced_core::Length::Fixed(1.0))
+                .width(cosmic::iced::core::Length::Fixed(1.0))
                 .into()
         }
     }
@@ -342,7 +342,7 @@ impl cosmic::Application for App {
 
                 if let Some(indicator) = self.recording_indicator.take() {
                     log::info!("Recording stopped, destroying indicator overlay");
-                    return cosmic::iced_winit::commands::layer_surface::destroy_layer_surface(
+                    return cosmic::iced::platform_specific::shell::commands::layer_surface::destroy_layer_surface(
                         indicator.window_id,
                     );
                 }
@@ -446,12 +446,12 @@ impl cosmic::Application for App {
                     let wl_output = indicator.output.clone();
                     let annotation_mode = indicator.annotation_mode;
 
-                    use cosmic::iced_winit::commands::layer_surface::destroy_layer_surface;
+                    use cosmic::iced::platform_specific::shell::commands::layer_surface::destroy_layer_surface;
                     use wlr_layer::{Anchor, KeyboardInteractivity, Layer};
 
                     let input_zone = if annotation_mode {
                         // Annotation mode: capture region for drawing + toolbar for controls
-                        let region_rect = cosmic::iced_core::Rectangle {
+                        let region_rect = cosmic::iced::core::Rectangle {
                             x: indicator.region.0 as f32,
                             y: indicator.region.1 as f32,
                             width: indicator.region.2 as f32,
@@ -553,7 +553,7 @@ impl cosmic::Application for App {
                     // Update toolbar_bounds to match new position
                     let toolbar_width = 280.0f32;
                     let toolbar_height = 72.0f32; // 56 + padding
-                    indicator.toolbar_bounds = Some(cosmic::iced_core::Rectangle {
+                    indicator.toolbar_bounds = Some(cosmic::iced::core::Rectangle {
                         x: indicator.toolbar_pos.0,
                         y: indicator.toolbar_pos.1,
                         width: toolbar_width,
@@ -570,19 +570,19 @@ impl cosmic::Application for App {
                     let annotation_mode = indicator.annotation_mode;
                     let region = indicator.region;
 
-                    use cosmic::iced_winit::commands::layer_surface::destroy_layer_surface;
+                    use cosmic::iced::platform_specific::shell::commands::layer_surface::destroy_layer_surface;
                     use wlr_layer::{Anchor, KeyboardInteractivity, Layer};
 
                     // Build input zones based on annotation mode
                     let input_zone = if annotation_mode {
                         // Annotation mode: capture region for drawing + toolbar for controls
-                        let region_rect = cosmic::iced_core::Rectangle {
+                        let region_rect = cosmic::iced::core::Rectangle {
                             x: region.0 as f32,
                             y: region.1 as f32,
                             width: region.2 as f32,
                             height: region.3 as f32,
                         };
-                        let toolbar_rect = cosmic::iced_core::Rectangle {
+                        let toolbar_rect = cosmic::iced::core::Rectangle {
                             x: toolbar_pos.0,
                             y: toolbar_pos.1,
                             width: toolbar_width,
@@ -591,7 +591,7 @@ impl cosmic::Application for App {
                         Some(vec![region_rect, toolbar_rect])
                     } else {
                         // No annotation mode: only capture toolbar
-                        Some(vec![cosmic::iced_core::Rectangle {
+                        Some(vec![cosmic::iced::core::Rectangle {
                             x: toolbar_pos.0,
                             y: toolbar_pos.1,
                             width: toolbar_width,
@@ -691,7 +691,9 @@ impl cosmic::Application for App {
                 cosmic::iced::Task::none()
             }
             Msg::LayerClosed(id) if id == self.dummy_id => {
-                log::warn!("Dummy layer surface was closed by compositor (output removed?), re-creating it");
+                log::warn!(
+                    "Dummy layer surface was closed by compositor (output removed?), re-creating it"
+                );
                 self.dummy_id = window::Id::unique();
                 get_layer_surface(SctkLayerSurfaceSettings {
                     id: self.dummy_id,
@@ -784,7 +786,8 @@ impl cosmic::Application for App {
                                 let surface_cmd = get_layer_surface(SctkLayerSurfaceSettings {
                                     id: output_state.id,
                                     layer: wlr_layer::Layer::Overlay,
-                                    keyboard_interactivity: wlr_layer::KeyboardInteractivity::Exclusive,
+                                    keyboard_interactivity:
+                                        wlr_layer::KeyboardInteractivity::Exclusive,
                                     input_zone: None,
                                     anchor: wlr_layer::Anchor::all(),
                                     output: IcedOutput::Output(output_state.output.clone()),
@@ -844,7 +847,7 @@ impl cosmic::Application for App {
         }
     }
 
-    fn subscription(&self) -> cosmic::iced_futures::Subscription<Self::Message> {
+    fn subscription(&self) -> cosmic::iced::Subscription<Self::Message> {
         // Use direct screenshot subscription if in direct mode, otherwise portal subscription
         let screenshot_sub = if self.direct_screenshot {
             direct_screenshot_subscription(self.wayland_helper.clone()).map(|e| match e {
@@ -861,21 +864,21 @@ impl cosmic::Application for App {
         let mut subscriptions = vec![
             screenshot_sub,
             listen_with(|e, _, _| match e {
-                cosmic::iced_core::Event::PlatformSpecific(
-                    cosmic::iced_core::event::PlatformSpecific::Wayland(
-                        cosmic::iced_core::event::wayland::Event::Output(o_event, wl_output),
+                cosmic::iced::core::Event::PlatformSpecific(
+                    cosmic::iced::core::event::PlatformSpecific::Wayland(
+                        cosmic::iced::core::event::wayland::Event::Output(o_event, wl_output),
                     ),
                 ) => Some(Msg::Output(o_event, wl_output)),
-                cosmic::iced_core::Event::PlatformSpecific(
-                    cosmic::iced_core::event::PlatformSpecific::Wayland(
-                        cosmic::iced_core::event::wayland::Event::Layer(
-                            cosmic::iced_core::event::wayland::LayerEvent::Done,
+                cosmic::iced::core::Event::PlatformSpecific(
+                    cosmic::iced::core::event::PlatformSpecific::Wayland(
+                        cosmic::iced::core::event::wayland::Event::Layer(
+                            cosmic::iced::core::event::wayland::LayerEvent::Done,
                             _surface,
                             id,
                         ),
                     ),
                 ) => Some(Msg::LayerClosed(id)),
-                cosmic::iced_core::Event::Keyboard(keyboard_event) => {
+                cosmic::iced::core::Event::Keyboard(keyboard_event) => {
                     Some(Msg::Keyboard(keyboard_event))
                 }
                 _ => None,
@@ -916,13 +919,11 @@ impl cosmic::Application for App {
         if let Some(args) = &self.screenshot_args
             && args.ui.is_animating()
         {
-            subscriptions.push(
-                cosmic::iced::window::frames().map(|(window_id, instant)| {
-                    Msg::Screenshot(crate::session::messages::Msg::timeline_tick(
-                        window_id, instant,
-                    ))
-                }),
-            );
+            subscriptions.push(cosmic::iced::window::frames().map(|(window_id, instant)| {
+                Msg::Screenshot(crate::session::messages::Msg::timeline_tick(
+                    window_id, instant,
+                ))
+            }));
         }
 
         // Failsafe timer: if screenshot args arrived but no outputs were available,
@@ -970,17 +971,17 @@ pub(crate) fn portal_subscription(
     Subscription::run_with(PortalSubscription(helper), |data| {
         let helper = data.0.clone();
 
-        cosmic::iced_futures::stream::channel(
+        cosmic::iced::stream::channel(
             10,
-            move |mut output: cosmic::iced_futures::futures::channel::mpsc::Sender<PortalEvent>| async move {
-            let mut state = SubscriptionState::Init;
-            loop {
-                if let Err(err) = process_changes(&mut state, &mut output, &helper).await {
-                    log::debug!("Portal Subscription Error: {:?}", err);
-                    futures::future::pending::<()>().await;
+            move |mut output: cosmic::iced::futures::channel::mpsc::Sender<PortalEvent>| async move {
+                let mut state = SubscriptionState::Init;
+                loop {
+                    if let Err(err) = process_changes(&mut state, &mut output, &helper).await {
+                        log::debug!("Portal Subscription Error: {:?}", err);
+                        futures::future::pending::<()>().await;
+                    }
                 }
-            }
-        },
+            },
         )
     })
 }
@@ -1004,36 +1005,40 @@ pub(crate) async fn process_changes(
                 .serve_at(CONTROL_PATH, ControlInterface::new(ctrl_tx))?
                 .build()
                 .await?;
-            log::info!("D-Bus interfaces registered: portal at {}, control at {}", DBUS_PATH, CONTROL_PATH);
-            _ = output.send(PortalEvent::Screenshot(screenshot::Event::Init(tx))).await;
+            log::info!(
+                "D-Bus interfaces registered: portal at {}, control at {}",
+                DBUS_PATH,
+                CONTROL_PATH
+            );
+            _ = output
+                .send(PortalEvent::Screenshot(screenshot::Event::Init(tx)))
+                .await;
             *state = SubscriptionState::Waiting(connection, rx, ctrl_rx);
         }
-        SubscriptionState::Waiting(_conn, rx, ctrl_rx) => {
-            loop {
-                tokio::select! {
-                    Some(event) = rx.recv() => {
-                        match event {
-                            screenshot::Event::Screenshot(args) => {
-                                if let Err(err) = output.send(PortalEvent::Screenshot(screenshot::Event::Screenshot(args))).await {
-                                    log::error!("Error sending screenshot event: {:?}", err);
-                                };
-                            }
-                            screenshot::Event::RecordingStopped => {
-                                if let Err(err) = output.send(PortalEvent::Screenshot(screenshot::Event::RecordingStopped)).await {
-                                    log::error!("Error sending RecordingStopped event: {:?}", err);
-                                };
-                            }
-                            screenshot::Event::Init(_) => {}
+        SubscriptionState::Waiting(_conn, rx, ctrl_rx) => loop {
+            tokio::select! {
+                Some(event) = rx.recv() => {
+                    match event {
+                        screenshot::Event::Screenshot(args) => {
+                            if let Err(err) = output.send(PortalEvent::Screenshot(screenshot::Event::Screenshot(args))).await {
+                                log::error!("Error sending screenshot event: {:?}", err);
+                            };
                         }
+                        screenshot::Event::RecordingStopped => {
+                            if let Err(err) = output.send(PortalEvent::Screenshot(screenshot::Event::RecordingStopped)).await {
+                                log::error!("Error sending RecordingStopped event: {:?}", err);
+                            };
+                        }
+                        screenshot::Event::Init(_) => {}
                     }
-                    Some(cmd) = ctrl_rx.recv() => {
-                        if let Err(err) = output.send(PortalEvent::Control(cmd)).await {
-                            log::error!("Error sending control command: {:?}", err);
-                        }
+                }
+                Some(cmd) = ctrl_rx.recv() => {
+                    if let Err(err) = output.send(PortalEvent::Control(cmd)).await {
+                        log::error!("Error sending control command: {:?}", err);
                     }
                 }
             }
-        }
+        },
     };
     Ok(())
 }
@@ -1058,32 +1063,32 @@ pub(crate) fn direct_screenshot_subscription(
     Subscription::run_with(DirectScreenshotSubscription(helper), |data| {
         let helper = data.0.clone();
 
-        cosmic::iced_futures::stream::channel(
+        cosmic::iced::stream::channel(
             10,
-            move |mut output: cosmic::iced_futures::futures::channel::mpsc::Sender<PortalEvent>| async move {
-            use crate::config::SnapPeaConfig;
-            use crate::core::portal::PortalResponse;
-            use crate::domain::{Choice, DragState, Rect};
-            use crate::screenshot::portal::ScreenshotResult;
-            use crate::session::state::{
-                AnnotationState, CaptureData, DetectionState, PortalContext, SessionState, UiState,
-            };
-            use crate::screenshot::portal::ScreenshotOptions;
-            use std::collections::HashMap;
+            move |mut output: cosmic::iced::futures::channel::mpsc::Sender<PortalEvent>| async move {
+                use crate::config::SnapPeaConfig;
+                use crate::core::portal::PortalResponse;
+                use crate::domain::{Choice, DragState, Rect};
+                use crate::screenshot::portal::ScreenshotOptions;
+                use crate::screenshot::portal::ScreenshotResult;
+                use crate::session::state::{
+                    AnnotationState, CaptureData, DetectionState, PortalContext, SessionState,
+                    UiState,
+                };
+                use std::collections::HashMap;
 
-            // Create a dummy channel for portal context (not used in direct mode, but required for Args)
-            let (tx, _rx) = tokio::sync::mpsc::channel::<PortalResponse<ScreenshotResult>>(1);
+                // Create a dummy channel for portal context (not used in direct mode, but required for Args)
+                let (tx, _rx) = tokio::sync::mpsc::channel::<PortalResponse<ScreenshotResult>>(1);
 
-            // Create a channel for the Init event
-            let (init_tx, _init_rx) = tokio::sync::mpsc::channel(1);
+                // Create a channel for the Init event
+                let (init_tx, _init_rx) = tokio::sync::mpsc::channel(1);
 
-            // Create control interface channel
-            let (ctrl_tx, mut ctrl_rx) = tokio::sync::mpsc::channel::<ControlCommand>(10);
+                // Create control interface channel
+                let (ctrl_tx, mut ctrl_rx) = tokio::sync::mpsc::channel::<ControlCommand>(10);
 
-            // Register D-Bus control interface (no portal interface in direct mode)
-            let _connection = match zbus::connection::Builder::session() {
-                Ok(builder) => {
-                    match builder.name(DBUS_NAME) {
+                // Register D-Bus control interface (no portal interface in direct mode)
+                let _connection = match zbus::connection::Builder::session() {
+                    Ok(builder) => match builder.name(DBUS_NAME) {
                         Ok(builder) => {
                             match builder.serve_at(CONTROL_PATH, ControlInterface::new(ctrl_tx)) {
                                 Ok(builder) => match builder.build().await {
@@ -1109,150 +1114,156 @@ pub(crate) fn direct_screenshot_subscription(
                             log::warn!("Failed to claim D-Bus name: {}", e);
                             None
                         }
+                    },
+                    Err(e) => {
+                        log::warn!("Failed to setup D-Bus control interface: {}", e);
+                        None
+                    }
+                };
+
+                // Send Init event first
+                _ = output
+                    .send(PortalEvent::Screenshot(screenshot::Event::Init(init_tx)))
+                    .await;
+
+                // Small delay to let the app initialize
+                tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+
+                // Capture screenshots
+                let outputs: Vec<_> = helper
+                    .outputs()
+                    .into_iter()
+                    .filter_map(|wl_output| {
+                        let info = helper.output_info(&wl_output)?;
+                        Some((
+                            wl_output,
+                            info.name.clone()?,
+                            info.logical_position?,
+                            info.logical_size?,
+                            info.scale_factor,
+                        ))
+                    })
+                    .collect();
+
+                if outputs.is_empty() {
+                    log::error!("No outputs found for direct screenshot");
+                    return;
+                }
+
+                // Capture output images
+                let mut output_images = HashMap::new();
+                for (wl_output, name, _, _, _) in &outputs {
+                    if let Some(frame) = helper
+                        .capture_source_shm(CaptureSource::Output(wl_output.clone()), false)
+                        .await
+                    {
+                        match ScreenshotImage::new(frame) {
+                            Ok(img) => {
+                                output_images.insert(name.clone(), img);
+                            }
+                            Err(e) => {
+                                log::error!(
+                                    "Failed to create screenshot image for {}: {}",
+                                    name,
+                                    e
+                                );
+                            }
+                        }
+                    } else {
+                        log::error!("Failed to capture output {}", name);
                     }
                 }
-                Err(e) => {
-                    log::warn!("Failed to setup D-Bus control interface: {}", e);
-                    None
-                }
-            };
 
-            // Send Init event first
-            _ = output.send(PortalEvent::Screenshot(screenshot::Event::Init(init_tx))).await;
+                let config = SnapPeaConfig::load();
+                let choice = Choice::Rectangle(Rect::default(), DragState::default());
 
-            // Small delay to let the app initialize
-            tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+                // Create screenshot Args
+                let args = screenshot::Args {
+                    portal: PortalContext {
+                        handle: zbus::zvariant::ObjectPath::try_from("/direct/screenshot").unwrap(),
+                        app_id: "direct".to_string(),
+                        parent_window: String::new(),
+                        options: ScreenshotOptions {
+                            modal: None,
+                            interactive: Some(true),
+                            choose_destination: None,
+                        },
+                        tx,
+                    },
+                    capture: CaptureData { output_images },
+                    session: SessionState {
+                        choice,
+                        action: crate::domain::Action::ReturnPath,
+                        location: crate::domain::ImageSaveLocation::Pictures,
+                        focused_output_index: 0,
+                        also_copy_to_clipboard: false,
+                        has_mouse_entered: false,
+                    },
+                    detection: DetectionState::default(),
+                    annotations: AnnotationState::default(),
+                    ui: UiState {
+                        now: Instant::now(),
+                        toolbar_position: config.toolbar_position,
+                        settings_drawer_open: false,
+                        settings_tab: crate::session::state::SettingsTab::General,
+                        primary_shape_tool: config.primary_shape_tool,
+                        shape_popup_open: false,
+                        shape_color: config.shape_color,
+                        shape_shadow: config.shape_shadow,
+                        primary_redact_tool: config.primary_redact_tool,
+                        redact_popup_open: false,
+                        pixelation_block_size: config.pixelation_block_size,
+                        magnifier_enabled: config.magnifier_enabled,
+                        save_location_setting: config.save_location,
+                        custom_save_path: config.custom_save_path.clone(),
+                        video_save_location_setting: config.video_save_location,
+                        video_custom_save_path: config.video_custom_save_path.clone(),
+                        copy_to_clipboard_on_save: config.copy_to_clipboard_on_save,
+                        toolbar_unhovered_opacity: config.toolbar_unhovered_opacity,
+                        toolbar_is_hovered: false,
+                        toolbar_hover_animation: cosmic::iced::Animation::new(false)
+                            .quick()
+                            .easing(animation::Easing::EaseInOut),
+                        toolbar_opacity_save_id: 0,
+                        tesseract_available: crate::capture::ocr::is_tesseract_available(),
+                        available_encoders: Vec::new(),
+                        encoder_displays: Vec::new(),
+                        selected_encoder: config.video_encoder.clone(),
+                        video_container: config.video_container,
+                        video_framerate: config.video_framerate,
+                        video_show_cursor: config.video_show_cursor,
+                        is_video_mode: false,
+                        capture_mode_animation: cosmic::iced::Animation::new(false)
+                            .quick()
+                            .easing(animation::Easing::EaseInOut),
+                        is_recording: false,
+                        recording_annotation_mode: false,
+                        pencil_popup_open: false,
+                        pencil_color: config.pencil_color,
+                        pencil_fade_duration: config.pencil_fade_duration,
+                        pencil_thickness: config.pencil_thickness,
+                        toolbar_bounds: None,
+                        hide_toolbar_to_tray: config.hide_toolbar_to_tray,
+                        move_offset: None,
+                        is_default_portal: crate::screenshot::is_snappea_default_portal(),
+                    },
+                };
 
-            // Capture screenshots
-            let outputs: Vec<_> = helper
-                .outputs()
-                .into_iter()
-                .filter_map(|wl_output| {
-                    let info = helper.output_info(&wl_output)?;
-                    Some((
-                        wl_output,
-                        info.name.clone()?,
-                        info.logical_position?,
-                        info.logical_size?,
-                        info.scale_factor,
-                    ))
-                })
-                .collect();
-
-            if outputs.is_empty() {
-                log::error!("No outputs found for direct screenshot");
-                return;
-            }
-
-            // Capture output images
-            let mut output_images = HashMap::new();
-            for (wl_output, name, _, _, _) in &outputs {
-                if let Some(frame) = helper
-                    .capture_source_shm(CaptureSource::Output(wl_output.clone()), false)
+                // Send the screenshot event to trigger the UI
+                if let Err(e) = output
+                    .send(PortalEvent::Screenshot(screenshot::Event::Screenshot(args)))
                     .await
                 {
-                    match ScreenshotImage::new(frame) {
-                        Ok(img) => {
-                            output_images.insert(name.clone(), img);
-                        }
-                        Err(e) => {
-                            log::error!("Failed to create screenshot image for {}: {}", name, e);
-                        }
+                    log::error!("Failed to send direct screenshot event: {}", e);
+                }
+
+                // Keep the subscription alive and handle control commands
+                while let Some(cmd) = ctrl_rx.recv().await {
+                    if output.send(PortalEvent::Control(cmd)).await.is_err() {
+                        break;
                     }
-                } else {
-                    log::error!("Failed to capture output {}", name);
                 }
-            }
-
-            let config = SnapPeaConfig::load();
-            let choice = Choice::Rectangle(Rect::default(), DragState::default());
-
-            // Create screenshot Args
-            let args = screenshot::Args {
-                portal: PortalContext {
-                    handle: zbus::zvariant::ObjectPath::try_from("/direct/screenshot").unwrap(),
-                    app_id: "direct".to_string(),
-                    parent_window: String::new(),
-                    options: ScreenshotOptions {
-                        modal: None,
-                        interactive: Some(true),
-                        choose_destination: None,
-                    },
-                    tx,
-                },
-                capture: CaptureData {
-                    output_images,
-                },
-                session: SessionState {
-                    choice,
-                    action: crate::domain::Action::ReturnPath,
-                    location: crate::domain::ImageSaveLocation::Pictures,
-                    focused_output_index: 0,
-                    also_copy_to_clipboard: false,
-                    has_mouse_entered: false,
-                },
-                detection: DetectionState::default(),
-                annotations: AnnotationState::default(),
-                ui: UiState {
-                    now: Instant::now(),
-                    toolbar_position: config.toolbar_position,
-                    settings_drawer_open: false,
-                    settings_tab: crate::session::state::SettingsTab::General,
-                    primary_shape_tool: config.primary_shape_tool,
-                    shape_popup_open: false,
-                    shape_color: config.shape_color,
-                    shape_shadow: config.shape_shadow,
-                    primary_redact_tool: config.primary_redact_tool,
-                    redact_popup_open: false,
-                    pixelation_block_size: config.pixelation_block_size,
-                    magnifier_enabled: config.magnifier_enabled,
-                    save_location_setting: config.save_location,
-                    custom_save_path: config.custom_save_path.clone(),
-                    video_save_location_setting: config.video_save_location,
-                    video_custom_save_path: config.video_custom_save_path.clone(),
-                    copy_to_clipboard_on_save: config.copy_to_clipboard_on_save,
-                    toolbar_unhovered_opacity: config.toolbar_unhovered_opacity,
-                    toolbar_is_hovered: false,
-                    toolbar_hover_animation: cosmic::iced::Animation::new(false)
-                        .quick()
-                        .easing(animation::Easing::EaseInOut),
-                    toolbar_opacity_save_id: 0,
-                    tesseract_available: crate::capture::ocr::is_tesseract_available(),
-                    available_encoders: Vec::new(),
-                    encoder_displays: Vec::new(),
-                    selected_encoder: config.video_encoder.clone(),
-                    video_container: config.video_container,
-                    video_framerate: config.video_framerate,
-                    video_show_cursor: config.video_show_cursor,
-                    is_video_mode: false,
-                    capture_mode_animation: cosmic::iced::Animation::new(false)
-                        .quick()
-                        .easing(animation::Easing::EaseInOut),
-                    is_recording: false,
-                    recording_annotation_mode: false,
-                    pencil_popup_open: false,
-                    pencil_color: config.pencil_color,
-                    pencil_fade_duration: config.pencil_fade_duration,
-                    pencil_thickness: config.pencil_thickness,
-                    toolbar_bounds: None,
-                    hide_toolbar_to_tray: config.hide_toolbar_to_tray,
-                    move_offset: None,
-                    is_default_portal: crate::screenshot::is_snappea_default_portal(),
-                },
-            };
-
-            // Send the screenshot event to trigger the UI
-            if let Err(e) = output.send(PortalEvent::Screenshot(screenshot::Event::Screenshot(args))).await {
-                log::error!("Failed to send direct screenshot event: {}", e);
-            }
-
-            // Keep the subscription alive and handle control commands
-            while let Some(cmd) = ctrl_rx.recv().await {
-                if output.send(PortalEvent::Control(cmd)).await.is_err() {
-                    break;
-                }
-            }
-        },
+            },
         )
     })
 }
@@ -1273,25 +1284,25 @@ fn tray_subscription(rx: CbReceiver<TrayAction>) -> Subscription<Msg> {
 
         cosmic::iced::stream::channel(
             10,
-            move |mut output: cosmic::iced_futures::futures::channel::mpsc::Sender<Msg>| async move {
-            use cosmic::iced_futures::futures::StreamExt;
+            move |mut output: cosmic::iced::futures::channel::mpsc::Sender<Msg>| async move {
+                use cosmic::iced::futures::StreamExt;
 
-            // Bridge the blocking crossbeam receiver into an async stream
-            let (mut tx, mut async_rx) =
-                cosmic::iced_futures::futures::channel::mpsc::channel::<TrayAction>(10);
+                // Bridge the blocking crossbeam receiver into an async stream
+                let (mut tx, mut async_rx) =
+                    cosmic::iced::futures::channel::mpsc::channel::<TrayAction>(10);
 
-            std::thread::spawn(move || {
-                for action in rx.iter() {
-                    let _ = tx.try_send(action);
+                std::thread::spawn(move || {
+                    for action in rx.iter() {
+                        let _ = tx.try_send(action);
+                    }
+                });
+
+                while let Some(action) = async_rx.next().await {
+                    if output.send(Msg::TrayAction(action)).await.is_err() {
+                        break;
+                    }
                 }
-            });
-
-            while let Some(action) = async_rx.next().await {
-                if output.send(Msg::TrayAction(action)).await.is_err() {
-                    break;
-                }
-            }
-        },
+            },
         )
     })
 }
@@ -1301,8 +1312,8 @@ fn render_recording_indicator(
     indicator: &RecordingIndicator,
     toolbar_visible: bool,
 ) -> cosmic::Element<'static, Msg> {
-    use cosmic::iced_core::Length;
-    use cosmic::iced_widget::canvas::{self, Geometry, Path, Stroke};
+    use cosmic::iced::core::Length;
+    use cosmic::iced::widget::canvas::{self, Geometry, Path, Stroke};
 
     // Clone data for use in the canvas program
     let region = indicator.region;
@@ -1324,15 +1335,15 @@ fn render_recording_indicator(
         pencil_color: crate::config::ShapeColor,
         pencil_thickness: f32,
         pencil_popup_open: bool,
-        pencil_popup_bounds: Option<cosmic::iced_core::Rectangle>,
-        toolbar_bounds: Option<cosmic::iced_core::Rectangle>,
+        pencil_popup_bounds: Option<cosmic::iced::core::Rectangle>,
+        toolbar_bounds: Option<cosmic::iced::core::Rectangle>,
         toolbar_dragging: bool,
     }
 
     /// State for tracking cursor position between events
     #[derive(Default)]
     struct OverlayState {
-        cursor_position: cosmic::iced_core::Point,
+        cursor_position: cosmic::iced::core::Point,
     }
 
     impl canvas::Program<Msg, cosmic::Theme, cosmic::Renderer> for RecordingOverlay {
@@ -1342,10 +1353,10 @@ fn render_recording_indicator(
             &self,
             state: &mut Self::State,
             event: &cosmic::iced::Event,
-            bounds: cosmic::iced_core::Rectangle,
-            cursor: cosmic::iced_core::mouse::Cursor,
+            bounds: cosmic::iced::core::Rectangle,
+            cursor: cosmic::iced::core::mouse::Cursor,
         ) -> Option<canvas::Action<Msg>> {
-            use cosmic::iced_core::mouse::{Button, Event as MouseEvent};
+            use cosmic::iced::core::mouse::{Button, Event as MouseEvent};
 
             // Update cursor position if available
             if let Some(pos) = cursor.position_in(bounds) {
@@ -1368,27 +1379,31 @@ fn render_recording_indicator(
 
                             // Close popup if clicking outside popup and toolbar
                             if !in_popup && !in_toolbar {
-                                return Some(canvas::Action::publish(
-                                    Msg::Screenshot(crate::session::messages::Msg::Tool(
-                                        crate::session::messages::ToolMsg::PencilPopup(
-                                            crate::session::messages::ToolPopupAction::Close,
+                                return Some(
+                                    canvas::Action::publish(Msg::Screenshot(
+                                        crate::session::messages::Msg::Tool(
+                                            crate::session::messages::ToolMsg::PencilPopup(
+                                                crate::session::messages::ToolPopupAction::Close,
+                                            ),
                                         ),
-                                    )),
-                                )
-                                .and_capture());
+                                    ))
+                                    .and_capture(),
+                                );
                             }
                         }
                     }
 
                     // Start drawing if in annotation mode (and popup not handling the click)
                     if self.annotation_mode && !self.pencil_popup_open {
-                        return Some(canvas::Action::publish(Msg::IndicatorMouse(
+                        return Some(
+                            canvas::Action::publish(Msg::IndicatorMouse(
                                 cosmic::iced::mouse::Event::ButtonPressed(
                                     cosmic::iced::mouse::Button::Left,
                                 ),
                                 state.cursor_position,
                             ))
-                            .and_capture());
+                            .and_capture(),
+                        );
                     }
                 }
                 canvas::Event::Mouse(MouseEvent::CursorMoved { position }) => {
@@ -1397,10 +1412,8 @@ fn render_recording_indicator(
                     // Handle toolbar dragging - takes priority over annotation drawing
                     if self.toolbar_dragging {
                         return Some(
-                            canvas::Action::publish(Msg::ToolbarDragMove(
-                                position.x, position.y,
-                            ))
-                            .and_capture(),
+                            canvas::Action::publish(Msg::ToolbarDragMove(position.x, position.y))
+                                .and_capture(),
                         );
                     }
 
@@ -1409,11 +1422,15 @@ fn render_recording_indicator(
                         && self.current_stroke.is_some()
                         && !self.pencil_popup_open
                     {
-                        return Some(canvas::Action::publish(Msg::IndicatorMouse(
-                                cosmic::iced::mouse::Event::CursorMoved { position: *position },
+                        return Some(
+                            canvas::Action::publish(Msg::IndicatorMouse(
+                                cosmic::iced::mouse::Event::CursorMoved {
+                                    position: *position,
+                                },
                                 *position,
                             ))
-                            .and_capture());
+                            .and_capture(),
+                        );
                     }
                 }
                 canvas::Event::Mouse(MouseEvent::ButtonReleased(Button::Left)) => {
@@ -1424,13 +1441,15 @@ fn render_recording_indicator(
 
                     // Don't capture release if popup is open (even mid-stroke)
                     if self.current_stroke.is_some() && !self.pencil_popup_open {
-                        return Some(canvas::Action::publish(Msg::IndicatorMouse(
+                        return Some(
+                            canvas::Action::publish(Msg::IndicatorMouse(
                                 cosmic::iced::mouse::Event::ButtonReleased(
                                     cosmic::iced::mouse::Button::Left,
                                 ),
                                 state.cursor_position,
                             ))
-                            .and_capture());
+                            .and_capture(),
+                        );
                     }
                 }
                 _ => {}
@@ -1445,8 +1464,8 @@ fn render_recording_indicator(
             _state: &Self::State,
             renderer: &cosmic::Renderer,
             _theme: &cosmic::Theme,
-            bounds: cosmic::iced_core::Rectangle,
-            _cursor: cosmic::iced_core::mouse::Cursor,
+            bounds: cosmic::iced::core::Rectangle,
+            _cursor: cosmic::iced::core::mouse::Cursor,
         ) -> Vec<Geometry> {
             let mut frame = canvas::Frame::new(renderer, bounds.size());
 
@@ -1463,14 +1482,14 @@ fn render_recording_indicator(
                 let h = self.region.3 as f32 + (border_width + margin) * 2.0;
 
                 let path = Path::rectangle(
-                    cosmic::iced_core::Point::new(x, y),
-                    cosmic::iced_core::Size::new(w, h),
+                    cosmic::iced::core::Point::new(x, y),
+                    cosmic::iced::core::Size::new(w, h),
                 );
 
                 frame.stroke(
                     &path,
                     Stroke::default()
-                        .with_color(cosmic::iced_core::Color::from_rgb(1.0, 0.0, 0.0))
+                        .with_color(cosmic::iced::core::Color::from_rgb(1.0, 0.0, 0.0))
                         .with_width(border_width),
                 );
             }
@@ -1483,17 +1502,17 @@ fn render_recording_indicator(
                 }
 
                 let path = Path::new(|builder| {
-                    builder.move_to(cosmic::iced_core::Point::new(
+                    builder.move_to(cosmic::iced::core::Point::new(
                         stroke.points[0].0,
                         stroke.points[0].1,
                     ));
                     for point in &stroke.points[1..] {
-                        builder.line_to(cosmic::iced_core::Point::new(point.0, point.1));
+                        builder.line_to(cosmic::iced::core::Point::new(point.0, point.1));
                     }
                 });
 
                 // Use per-stroke color with fading opacity
-                let color = cosmic::iced_core::Color::from_rgba(
+                let color = cosmic::iced::core::Color::from_rgba(
                     stroke.color.r,
                     stroke.color.g,
                     stroke.color.b,
@@ -1514,14 +1533,14 @@ fn render_recording_indicator(
             if let Some(points) = &self.current_stroke {
                 if points.len() >= 2 {
                     let path = Path::new(|builder| {
-                        builder.move_to(cosmic::iced_core::Point::new(points[0].0, points[0].1));
+                        builder.move_to(cosmic::iced::core::Point::new(points[0].0, points[0].1));
                         for point in &points[1..] {
-                            builder.line_to(cosmic::iced_core::Point::new(point.0, point.1));
+                            builder.line_to(cosmic::iced::core::Point::new(point.0, point.1));
                         }
                     });
 
                     // Use current pencil color, full opacity for stroke being drawn
-                    let color = cosmic::iced_core::Color::from_rgba(
+                    let color = cosmic::iced::core::Color::from_rgba(
                         self.pencil_color.r,
                         self.pencil_color.g,
                         self.pencil_color.b,
@@ -1564,8 +1583,8 @@ fn render_recording_indicator(
         .height(Length::Fill);
 
     // Add toolbar with stop and pencil toggle buttons
-    use cosmic::iced_core::Background;
-    use cosmic::iced_widget::row;
+    use cosmic::iced::core::Background;
+    use cosmic::iced::widget::row;
     use cosmic::widget::{button, container, icon};
 
     let toolbar_pos = indicator.toolbar_pos;
@@ -1578,13 +1597,13 @@ fn render_recording_indicator(
     )
     .class(cosmic::theme::Container::Custom(Box::new(|_theme| {
         cosmic::iced::widget::container::Style {
-            background: Some(Background::Color(cosmic::iced_core::Color::from_rgb(
+            background: Some(Background::Color(cosmic::iced::core::Color::from_rgb(
                 0.85, 0.2, 0.2,
             ))),
-            border: cosmic::iced_core::Border {
+            border: cosmic::iced::core::Border {
                 radius: 20.0.into(),
                 width: 2.0,
-                color: cosmic::iced_core::Color::WHITE,
+                color: cosmic::iced::core::Color::WHITE,
             },
             ..Default::default()
         }
@@ -1592,8 +1611,8 @@ fn render_recording_indicator(
     .padding(10)
     .width(Length::Fixed(40.0))
     .height(Length::Fixed(40.0))
-    .align_x(cosmic::iced_core::alignment::Horizontal::Center)
-    .align_y(cosmic::iced_core::alignment::Vertical::Center);
+    .align_x(cosmic::iced::core::alignment::Horizontal::Center)
+    .align_y(cosmic::iced::core::alignment::Vertical::Center);
 
     let btn_stop = cosmic::widget::tooltip(
         button::custom(stop_icon)
@@ -1607,21 +1626,23 @@ fn render_recording_indicator(
     );
 
     // Drag handle on the left - wrapped in mouse_area for drag support
-    const DRAG_ICON: &[u8] = include_bytes!("../../data/icons/hicolor/scalable/actions/drag.svg");
-    let drag_handle_icon =
-        cosmic::widget::icon(cosmic::widget::icon::from_svg_bytes(DRAG_ICON).symbolic(true))
-            .size(40);
+    let drag_handle_icon = crate::widget::lucide::icon_with_opacity(
+        crate::widget::lucide::AppIcon::Drag,
+        30.0,
+        1.0,
+        false,
+    );
     let drag_handle_container = cosmic::widget::container(drag_handle_icon)
         .width(Length::Fixed(56.0))
         .height(Length::Fixed(56.0))
-        .align_x(cosmic::iced_core::alignment::Horizontal::Center)
-        .align_y(cosmic::iced_core::alignment::Vertical::Center);
+        .align_x(cosmic::iced::core::alignment::Horizontal::Center)
+        .align_y(cosmic::iced::core::alignment::Vertical::Center);
 
     // Wrap drag handle in mouse_area to capture drag events
     let drag_handle = cosmic::widget::mouse_area(drag_handle_container)
         .on_press(Msg::ToolbarDragStart)
         .on_release(Msg::ToolbarDragEnd)
-        .interaction(cosmic::iced_core::mouse::Interaction::Grab);
+        .interaction(cosmic::iced::core::mouse::Interaction::Grab);
 
     // Pencil toggle button with indicator dot and popup support
     let btn_pencil: cosmic::Element<'static, Msg> = crate::widget::tool_button::build_tool_button(
@@ -1643,11 +1664,12 @@ fn render_recording_indicator(
     );
 
     // Hide to tray button (minimize icon)
-    const MINIMIZE_ICON: &[u8] =
-        include_bytes!("../../data/icons/hicolor/scalable/actions/minimize.svg");
-    let tray_icon =
-        cosmic::widget::icon(cosmic::widget::icon::from_svg_bytes(MINIMIZE_ICON).symbolic(true))
-            .size(40);
+    let tray_icon = crate::widget::lucide::icon_with_opacity(
+        crate::widget::lucide::AppIcon::Minimize,
+        30.0,
+        1.0,
+        false,
+    );
 
     let btn_hide_to_tray = cosmic::widget::tooltip(
         button::custom(tray_icon)
@@ -1663,7 +1685,7 @@ fn render_recording_indicator(
     // Build toolbar content: drag handle | pencil | stop | minimize
     let toolbar_content = row![drag_handle, btn_pencil, btn_stop, btn_hide_to_tray]
         .spacing(8)
-        .align_y(cosmic::iced_core::Alignment::Center);
+        .align_y(cosmic::iced::core::Alignment::Center);
 
     // Build pencil popup if open
     let pencil_popup = if pencil_popup_open {
@@ -1704,7 +1726,7 @@ fn render_recording_indicator(
     };
 
     // Stack canvas, toolbar, and popup with proper vertical positioning
-    use cosmic::iced_widget::{column, stack};
+    use cosmic::iced::widget::{column, stack};
 
     // Toolbar styled container
     let toolbar_with_bg = cosmic::widget::container(toolbar_content).padding(8).class(
@@ -1714,7 +1736,7 @@ fn render_recording_indicator(
                 background: Some(Background::Color(
                     cosmic_theme.background.component.base.into(),
                 )),
-                border: cosmic::iced_core::Border {
+                border: cosmic::iced::core::Border {
                     radius: cosmic_theme.corner_radii.radius_s.into(),
                     ..Default::default()
                 },
@@ -1728,10 +1750,8 @@ fn render_recording_indicator(
     let _output_size = indicator.output_size;
 
     // Create horizontal spacer to position toolbar
-    let left_space =
-        cosmic::iced::widget::space().width(Length::Fixed(toolbar_pos.0.max(0.0)));
-    let top_space =
-        cosmic::iced::widget::space().height(Length::Fixed(toolbar_pos.1.max(0.0)));
+    let left_space = cosmic::iced::widget::space().width(Length::Fixed(toolbar_pos.0.max(0.0)));
+    let top_space = cosmic::iced::widget::space().height(Length::Fixed(toolbar_pos.1.max(0.0)));
 
     // Build the positioned toolbar
     let toolbar_row = row![
@@ -1746,8 +1766,8 @@ fn render_recording_indicator(
         toolbar_row,
         cosmic::iced::widget::space().height(Length::Fill)
     ]
-        .width(Length::Fill)
-        .height(Length::Fill);
+    .width(Length::Fill)
+    .height(Length::Fill);
 
     // Build stack with popup above toolbar if open
     // Build the final stack based on toolbar visibility
@@ -1791,8 +1811,8 @@ fn render_recording_indicator(
                 popup_row,
                 cosmic::iced::widget::space().height(Length::Fill)
             ]
-                .width(Length::Fill)
-                .height(Length::Fill);
+            .width(Length::Fill)
+            .height(Length::Fill);
 
             stack![canvas_layer, toolbar_layer, popup_layer]
                 .width(Length::Fill)
@@ -1819,15 +1839,14 @@ pub(crate) fn control_subscription() -> Subscription<Msg> {
     struct ControlSub;
 
     Subscription::run_with(TypeId::of::<ControlSub>(), |_| {
-        cosmic::iced_futures::stream::channel(
+        cosmic::iced::stream::channel(
             10,
-            |mut output: cosmic::iced_futures::futures::channel::mpsc::Sender<Msg>| async move {
-            let (cmd_tx, mut cmd_rx) = tokio::sync::mpsc::channel::<ControlCommand>(10);
+            |mut output: cosmic::iced::futures::channel::mpsc::Sender<Msg>| async move {
+                let (cmd_tx, mut cmd_rx) = tokio::sync::mpsc::channel::<ControlCommand>(10);
 
-            // Try to register the D-Bus control interface
-            let connection = match zbus::connection::Builder::session() {
-                Ok(builder) => {
-                    match builder.name(DBUS_NAME) {
+                // Try to register the D-Bus control interface
+                let connection = match zbus::connection::Builder::session() {
+                    Ok(builder) => match builder.name(DBUS_NAME) {
                         Ok(builder) => {
                             match builder.serve_at(CONTROL_PATH, ControlInterface::new(cmd_tx)) {
                                 Ok(builder) => match builder.build().await {
@@ -1853,26 +1872,25 @@ pub(crate) fn control_subscription() -> Subscription<Msg> {
                             log::warn!("Failed to claim D-Bus name: {}", e);
                             None
                         }
+                    },
+                    Err(e) => {
+                        log::warn!("Failed to setup D-Bus control interface: {}", e);
+                        None
                     }
-                }
-                Err(e) => {
-                    log::warn!("Failed to setup D-Bus control interface: {}", e);
-                    None
-                }
-            };
+                };
 
-            // Keep connection alive and forward commands
-            if connection.is_some() {
-                while let Some(cmd) = cmd_rx.recv().await {
-                    if output.send(Msg::Control(cmd)).await.is_err() {
-                        break;
+                // Keep connection alive and forward commands
+                if connection.is_some() {
+                    while let Some(cmd) = cmd_rx.recv().await {
+                        if output.send(Msg::Control(cmd)).await.is_err() {
+                            break;
+                        }
                     }
+                } else {
+                    // No D-Bus connection, just keep the subscription alive
+                    futures::future::pending::<()>().await;
                 }
-            } else {
-                // No D-Bus connection, just keep the subscription alive
-                futures::future::pending::<()>().await;
-            }
-        },
+            },
         )
     })
 }
@@ -1951,9 +1969,7 @@ async fn trigger_screenshot(
             },
             tx: portal_tx,
         },
-        capture: CaptureData {
-            output_images,
-        },
+        capture: CaptureData { output_images },
         session: SessionState {
             choice,
             action: crate::domain::Action::ReturnPath,

@@ -6,13 +6,10 @@
 use cosmic::{
     Element,
     cosmic_theme::Spacing,
+    iced::core::{Layout, Length, Point, Size, layout, overlay, widget::Tree},
+    iced::widget::canvas,
     iced::{self, window},
-    iced_core::{
-        Layout, Length, Point, Size,
-        layout, overlay, widget::Tree,
-    },
-    iced_widget::canvas,
-    widget::{image},
+    widget::image,
 };
 
 use cosmic::widget::segmented_button;
@@ -117,7 +114,6 @@ where
     qr_codes_for_output: Vec<(f32, f32, String)>,
     ocr_overlays_for_output: Vec<(f32, f32, f32, f32, i32)>,
 
-
     // Pre-built child elements
     bg_element: Element<'a, Msg>,
     fg_element: Element<'a, Msg>,
@@ -168,8 +164,7 @@ where
             filter_ocr_overlays_for_output(&detection.ocr_overlays, &output.name);
 
         // Calculate selection rectangle relative to this output
-        let selection_rect =
-            calculate_selection_rect(&choice, output_rect, output.logical_size);
+        let selection_rect = calculate_selection_rect(&choice, output_rect, output.logical_size);
 
         let _space_l = spacing.space_l;
         let space_s = spacing.space_s;
@@ -302,10 +297,7 @@ where
             ui.is_recording,
             ui.recording_annotation_mode,
             ui.pencil_popup_open,
-            crate::widget::icon_toggle::get_toggle_percent(
-                &ui.capture_mode_animation,
-                ui.now,
-            ),
+            crate::widget::icon_toggle::get_toggle_percent(&ui.capture_mode_animation, ui.now),
             {
                 let on_event = on_event.clone();
                 move |is_video| on_event(ScreenshotEvent::capture_mode_toggle(is_video))
@@ -561,7 +553,7 @@ where
 // Widget trait implementation
 // ============================================================================
 
-impl<'a, E> cosmic::iced_core::Widget<Msg, cosmic::Theme, cosmic::Renderer>
+impl<'a, E> cosmic::iced::core::Widget<Msg, cosmic::Theme, cosmic::Renderer>
     for ScreenshotSelectionWidget<'a, E>
 where
     E: Fn(ScreenshotEvent) -> Msg + Clone + Send + Sync + 'static,
@@ -905,12 +897,12 @@ where
         tree: &Tree,
         renderer: &mut cosmic::Renderer,
         theme: &cosmic::Theme,
-        style: &cosmic::iced_core::renderer::Style,
+        style: &cosmic::iced::core::renderer::Style,
         layout: Layout<'_>,
         cursor: cosmic::iced::mouse::Cursor,
-        viewport: &cosmic::iced_core::Rectangle,
+        viewport: &cosmic::iced::core::Rectangle,
     ) {
-        use cosmic::iced_core::Renderer;
+        use cosmic::iced::core::Renderer;
 
         let children = &[
             &self.bg_element,
@@ -1203,16 +1195,16 @@ where
     fn update(
         &mut self,
         tree: &mut Tree,
-        event: &cosmic::iced_core::Event,
+        event: &cosmic::iced::core::Event,
         layout: Layout<'_>,
         cursor: cosmic::iced::mouse::Cursor,
         renderer: &cosmic::Renderer,
-        clipboard: &mut dyn cosmic::iced_core::Clipboard,
-        shell: &mut cosmic::iced_core::Shell<'_, Msg>,
-        viewport: &cosmic::iced_core::Rectangle,
+        clipboard: &mut dyn cosmic::iced::core::Clipboard,
+        shell: &mut cosmic::iced::core::Shell<'_, Msg>,
+        viewport: &cosmic::iced::core::Rectangle,
     ) {
-        use cosmic::iced_core::Event;
-        use cosmic::iced_core::mouse::{Button, Event as MouseEvent};
+        use cosmic::iced::core::Event;
+        use cosmic::iced::core::mouse::{Button, Event as MouseEvent};
 
         if self.output_ctx.is_active_output {
             if matches!(event, Event::Mouse(_)) {
@@ -1484,7 +1476,7 @@ where
                 shell,
                 viewport,
             );
-            if matches!(event, cosmic::iced_core::event::Event::PlatformSpecific(_)) {
+            if matches!(event, cosmic::iced::core::event::Event::PlatformSpecific(_)) {
                 continue;
             }
             if shell.is_event_captured() {
@@ -1721,7 +1713,7 @@ where
         state: &Tree,
         layout: Layout<'_>,
         cursor: cosmic::iced::mouse::Cursor,
-        viewport: &cosmic::iced_core::Rectangle,
+        viewport: &cosmic::iced::core::Rectangle,
         renderer: &cosmic::Renderer,
     ) -> cosmic::iced::mouse::Interaction {
         // If actively dragging a rectangle selection, show the appropriate cursor
@@ -1764,19 +1756,24 @@ where
         }
 
         let layout_children = layout.children().collect::<Vec<_>>();
-        
+
         // First check popups (indices > 3) - they overlay everything
         for (i, (child_layout, child)) in layout_children
             .iter()
             .zip(children.iter())
             .enumerate()
             .rev()
-            .skip_while(|(i, _)| *i <= 3) // Skip bg, fg, shapes, menu - check popups first
+            .skip_while(|(i, _)| *i <= 3)
+        // Skip bg, fg, shapes, menu - check popups first
         {
             let tree = &state.children[i];
-            let interaction = child
-                .as_widget()
-                .mouse_interaction(tree, *child_layout, cursor, viewport, renderer);
+            let interaction = child.as_widget().mouse_interaction(
+                tree,
+                *child_layout,
+                cursor,
+                viewport,
+                renderer,
+            );
             if cursor.is_over(child_layout.bounds()) {
                 return interaction;
             }
@@ -1789,9 +1786,13 @@ where
             let menu_layout = layout_children[3];
             if cursor.is_over(menu_layout.bounds()) {
                 let tree = &state.children[3];
-                let interaction = children[3]
-                    .as_widget()
-                    .mouse_interaction(tree, menu_layout, cursor, viewport, renderer);
+                let interaction = children[3].as_widget().mouse_interaction(
+                    tree,
+                    menu_layout,
+                    cursor,
+                    viewport,
+                    renderer,
+                );
                 return interaction;
             }
         }
@@ -1801,7 +1802,7 @@ where
             if let Some(cursor_pos) = cursor.position() {
                 // Check if cursor is inside the selection region
                 if let Some((x, y, w, h)) = self.selection_rect {
-                    let selection_bounds = cosmic::iced_core::Rectangle {
+                    let selection_bounds = cosmic::iced::core::Rectangle {
                         x,
                         y,
                         width: w,
@@ -1842,7 +1843,7 @@ where
         state: &'b mut Tree,
         layout: Layout<'b>,
         renderer: &cosmic::Renderer,
-        viewport: &cosmic::iced_core::Rectangle,
+        viewport: &cosmic::iced::core::Rectangle,
         translation: iced::Vector,
     ) -> Option<overlay::Element<'b, Msg, cosmic::Theme, cosmic::Renderer>> {
         let mut elements: Vec<&mut Element<'_, Msg>> = vec![
@@ -1911,16 +1912,18 @@ where
             .rev()
         {
             let tree = &mut tree.children[i];
-            child.as_widget_mut().operate(tree, layout, renderer, operation);
+            child
+                .as_widget_mut()
+                .operate(tree, layout, renderer, operation);
         }
     }
 
-    fn tag(&self) -> cosmic::iced_core::widget::tree::Tag {
-        cosmic::iced_core::widget::tree::Tag::of::<()>()
+    fn tag(&self) -> cosmic::iced::core::widget::tree::Tag {
+        cosmic::iced::core::widget::tree::Tag::of::<()>()
     }
 
-    fn state(&self) -> cosmic::iced_core::widget::tree::State {
-        cosmic::iced_core::widget::tree::State::None
+    fn state(&self) -> cosmic::iced::core::widget::tree::State {
+        cosmic::iced::core::widget::tree::State::None
     }
 
     fn id(&self) -> Option<cosmic::widget::Id> {
@@ -1936,7 +1939,7 @@ where
         state: &Tree,
         layout: Layout<'_>,
         renderer: &cosmic::Renderer,
-        dnd_rectangles: &mut cosmic::iced_core::clipboard::DndDestinationRectangles,
+        dnd_rectangles: &mut cosmic::iced::core::clipboard::DndDestinationRectangles,
     ) {
         let mut children: Vec<&Element<'_, Msg>> =
             vec![&self.bg_element, &self.fg_element, &self.menu_element];

@@ -1,13 +1,15 @@
 use cosmic::cosmic_config::CosmicConfigEntry;
 use cosmic::iced::animation;
 use cosmic::iced::clipboard::mime::AsMimeTypes;
-use cosmic::iced::{Limits, window};
-use cosmic::iced_core::Length;
-use cosmic::iced_runtime::clipboard;
-use cosmic::iced_runtime::platform_specific::wayland::layer_surface::{
+use cosmic::iced::core::Length;
+use cosmic::iced::platform_specific::runtime::wayland::layer_surface::{
     IcedOutput, SctkLayerSurfaceSettings,
 };
-use cosmic::iced_winit::commands::layer_surface::{destroy_layer_surface, get_layer_surface};
+use cosmic::iced::platform_specific::shell::commands::layer_surface::{
+    destroy_layer_surface, get_layer_surface,
+};
+use cosmic::iced::runtime::clipboard;
+use cosmic::iced::{Limits, window};
 use cosmic_client_toolkit::sctk::shell::wlr_layer::{Anchor, KeyboardInteractivity, Layer};
 
 use image::RgbaImage;
@@ -348,9 +350,7 @@ impl Screenshot {
                     options: options.clone(),
                     tx,
                 },
-                capture: CaptureData {
-                    output_images,
-                },
+                capture: CaptureData { output_images },
                 session: SessionState {
                     choice,
                     action: if options.choose_destination.unwrap_or_default() {
@@ -472,10 +472,7 @@ pub(crate) fn view(app: &App, id: window::Id) -> cosmic::Element<'_, Msg> {
         }
     };
 
-    let has_confirmed_selection = matches!(
-        &args.session.choice,
-        Choice::Output(Some(_))
-    );
+    let has_confirmed_selection = matches!(&args.session.choice, Choice::Output(Some(_)));
 
     let output_ctx = OutputContext {
         output_count: app.outputs.len(),
@@ -606,7 +603,7 @@ fn handle_tool_msg(app: &mut App, msg: ToolMsg) -> cosmic::Task<crate::core::app
                     (indicator.toolbar_pos.1 - popup_gap - popup_height).max(0.0)
                 };
 
-                indicator.pencil_popup_bounds = Some(cosmic::iced_core::Rectangle {
+                indicator.pencil_popup_bounds = Some(cosmic::iced::core::Rectangle {
                     x: popup_x,
                     y: popup_y,
                     width: popup_width,
@@ -739,7 +736,9 @@ fn handle_settings_msg(app: &mut App, msg: SettingsMsg) -> cosmic::Task<crate::c
                     .map(|handle| handle.path().to_string_lossy().to_string())
             },
             |result| {
-                crate::core::app::Msg::Screenshot(crate::session::messages::Msg::browse_save_location_result(result))
+                crate::core::app::Msg::Screenshot(
+                    crate::session::messages::Msg::browse_save_location_result(result),
+                )
             },
         );
 
@@ -779,7 +778,9 @@ fn handle_settings_msg(app: &mut App, msg: SettingsMsg) -> cosmic::Task<crate::c
                     .map(|handle| handle.path().to_string_lossy().to_string())
             },
             |result| {
-                crate::core::app::Msg::Screenshot(crate::session::messages::Msg::browse_video_save_location_result(result))
+                crate::core::app::Msg::Screenshot(
+                    crate::session::messages::Msg::browse_video_save_location_result(result),
+                )
             },
         );
 
@@ -859,7 +860,9 @@ fn handle_settings_msg(app: &mut App, msg: SettingsMsg) -> cosmic::Task<crate::c
             }
             SettingsMsg::ToolbarHoverChanged(is_hovered) => {
                 args.ui.toolbar_is_hovered = is_hovered;
-                args.ui.toolbar_hover_animation.go_mut(is_hovered, args.ui.now);
+                args.ui
+                    .toolbar_hover_animation
+                    .go_mut(is_hovered, args.ui.now);
                 cosmic::Task::none()
             }
             SettingsMsg::ToolbarBounds(bounds) => {
@@ -1231,7 +1234,7 @@ fn handle_capture_msg(app: &mut App, msg: CaptureMsg) -> cosmic::Task<crate::cor
             let toolbar_x = (output_size.0 - toolbar_width) / 2.0;
             let toolbar_y = output_size.1 - toolbar_height - toolbar_margin;
 
-            let toolbar_input_bounds = cosmic::iced_core::Rectangle {
+            let toolbar_input_bounds = cosmic::iced::core::Rectangle {
                 x: toolbar_x,
                 y: toolbar_y,
                 width: toolbar_width,

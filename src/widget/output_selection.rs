@@ -1,6 +1,6 @@
 use cosmic::{
     iced::Limits,
-    iced_core::{
+    iced::core::{
         Background, Border, Color, Length, Renderer, Shadow, Size, alignment,
         layout::Node,
         mouse,
@@ -66,11 +66,11 @@ impl<Msg: Clone + 'static> Widget<Msg, cosmic::Theme, cosmic::Renderer> for Outp
         Size::new(Length::Fill, Length::Fill)
     }
 
-    fn state(&self) -> cosmic::iced_core::widget::tree::State {
+    fn state(&self) -> cosmic::iced::core::widget::tree::State {
         State::new(MyState::default())
     }
 
-    fn tag(&self) -> cosmic::iced_core::widget::tree::Tag {
+    fn tag(&self) -> cosmic::iced::core::widget::tree::Tag {
         tree::Tag::of::<MyState>()
     }
 
@@ -84,10 +84,10 @@ impl<Msg: Clone + 'static> Widget<Msg, cosmic::Theme, cosmic::Renderer> for Outp
         _tree: &Tree,
         renderer: &mut cosmic::Renderer,
         theme: &cosmic::Theme,
-        _style: &cosmic::iced_core::renderer::Style,
-        layout: cosmic::iced_core::Layout<'_>,
-        _cursor: cosmic::iced_core::mouse::Cursor,
-        _viewport: &cosmic::iced_core::Rectangle,
+        _style: &cosmic::iced::core::renderer::Style,
+        layout: cosmic::iced::core::Layout<'_>,
+        _cursor: cosmic::iced::core::mouse::Cursor,
+        _viewport: &cosmic::iced::core::Rectangle,
     ) {
         let cosmic_theme = theme.cosmic();
         let radius_s = cosmic_theme.radius_s();
@@ -143,7 +143,7 @@ impl<Msg: Clone + 'static> Widget<Msg, cosmic::Theme, cosmic::Renderer> for Outp
             let hint_x = bounds.x + (bounds.width - hint_width) / 2.0;
             let hint_y = bounds.y + (bounds.height - hint_height) / 2.0;
 
-            let hint_bounds = cosmic::iced_core::Rectangle {
+            let hint_bounds = cosmic::iced::core::Rectangle {
                 x: hint_x,
                 y: hint_y,
                 width: hint_width,
@@ -193,7 +193,7 @@ impl<Msg: Clone + 'static> Widget<Msg, cosmic::Theme, cosmic::Renderer> for Outp
                     wrapping: text::Wrapping::Word,
                     ellipsize: text::Ellipsize::default(),
                 },
-                cosmic::iced_core::Point::new(text_center_x, text_center_y),
+                cosmic::iced::core::Point::new(text_center_x, text_center_y),
                 text_color,
                 hint_bounds,
             );
@@ -203,28 +203,28 @@ impl<Msg: Clone + 'static> Widget<Msg, cosmic::Theme, cosmic::Renderer> for Outp
     fn mouse_interaction(
         &self,
         _state: &Tree,
-        layout: cosmic::iced_core::Layout<'_>,
-        cursor: cosmic::iced_core::mouse::Cursor,
-        _viewport: &cosmic::iced_core::Rectangle,
+        layout: cosmic::iced::core::Layout<'_>,
+        cursor: cosmic::iced::core::mouse::Cursor,
+        _viewport: &cosmic::iced::core::Rectangle,
         _renderer: &cosmic::Renderer,
-    ) -> cosmic::iced_core::mouse::Interaction {
+    ) -> cosmic::iced::core::mouse::Interaction {
         if self.picker_mode && cursor.is_over(layout.bounds()) {
-            cosmic::iced_core::mouse::Interaction::Pointer
+            cosmic::iced::core::mouse::Interaction::Pointer
         } else {
-            cosmic::iced_core::mouse::Interaction::default()
+            cosmic::iced::core::mouse::Interaction::default()
         }
     }
 
     fn update(
         &mut self,
         state: &mut Tree,
-        event: &cosmic::iced_core::Event,
-        layout: cosmic::iced_core::Layout<'_>,
-        cursor: cosmic::iced_core::mouse::Cursor,
+        event: &cosmic::iced::core::Event,
+        layout: cosmic::iced::core::Layout<'_>,
+        cursor: cosmic::iced::core::mouse::Cursor,
         _renderer: &cosmic::Renderer,
-        _clipboard: &mut dyn cosmic::iced_core::Clipboard,
-        shell: &mut cosmic::iced_core::Shell<'_, Msg>,
-        _viewport: &cosmic::iced_core::Rectangle,
+        _clipboard: &mut dyn cosmic::iced::core::Clipboard,
+        shell: &mut cosmic::iced::core::Shell<'_, Msg>,
+        _viewport: &cosmic::iced::core::Rectangle,
     ) {
         let my_state = state.state.downcast_mut::<MyState>();
         let hovered = cursor.is_over(layout.bounds());
@@ -241,8 +241,8 @@ impl<Msg: Clone + 'static> Widget<Msg, cosmic::Theme, cosmic::Renderer> for Outp
 
         if should_publish_enter {
             match event {
-                cosmic::iced_core::Event::Mouse(mouse::Event::CursorMoved { .. })
-                | cosmic::iced_core::Event::Mouse(mouse::Event::CursorEntered) => {
+                cosmic::iced::core::Event::Mouse(mouse::Event::CursorMoved { .. })
+                | cosmic::iced::core::Event::Mouse(mouse::Event::CursorEntered) => {
                     my_state.entered_published = true;
                     shell.publish(self.on_enter.clone());
                     shell.capture_event();
@@ -255,8 +255,9 @@ impl<Msg: Clone + 'static> Widget<Msg, cosmic::Theme, cosmic::Renderer> for Outp
         // Handle click for confirming selection (in picker mode)
         if self.picker_mode
             && hovered
-            && let cosmic::iced_core::Event::Mouse(mouse::Event::ButtonPressed(mouse::Button::Left)) =
-                event
+            && let cosmic::iced::core::Event::Mouse(mouse::Event::ButtonPressed(
+                mouse::Button::Left,
+            )) = event
             && let Some(on_click) = &self.on_click
         {
             shell.publish(on_click.clone());

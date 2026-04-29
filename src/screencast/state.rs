@@ -124,8 +124,8 @@ pub fn stop_recording() -> Result<()> {
             match handle.join() {
                 Ok(_) => {
                     log::info!("Recording saved to: {}", output_file.display());
-                    // Show desktop notification
-                    show_recording_saved_notification(&output_file);
+                    // Launch snappea-edit with --discard so user can trim/convert
+                    launch_editor(&output_file);
                 }
                 Err(e) => {
                     log::error!("Recording thread error: {}", e);
@@ -143,25 +143,30 @@ pub fn stop_recording() -> Result<()> {
     }
 }
 
-/// Show a desktop notification that the recording was saved
-fn show_recording_saved_notification(output_file: &std::path::Path) {
-    let file_name = output_file
-        .file_name()
-        .and_then(|n| n.to_str())
-        .unwrap_or("recording");
+/// Launch snappea-edit to let the user trim/convert the recording.
+fn launch_editor(output_file: &std::path::Path) {
+    let editor_bin = std::env::current_exe()
+        .ok()
+        .and_then(|p| p.parent().map(|d| d.join("snappea-edit")))
+        .unwrap_or_else(|| std::path::PathBuf::from("snappea-edit"));
 
-    let body = format!("Saved to {}", output_file.display());
-
-    // Use notify-send (available on most Linux systems)
-    let result = std::process::Command::new("notify-send")
-        .arg("--app-name=SnapPea")
-        .arg("--icon=video-x-generic")
-        .arg("Recording Saved")
-        .arg(&body)
-        .spawn();
-
-    if let Err(e) = result {
-        log::warn!("Failed to show notification: {}", e);
+    match std::process::Command::new(&editor_bin)
+        .arg("--discard")
+        .arg(output_file)
+        .spawn()
+    {
+        Ok(_) => log::info!("Launched editor for: {}", output_file.display()),
+        Err(e) => {
+            log::warn!("Failed to launch snappea-edit: {}", e);
+            // Fallback: show a notification instead
+            let body = format!("Saved to {}", output_file.display());
+            let _ = std::process::Command::new("notify-send")
+                .arg("--app-name=SnapPea")
+                .arg("--icon=video-x-generic")
+                .arg("Recording Saved")
+                .arg(&body)
+                .spawn();
+        }
     }
 }
 

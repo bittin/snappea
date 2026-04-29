@@ -1,7 +1,7 @@
 //! Widget for selecting toolbar position with triangular hit regions
 
 use cosmic::iced::Size;
-use cosmic::iced_core::{
+use cosmic::iced::core::{
     Background, Border, Element, Length,
     layout::{self, Layout},
     renderer::Quad,
@@ -53,11 +53,11 @@ impl<Msg: Clone> ToolbarPositionSelector<Msg> {
         &self,
         x: f32,
         y: f32,
-        bounds: cosmic::iced_core::Rectangle,
+        bounds: cosmic::iced::core::Rectangle,
     ) -> Option<ToolbarPosition> {
         // Extend the clickable region by a margin
         let margin = 8.0;
-        let extended_bounds = cosmic::iced_core::Rectangle {
+        let extended_bounds = cosmic::iced::core::Rectangle {
             x: bounds.x - margin,
             y: bounds.y - margin,
             width: bounds.width + margin * 2.0,
@@ -110,7 +110,7 @@ impl<Msg: Clone + 'static> cosmic::widget::Widget<Msg, cosmic::Theme, cosmic::Re
 
     fn layout(
         &mut self,
-        _tree: &mut cosmic::iced_core::widget::Tree,
+        _tree: &mut cosmic::iced::core::widget::Tree,
         _renderer: &cosmic::Renderer,
         _limits: &cosmic::iced::Limits,
     ) -> layout::Node {
@@ -119,15 +119,15 @@ impl<Msg: Clone + 'static> cosmic::widget::Widget<Msg, cosmic::Theme, cosmic::Re
 
     fn draw(
         &self,
-        _tree: &cosmic::iced_core::widget::Tree,
+        _tree: &cosmic::iced::core::widget::Tree,
         renderer: &mut cosmic::Renderer,
         theme: &cosmic::Theme,
-        _style: &cosmic::iced_core::renderer::Style,
+        _style: &cosmic::iced::core::renderer::Style,
         layout: Layout<'_>,
-        cursor: cosmic::iced_core::mouse::Cursor,
-        _viewport: &cosmic::iced_core::Rectangle,
+        cursor: cosmic::iced::core::mouse::Cursor,
+        _viewport: &cosmic::iced::core::Rectangle,
     ) {
-        use cosmic::iced_core::Renderer as _;
+        use cosmic::iced::core::Renderer as _;
 
         let bounds = layout.bounds();
         let cosmic_theme = theme.cosmic();
@@ -160,7 +160,7 @@ impl<Msg: Clone + 'static> cosmic::widget::Widget<Msg, cosmic::Theme, cosmic::Re
         };
         renderer.fill_quad(
             Quad {
-                bounds: cosmic::iced_core::Rectangle {
+                bounds: cosmic::iced::core::Rectangle {
                     x: bounds.x + edge_thickness + gap,
                     y: bounds.y,
                     width: inner_length,
@@ -171,7 +171,7 @@ impl<Msg: Clone + 'static> cosmic::widget::Widget<Msg, cosmic::Theme, cosmic::Re
                     width: 1.0,
                     color: accent,
                 },
-                shadow: cosmic::iced_core::Shadow::default(),
+                shadow: cosmic::iced::core::Shadow::default(),
                 snap: false,
             },
             Background::Color(top_color),
@@ -187,7 +187,7 @@ impl<Msg: Clone + 'static> cosmic::widget::Widget<Msg, cosmic::Theme, cosmic::Re
         };
         renderer.fill_quad(
             Quad {
-                bounds: cosmic::iced_core::Rectangle {
+                bounds: cosmic::iced::core::Rectangle {
                     x: bounds.x + edge_thickness + gap,
                     y: bounds.y + bounds.height - edge_thickness,
                     width: inner_length,
@@ -198,7 +198,7 @@ impl<Msg: Clone + 'static> cosmic::widget::Widget<Msg, cosmic::Theme, cosmic::Re
                     width: 1.0,
                     color: accent,
                 },
-                shadow: cosmic::iced_core::Shadow::default(),
+                shadow: cosmic::iced::core::Shadow::default(),
                 snap: false,
             },
             Background::Color(bottom_color),
@@ -214,7 +214,7 @@ impl<Msg: Clone + 'static> cosmic::widget::Widget<Msg, cosmic::Theme, cosmic::Re
         };
         renderer.fill_quad(
             Quad {
-                bounds: cosmic::iced_core::Rectangle {
+                bounds: cosmic::iced::core::Rectangle {
                     x: bounds.x,
                     y: bounds.y + edge_thickness + gap,
                     width: edge_thickness,
@@ -225,7 +225,7 @@ impl<Msg: Clone + 'static> cosmic::widget::Widget<Msg, cosmic::Theme, cosmic::Re
                     width: 1.0,
                     color: accent,
                 },
-                shadow: cosmic::iced_core::Shadow::default(),
+                shadow: cosmic::iced::core::Shadow::default(),
                 snap: false,
             },
             Background::Color(left_color),
@@ -241,7 +241,7 @@ impl<Msg: Clone + 'static> cosmic::widget::Widget<Msg, cosmic::Theme, cosmic::Re
         };
         renderer.fill_quad(
             Quad {
-                bounds: cosmic::iced_core::Rectangle {
+                bounds: cosmic::iced::core::Rectangle {
                     x: bounds.x + bounds.width - edge_thickness,
                     y: bounds.y + edge_thickness + gap,
                     width: edge_thickness,
@@ -252,7 +252,7 @@ impl<Msg: Clone + 'static> cosmic::widget::Widget<Msg, cosmic::Theme, cosmic::Re
                     width: 1.0,
                     color: accent,
                 },
-                shadow: cosmic::iced_core::Shadow::default(),
+                shadow: cosmic::iced::core::Shadow::default(),
                 snap: false,
             },
             Background::Color(right_color),
@@ -261,33 +261,33 @@ impl<Msg: Clone + 'static> cosmic::widget::Widget<Msg, cosmic::Theme, cosmic::Re
 
     fn mouse_interaction(
         &self,
-        _state: &cosmic::iced_core::widget::Tree,
+        _state: &cosmic::iced::core::widget::Tree,
         layout: Layout<'_>,
-        cursor: cosmic::iced_core::mouse::Cursor,
-        _viewport: &cosmic::iced_core::Rectangle,
+        cursor: cosmic::iced::core::mouse::Cursor,
+        _viewport: &cosmic::iced::core::Rectangle,
         _renderer: &cosmic::Renderer,
-    ) -> cosmic::iced_core::mouse::Interaction {
+    ) -> cosmic::iced::core::mouse::Interaction {
         if let Some(pos) = cursor.position()
             && self.get_region(pos.x, pos.y, layout.bounds()).is_some()
         {
-            return cosmic::iced_core::mouse::Interaction::Pointer;
+            return cosmic::iced::core::mouse::Interaction::Pointer;
         }
-        cosmic::iced_core::mouse::Interaction::default()
+        cosmic::iced::core::mouse::Interaction::default()
     }
 
     fn update(
         &mut self,
-        _state: &mut cosmic::iced_core::widget::Tree,
-        event: &cosmic::iced_core::Event,
+        _state: &mut cosmic::iced::core::widget::Tree,
+        event: &cosmic::iced::core::Event,
         layout: Layout<'_>,
-        cursor: cosmic::iced_core::mouse::Cursor,
+        cursor: cosmic::iced::core::mouse::Cursor,
         _renderer: &cosmic::Renderer,
-        _clipboard: &mut dyn cosmic::iced_core::Clipboard,
-        shell: &mut cosmic::iced_core::Shell<'_, Msg>,
-        _viewport: &cosmic::iced_core::Rectangle,
+        _clipboard: &mut dyn cosmic::iced::core::Clipboard,
+        shell: &mut cosmic::iced::core::Shell<'_, Msg>,
+        _viewport: &cosmic::iced::core::Rectangle,
     ) {
-        if let cosmic::iced_core::Event::Mouse(cosmic::iced_core::mouse::Event::ButtonPressed(
-            cosmic::iced_core::mouse::Button::Left,
+        if let cosmic::iced::core::Event::Mouse(cosmic::iced::core::mouse::Event::ButtonPressed(
+            cosmic::iced::core::mouse::Button::Left,
         )) = event
             && let Some(pos) = cursor.position()
             && let Some(region) = self.get_region(pos.x, pos.y, layout.bounds())

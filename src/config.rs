@@ -1,6 +1,6 @@
 //! Configuration persistence for snappea settings
 
-use cosmic::cosmic_config::{self, cosmic_config_derive::CosmicConfigEntry, CosmicConfigEntry};
+use cosmic::cosmic_config::{self, CosmicConfigEntry, cosmic_config_derive::CosmicConfigEntry};
 use cosmic::iced::Color;
 use serde::{Deserialize, Serialize};
 
@@ -89,15 +89,6 @@ impl ShapeTool {
         }
     }
 
-    /// Get the icon name for this shape tool
-    pub fn icon_name(self) -> &'static str {
-        match self {
-            ShapeTool::Arrow => "arrow-symbolic",
-            ShapeTool::Circle => "circle-symbolic",
-            ShapeTool::Rectangle => "square-symbolic",
-        }
-    }
-
     /// Get the tooltip text for this shape tool
     pub fn tooltip(self) -> String {
         match self {
@@ -132,14 +123,6 @@ impl RedactTool {
         match self {
             RedactTool::Redact => RedactTool::Pixelate,
             RedactTool::Pixelate => RedactTool::Redact,
-        }
-    }
-
-    /// Get the icon name for this redact tool
-    pub fn icon_name(self) -> &'static str {
-        match self {
-            RedactTool::Redact => "redact-symbolic",
-            RedactTool::Pixelate => "pixelate-symbolic",
         }
     }
 

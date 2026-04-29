@@ -891,8 +891,8 @@ fn capture_frame_dmabuf_triple(
     // Cleanup wl_buffer (the underlying DMA-buf fd is still valid)
     wl_buffer.destroy();
 
-            // Push DMA-buf-backed GstMemory to GStreamer without copying it to CPU memory.
-            pipeline.push_dmabuf_frame(dmabuf, timestamp)?;
+    // Push DMA-buf-backed GstMemory to GStreamer without copying it to CPU memory.
+    pipeline.push_dmabuf_frame(dmabuf, timestamp)?;
 
     // Advance to next buffer for next frame
     pool.advance();
@@ -1219,85 +1219,86 @@ pub fn start_recording_thread(
         // Note: We pass the session directly since we're in the same process
         let is_toplevel_capture = is_toplevel;
         let capture_thread = std::thread::spawn(move || {
-        let mut consecutive_failures = 0u32;
-        let mut last_error_log = std::time::Instant::now();
-        let max_consecutive_failures = 100;
-        let mut frame_count = 0u64;
-        let mut last_checksum: Option<u32> = None;
-        let mut same_frame_count = 0u32;
+            let mut consecutive_failures = 0u32;
+            let mut last_error_log = std::time::Instant::now();
+            let max_consecutive_failures = 100;
+            let mut frame_count = 0u64;
+            let mut last_checksum: Option<u32> = None;
+            let mut same_frame_count = 0u32;
 
-        while !stop_capture_clone.load(Ordering::Relaxed) {
-            match capture_frame_shm(&wayland_helper, &session, &formats_clone) {
-                Ok(frame_data) => {
-                    if consecutive_failures > 0 {
-                        log::debug!(
-                            "Capture thread: recovered after {} failures",
-                            consecutive_failures
-                        );
-                        consecutive_failures = 0;
-                    }
+            while !stop_capture_clone.load(Ordering::Relaxed) {
+                match capture_frame_shm(&wayland_helper, &session, &formats_clone) {
+                    Ok(frame_data) => {
+                        if consecutive_failures > 0 {
+                            log::debug!(
+                                "Capture thread: recovered after {} failures",
+                                consecutive_failures
+                            );
+                            consecutive_failures = 0;
+                        }
 
-                    // For toplevel capture, track if frames are changing
-                    if is_toplevel_capture {
-                        // Simple checksum of first 1KB to detect changes
-                        let checksum: u32 = frame_data
-                            .iter()
-                            .take(1024)
-                            .fold(0u32, |acc, &b| acc.wrapping_add(b as u32));
-                        if let Some(prev) = last_checksum {
-                            if prev == checksum {
-                                same_frame_count += 1;
-                            } else {
-                                if same_frame_count > 0 {
-                                    log::debug!(
-                                        "Capture thread: frame changed after {} identical frames",
-                                        same_frame_count
-                                    );
+                        // For toplevel capture, track if frames are changing
+                        if is_toplevel_capture {
+                            // Simple checksum of first 1KB to detect changes
+                            let checksum: u32 = frame_data
+                                .iter()
+                                .take(1024)
+                                .fold(0u32, |acc, &b| acc.wrapping_add(b as u32));
+                            if let Some(prev) = last_checksum {
+                                if prev == checksum {
+                                    same_frame_count += 1;
+                                } else {
+                                    if same_frame_count > 0 {
+                                        log::debug!(
+                                            "Capture thread: frame changed after {} identical frames",
+                                            same_frame_count
+                                        );
+                                    }
+                                    same_frame_count = 0;
                                 }
-                                same_frame_count = 0;
+                            }
+                            last_checksum = Some(checksum);
+
+                            frame_count += 1;
+                            if frame_count % 60 == 0 {
+                                log::debug!(
+                                    "Capture thread: {} frames captured, {} currently identical",
+                                    frame_count,
+                                    same_frame_count
+                                );
                             }
                         }
-                        last_checksum = Some(checksum);
 
-                        frame_count += 1;
-                        if frame_count % 60 == 0 {
-                            log::debug!(
-                                "Capture thread: {} frames captured, {} currently identical",
-                                frame_count,
-                                same_frame_count
+                        let _ = frame_tx.send(frame_data);
+                    }
+                    Err(e) => {
+                        consecutive_failures += 1;
+
+                        if last_error_log.elapsed() > Duration::from_secs(2) {
+                            log::warn!(
+                                "Capture thread: frame capture failed ({} consecutive failures): {}",
+                                consecutive_failures,
+                                e
                             );
+                            last_error_log = std::time::Instant::now();
                         }
-                    }
 
-                    let _ = frame_tx.send(frame_data);
-                }
-                Err(e) => {
-                    consecutive_failures += 1;
+                        if consecutive_failures >= max_consecutive_failures {
+                            log::error!(
+                                "Capture thread: giving up after {} consecutive failures",
+                                consecutive_failures
+                            );
+                            break;
+                        }
 
-                    if last_error_log.elapsed() > Duration::from_secs(2) {
-                        log::warn!(
-                            "Capture thread: frame capture failed ({} consecutive failures): {}",
-                            consecutive_failures,
-                            e
+                        let backoff = Duration::from_millis(
+                            (10 * (1 << consecutive_failures.min(6))).min(500),
                         );
-                        last_error_log = std::time::Instant::now();
+                        std::thread::sleep(backoff);
                     }
-
-                    if consecutive_failures >= max_consecutive_failures {
-                        log::error!(
-                            "Capture thread: giving up after {} consecutive failures",
-                            consecutive_failures
-                        );
-                        break;
-                    }
-
-                    let backoff =
-                        Duration::from_millis((10 * (1 << consecutive_failures.min(6))).min(500));
-                    std::thread::sleep(backoff);
                 }
             }
-        }
-        log::debug!("Capture thread exiting");
+            log::debug!("Capture thread exiting");
         });
 
         // Main encoding loop - maintains constant framerate

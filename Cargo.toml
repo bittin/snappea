@@ -1,6 +1,6 @@
 [package]
 name = "snappea"
-version = "0.6.2"
+version = "0.7.0"
 edition = "2024"
 license = "GPL-3.0-or-later"
 description = "Screenshot and screen recording for COSMIC desktop"
@@ -58,11 +58,39 @@ i18n-embed = { version = "0.16", features = [
 i18n-embed-fl = "0.10"
 rust-embed = "8.7.2"
 
+[[bin]]
+name = "snappea"
+path = "src/main.rs"
+
+[[bin]]
+name = "snappea-edit"
+path = "src/bin/snappea-edit.rs"
+
+[dependencies.cosmetics]
+git = "https://github.com/hojjatabdollahi/cosmetics"
+features = ["gif-player"]
+
+[dependencies.iced_video_player]
+git = "https://github.com/hojjatabdollahi/iced_video_player"
+branch = "iced-rebase"
+default-features = false
+features = ["wgpu"]
+
+[dependencies.url]
+version = "2"
+
 [dependencies.cosmic]
 package = "libcosmic"
 git = "https://github.com/pop-os/libcosmic"
 default-features = false
 features = ["dbus-config", "multi-window", "tokio", "wayland", "wgpu", "winit"]
+
+[dependencies.iced]
+git = "https://github.com/pop-os/libcosmic"
+default-features = false
+
+[build-dependencies]
+iced_lucide = { git = "https://github.com/A-Disruption/iced_lucide", rev = "d06e2cc2a16b60bcd076a0904faf3ebb6b2c89f2" }
 
 [package.metadata.deb]
 maintainer = "Hojjat Abdollahi"
@@ -74,6 +102,11 @@ priority = "optional"
 assets = [
   [
     "target/release/snappea",
+    "usr/bin/",
+    "755",
+  ],
+  [
+    "target/release/snappea-edit",
     "usr/bin/",
     "755",
   ],
@@ -97,55 +130,9 @@ assets = [
     "usr/share/dbus-1/services/io.github.hojjatabdollahi.snappea.service",
     "644",
   ],
-  [
-    "data/icons/hicolor/scalable/actions/ocr-symbolic.svg",
-    "usr/share/icons/hicolor/scalable/actions/",
-    "644",
-  ],
-  [
-    "data/icons/hicolor/scalable/actions/qr-symbolic.svg",
-    "usr/share/icons/hicolor/scalable/actions/",
-    "644",
-  ],
-  [
-    "data/icons/hicolor/scalable/actions/arrow-symbolic.svg",
-    "usr/share/icons/hicolor/scalable/actions/",
-    "644",
-  ],
-  [
-    "data/icons/hicolor/scalable/actions/circle-symbolic.svg",
-    "usr/share/icons/hicolor/scalable/actions/",
-    "644",
-  ],
-  [
-    "data/icons/hicolor/scalable/actions/square-symbolic.svg",
-    "usr/share/icons/hicolor/scalable/actions/",
-    "644",
-  ],
-  [
-    "data/icons/hicolor/scalable/actions/redact-symbolic.svg",
-    "usr/share/icons/hicolor/scalable/actions/",
-    "644",
-  ],
-  [
-    "data/icons/hicolor/scalable/actions/pixelate-symbolic.svg",
-    "usr/share/icons/hicolor/scalable/actions/",
-    "644",
-  ],
-  [
-    "data/icons/hicolor/scalable/actions/drag.svg",
-    "usr/share/icons/hicolor/scalable/actions/",
-    "644",
-  ],
 ]
 
 [profile.release]
 opt-level = 3
 lto = "thin"
 panic = "abort"
-
-# [patch."https://github.com/pop-os/libcosmic"]
-# libcosmic = { path = "../libcosmic" }
-# cosmic-config = { path = "../libcosmic/cosmic-config" }
-# cosmic-config-derive = { path = "../libcosmic/cosmic-config-derive" }
-# cosmic-theme = { path = "../libcosmic/cosmic-theme" }

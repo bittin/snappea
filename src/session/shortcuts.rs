@@ -2,7 +2,7 @@ use crate::config::ToolbarPosition;
 use crate::domain::Choice;
 use crate::screenshot::Args;
 use crate::session::messages::Msg;
-use cosmic::iced::keyboard::{key::Named, Key, Modifiers};
+use cosmic::iced::keyboard::{Key, Modifiers, key::Named};
 
 pub fn handle_key_event(
     args: &Args,

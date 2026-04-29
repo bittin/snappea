@@ -5,7 +5,7 @@
 //! - Live preview during shape drawing
 //! - Mouse input for shape creation
 
-use cosmic::iced_widget::canvas;
+use cosmic::iced::widget::canvas;
 
 use crate::domain::{CircleOutlineAnnotation, Rect, RectOutlineAnnotation};
 
@@ -80,11 +80,11 @@ impl<'a, Message: Clone + 'static> canvas::Program<Message, cosmic::Theme, cosmi
         &self,
         state: &mut Self::State,
         event: &cosmic::iced::Event,
-        bounds: cosmic::iced_core::Rectangle,
-        cursor: cosmic::iced_core::mouse::Cursor,
+        bounds: cosmic::iced::core::Rectangle,
+        cursor: cosmic::iced::core::mouse::Cursor,
     ) -> Option<canvas::Action<Message>> {
-        use cosmic::iced_core::keyboard;
-        use cosmic::iced_core::mouse::{Button, Event as MouseEvent};
+        use cosmic::iced::core::keyboard;
+        use cosmic::iced::core::mouse::{Button, Event as MouseEvent};
 
         // Margin for shape clamping (0 = clamp to exact edge)
         const ANNOTATION_MARGIN: f32 = 0.0;
@@ -200,11 +200,11 @@ impl<'a, Message: Clone + 'static> canvas::Program<Message, cosmic::Theme, cosmi
         state: &Self::State,
         renderer: &cosmic::Renderer,
         _theme: &cosmic::Theme,
-        bounds: cosmic::iced_core::Rectangle,
-        cursor: cosmic::iced_core::mouse::Cursor,
+        bounds: cosmic::iced::core::Rectangle,
+        cursor: cosmic::iced::core::mouse::Cursor,
     ) -> Vec<canvas::Geometry> {
         use canvas::{Frame, Path, Stroke};
-        use cosmic::iced_core::{Color, Point, Size};
+        use cosmic::iced::core::{Color, Point, Size};
 
         let mut frame = Frame::new(renderer, bounds.size());
 

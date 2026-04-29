@@ -8,7 +8,7 @@
 use cosmic::Element;
 use cosmic::iced::Animation;
 use cosmic::iced::Size;
-use cosmic::iced_core::{
+use cosmic::iced::core::{
     Background, Border, Color, Layout, Length, Rectangle, layout,
     mouse::{self, Cursor},
     renderer::Quad,
@@ -18,10 +18,7 @@ use cosmic::widget::icon;
 use std::rc::Rc;
 
 /// Get the current toggle position.
-pub fn get_toggle_percent(
-    animation: &Animation<bool>,
-    now: std::time::Instant,
-) -> f32 {
+pub fn get_toggle_percent(animation: &Animation<bool>, now: std::time::Instant) -> f32 {
     animation.interpolate(0.0, 1.0, now)
 }
 
@@ -193,12 +190,12 @@ impl<'a, Msg: Clone + 'a> cosmic::widget::Widget<Msg, cosmic::Theme, cosmic::Ren
         _tree: &Tree,
         renderer: &mut cosmic::Renderer,
         theme: &cosmic::Theme,
-        style: &cosmic::iced_core::renderer::Style,
+        style: &cosmic::iced::core::renderer::Style,
         layout: Layout<'_>,
         cursor: Cursor,
         viewport: &Rectangle,
     ) {
-        use cosmic::iced_core::Renderer as _;
+        use cosmic::iced::core::Renderer as _;
 
         let bounds = layout.bounds();
         let cosmic_theme = theme.cosmic();
@@ -250,7 +247,7 @@ impl<'a, Msg: Clone + 'a> cosmic::widget::Widget<Msg, cosmic::Theme, cosmic::Ren
                     width: 0.0,
                     color: Color::TRANSPARENT,
                 },
-                shadow: cosmic::iced_core::Shadow::default(),
+                shadow: cosmic::iced::core::Shadow::default(),
                 snap: false,
             },
             Background::Color(pill_color),
@@ -283,7 +280,7 @@ impl<'a, Msg: Clone + 'a> cosmic::widget::Widget<Msg, cosmic::Theme, cosmic::Ren
                     width: 0.0,
                     color: Color::TRANSPARENT,
                 },
-                shadow: cosmic::iced_core::Shadow::default(),
+                shadow: cosmic::iced::core::Shadow::default(),
                 snap: false,
             },
             Background::Color(accent_color),
@@ -312,7 +309,7 @@ impl<'a, Msg: Clone + 'a> cosmic::widget::Widget<Msg, cosmic::Theme, cosmic::Ren
                         width: 0.0,
                         color: Color::TRANSPARENT,
                     },
-                    shadow: cosmic::iced_core::Shadow::default(),
+                    shadow: cosmic::iced::core::Shadow::default(),
                     snap: false,
                 },
                 Background::Color(hover_color),
@@ -335,19 +332,19 @@ impl<'a, Msg: Clone + 'a> cosmic::widget::Widget<Msg, cosmic::Theme, cosmic::Ren
 
         let icon_a_widget = if icon_a_selected {
             // Selected: use accent.on color (black/dark on accent background) with opacity
-            cosmic::iced_widget::svg::Svg::new(icon_a_handle)
+            cosmic::iced::widget::svg::Svg::new(icon_a_handle)
                 .width(Length::Fixed(ICON_SIZE))
                 .height(Length::Fixed(ICON_SIZE))
                 .opacity(opacity)
                 .symbolic(true)
                 .class(cosmic::theme::Svg::Custom(Rc::new(move |_theme| {
-                    cosmic::iced_widget::svg::Style {
+                    cosmic::iced::widget::svg::Style {
                         color: Some(on_accent_color),
                     }
                 })))
         } else {
             // Default: theme color with opacity
-            cosmic::iced_widget::svg::Svg::new(icon_a_handle)
+            cosmic::iced::widget::svg::Svg::new(icon_a_handle)
                 .width(Length::Fixed(ICON_SIZE))
                 .height(Length::Fixed(ICON_SIZE))
                 .opacity(opacity)
@@ -379,19 +376,19 @@ impl<'a, Msg: Clone + 'a> cosmic::widget::Widget<Msg, cosmic::Theme, cosmic::Ren
 
         let icon_b_widget = if icon_b_selected {
             // Selected: use accent.on color (black/dark on accent background) with opacity
-            cosmic::iced_widget::svg::Svg::new(icon_b_handle)
+            cosmic::iced::widget::svg::Svg::new(icon_b_handle)
                 .width(Length::Fixed(ICON_SIZE))
                 .height(Length::Fixed(ICON_SIZE))
                 .opacity(opacity)
                 .symbolic(true)
                 .class(cosmic::theme::Svg::Custom(Rc::new(move |_theme| {
-                    cosmic::iced_widget::svg::Style {
+                    cosmic::iced::widget::svg::Style {
                         color: Some(on_accent_color),
                     }
                 })))
         } else {
             // Default: theme color with opacity
-            cosmic::iced_widget::svg::Svg::new(icon_b_handle)
+            cosmic::iced::widget::svg::Svg::new(icon_b_handle)
                 .width(Length::Fixed(ICON_SIZE))
                 .height(Length::Fixed(ICON_SIZE))
                 .opacity(opacity)
@@ -419,12 +416,12 @@ impl<'a, Msg: Clone + 'a> cosmic::widget::Widget<Msg, cosmic::Theme, cosmic::Ren
     fn update(
         &mut self,
         _tree: &mut Tree,
-        event: &cosmic::iced_core::Event,
+        event: &cosmic::iced::core::Event,
         layout: Layout<'_>,
         cursor: Cursor,
         _renderer: &cosmic::Renderer,
-        _clipboard: &mut dyn cosmic::iced_core::Clipboard,
-        shell: &mut cosmic::iced_core::Shell<'_, Msg>,
+        _clipboard: &mut dyn cosmic::iced::core::Clipboard,
+        shell: &mut cosmic::iced::core::Shell<'_, Msg>,
         _viewport: &Rectangle,
     ) {
         // Only handle events if we have a callback
@@ -432,7 +429,7 @@ impl<'a, Msg: Clone + 'a> cosmic::widget::Widget<Msg, cosmic::Theme, cosmic::Ren
             return;
         };
 
-        if let cosmic::iced_core::Event::Mouse(mouse::Event::ButtonPressed(mouse::Button::Left)) =
+        if let cosmic::iced::core::Event::Mouse(mouse::Event::ButtonPressed(mouse::Button::Left)) =
             event
         {
             if let Some(pos) = cursor.position() {
@@ -482,7 +479,7 @@ impl<'a, Msg: Clone + 'a> cosmic::widget::Widget<Msg, cosmic::Theme, cosmic::Ren
         _tree: &mut Tree,
         _layout: Layout<'_>,
         _renderer: &cosmic::Renderer,
-        _operation: &mut dyn cosmic::iced_core::widget::Operation,
+        _operation: &mut dyn cosmic::iced::core::widget::Operation,
     ) {
     }
 
@@ -493,7 +490,8 @@ impl<'a, Msg: Clone + 'a> cosmic::widget::Widget<Msg, cosmic::Theme, cosmic::Ren
         _renderer: &cosmic::Renderer,
         _viewport: &Rectangle,
         _translation: cosmic::iced::Vector,
-    ) -> Option<cosmic::iced_core::overlay::Element<'b, Msg, cosmic::Theme, cosmic::Renderer>> {
+    ) -> Option<cosmic::iced::core::overlay::Element<'b, Msg, cosmic::Theme, cosmic::Renderer>>
+    {
         None
     }
 }

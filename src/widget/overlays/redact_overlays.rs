@@ -4,7 +4,7 @@
 //! on the screenshot preview.
 
 use cosmic::iced::Color;
-use cosmic::iced_core::{Background, Border, Rectangle};
+use cosmic::iced::core::{Background, Border, Rectangle};
 use image::RgbaImage;
 
 use crate::domain::{Annotation, PixelateAnnotation, RedactAnnotation};
@@ -22,7 +22,7 @@ pub fn draw_redaction(
     redact: &RedactAnnotation,
     output_offset: (f32, f32),
 ) {
-    use cosmic::iced_core::Renderer;
+    use cosmic::iced::core::Renderer;
 
     let (offset_x, offset_y) = output_offset;
     let x1 = redact.x - offset_x;
@@ -41,10 +41,10 @@ pub fn draw_redaction(
 
     renderer.with_layer(*viewport, |renderer| {
         renderer.fill_quad(
-            cosmic::iced_core::renderer::Quad {
+            cosmic::iced::core::renderer::Quad {
                 bounds: rect,
                 border: Border::default(),
-                shadow: cosmic::iced_core::Shadow::default(),
+                shadow: cosmic::iced::core::Shadow::default(),
                 snap: false,
             },
             Background::Color(Color::BLACK),
@@ -119,7 +119,7 @@ pub fn draw_pixelation_preview(
     block_size: u32,
     source: &PixelationSource,
 ) {
-    use cosmic::iced_core::Renderer;
+    use cosmic::iced::core::Renderer;
 
     let (offset_x, offset_y) = output_offset;
     let local_start_x = start.0 - offset_x;
@@ -157,7 +157,7 @@ pub fn draw_pixelation_preview(
     // Draw border
     renderer.with_layer(*viewport, |renderer| {
         renderer.fill_quad(
-            cosmic::iced_core::renderer::Quad {
+            cosmic::iced::core::renderer::Quad {
                 bounds: Rectangle {
                     x: min_x,
                     y: min_y,
@@ -169,7 +169,7 @@ pub fn draw_pixelation_preview(
                     width: 1.0,
                     radius: 0.0.into(),
                 },
-                shadow: cosmic::iced_core::Shadow::default(),
+                shadow: cosmic::iced::core::Shadow::default(),
                 snap: false,
             },
             Background::Color(Color::TRANSPARENT),
@@ -185,7 +185,7 @@ pub fn draw_redaction_preview(
     end: (f32, f32),   // Local end position (cursor)
     output_offset: (f32, f32),
 ) {
-    use cosmic::iced_core::Renderer;
+    use cosmic::iced::core::Renderer;
 
     let (offset_x, offset_y) = output_offset;
     let local_start_x = start.0 - offset_x;
@@ -205,7 +205,7 @@ pub fn draw_redaction_preview(
 
     renderer.with_layer(*viewport, |renderer| {
         renderer.fill_quad(
-            cosmic::iced_core::renderer::Quad {
+            cosmic::iced::core::renderer::Quad {
                 bounds: Rectangle {
                     x: min_x,
                     y: min_y,
@@ -217,7 +217,7 @@ pub fn draw_redaction_preview(
                     width: 1.0,
                     radius: 0.0.into(),
                 },
-                shadow: cosmic::iced_core::Shadow::default(),
+                shadow: cosmic::iced::core::Shadow::default(),
                 snap: false,
             },
             Background::Color(Color::from_rgba(0.0, 0.0, 0.0, 0.7)),
@@ -240,7 +240,7 @@ fn draw_pixelation_blocks_screenshot(
     image_scale: f32,
     block_size: f32,
 ) {
-    use cosmic::iced_core::Renderer;
+    use cosmic::iced::core::Renderer;
 
     renderer.with_layer(*viewport, |renderer| {
         let mut y = min_y;
@@ -257,7 +257,7 @@ fn draw_pixelation_blocks_screenshot(
 
                 if let Some(color) = sample_average_color(image, img_x, img_y, img_x2, img_y2) {
                     renderer.fill_quad(
-                        cosmic::iced_core::renderer::Quad {
+                        cosmic::iced::core::renderer::Quad {
                             bounds: Rectangle {
                                 x,
                                 y,
@@ -265,7 +265,7 @@ fn draw_pixelation_blocks_screenshot(
                                 height: block_h,
                             },
                             border: Border::default(),
-                            shadow: cosmic::iced_core::Shadow::default(),
+                            shadow: cosmic::iced::core::Shadow::default(),
                             snap: false,
                         },
                         Background::Color(color),
