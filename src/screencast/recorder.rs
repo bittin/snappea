@@ -10,15 +10,76 @@ use std::time::{Duration, Instant};
 use wayland_client::Connection;
 
 use super::dmabuf::{
-    DmabufContext, TripleBufferPool, drm_format_to_gst_format, select_best_format,
-    select_zero_copy_source_format,
+    drm_format_to_gst_format, select_best_format, select_zero_copy_source_format, DmabufContext,
+    TripleBufferPool,
 };
-use super::encoder::{EncoderInfo, detect_encoders};
-use super::pipeline::{CropRegion, Pipeline};
+use super::encoder::{detect_encoders, Codec, EncoderInfo};
+use super::pipeline::{crop_touches_trailing_edge, pipeline_output_size, CropRegion, Pipeline};
+use crate::config::Container;
 use crate::wayland::{CaptureSource, Rect, WaylandHelper};
 
 /// Global flag for graceful shutdown on SIGTERM
 static STOP_REQUESTED: AtomicBool = AtomicBool::new(false);
+
+const MIN_HARDWARE_CROP_DIMENSION: u32 = 64;
+
+fn compatible_software_encoder(
+    encoders: &[EncoderInfo],
+    container: Container,
+    requested_codec: Codec,
+) -> Option<EncoderInfo> {
+    let find = |element_name: &str| {
+        encoders
+            .iter()
+            .find(|encoder| !encoder.hardware && encoder.gst_element == element_name)
+            .cloned()
+    };
+
+    match container {
+        Container::Webm => find("vp9enc"),
+        Container::Mp4 => find("x264enc"),
+        Container::Mkv => match requested_codec {
+            Codec::VP9 | Codec::AV1 => find("vp9enc").or_else(|| find("x264enc")),
+            Codec::H264 | Codec::H265 => find("x264enc").or_else(|| find("vp9enc")),
+        },
+    }
+}
+
+fn select_effective_encoder(
+    requested: EncoderInfo,
+    encoders: &[EncoderInfo],
+    container: Container,
+    copied_path_reason: Option<&'static str>,
+    output_size: (u32, u32),
+) -> EncoderInfo {
+    let Some(reason) = copied_path_reason else {
+        return requested;
+    };
+
+    if !requested.hardware {
+        return requested;
+    }
+
+    if let Some(fallback) = compatible_software_encoder(encoders, container, requested.codec) {
+        log::info!(
+            "Using software encoder '{}' for {} {}x{}; copied fallback cannot reliably feed the VAAPI hardware encoder",
+            fallback.gst_element,
+            reason,
+            output_size.0,
+            output_size.1
+        );
+        fallback
+    } else {
+        log::warn!(
+            "{} {}x{} selected but no compatible software encoder is available; trying '{}' without DMA-BUF zero-copy",
+            reason,
+            output_size.0,
+            output_size.1,
+            requested.gst_element
+        );
+        requested
+    }
+}
 
 /// Start recording
 ///
@@ -163,66 +224,16 @@ pub fn start_recording(
         encoders.iter().map(|e| &e.gst_element).collect::<Vec<_>>()
     );
 
-    let encoder_info = encoders
-        .into_iter()
+    let requested_encoder_info = encoders
+        .iter()
         .find(|e| e.gst_element == encoder)
+        .cloned()
         .with_context(|| {
             format!(
                 "Encoder '{}' not available. Install GStreamer plugins for this encoder.",
                 encoder
             )
         })?;
-
-    log::info!(
-        "Using encoder: {} ({:?})",
-        encoder_info.gst_element,
-        encoder_info.codec
-    );
-
-    // Try to set up DMA-buf capture for zero-copy performance
-    let dmabuf_context = match DmabufContext::new() {
-        Ok(ctx) => {
-            log::info!("DMA-buf context initialized successfully");
-            Some(ctx)
-        }
-        Err(e) => {
-            log::warn!(
-                "Failed to initialize DMA-buf context: {}. Falling back to SHM.",
-                e
-            );
-            None
-        }
-    };
-
-    // Check for DMA-buf support from both compositor and Wayland protocol
-    let wayland_dmabuf_supported = wayland_helper.has_dmabuf_support();
-    log::info!(
-        "Wayland linux-dmabuf protocol: {}",
-        if wayland_dmabuf_supported {
-            "available"
-        } else {
-            "not available"
-        }
-    );
-
-    // Check for DMA-buf format support from screencopy
-    let dmabuf_format = if wayland_dmabuf_supported {
-        dmabuf_context
-            .as_ref()
-            .and_then(|ctx| select_dmabuf_format(&formats, &encoder_info, ctx))
-    } else {
-        None
-    };
-
-    let use_dmabuf = encoder_info.supports_dmabuf_zero_copy
-        && dmabuf_format.is_some()
-        && dmabuf_context.is_some()
-        && wayland_dmabuf_supported;
-    log::info!(
-        "Encoder path selection: {} ({})",
-        encoder_info.gst_element,
-        encoder_info.zero_copy_display_name()
-    );
 
     // Create GStreamer pipeline
     log::info!("Creating GStreamer pipeline...");
@@ -302,6 +313,100 @@ pub fn start_recording(
     } else {
         None
     };
+
+    let output_size = pipeline_output_size(crop, buffer_width, buffer_height);
+    let trailing_edge_crop = crop
+        .as_ref()
+        .map(|region| crop_touches_trailing_edge(region, buffer_width, buffer_height))
+        .unwrap_or(false);
+    let copied_path_reason = if trailing_edge_crop {
+        Some("trailing-edge crop")
+    } else if crop.is_some()
+        && (output_size.0 < MIN_HARDWARE_CROP_DIMENSION
+            || output_size.1 < MIN_HARDWARE_CROP_DIMENSION)
+    {
+        Some("tiny crop")
+    } else {
+        None
+    };
+    let encoder_info = select_effective_encoder(
+        requested_encoder_info,
+        &encoders,
+        container,
+        copied_path_reason,
+        output_size,
+    );
+    let zero_copy_allowed = copied_path_reason.is_none();
+
+    log::info!(
+        "Using encoder: {} ({:?}) for output {}x{}",
+        encoder_info.gst_element,
+        encoder_info.codec,
+        output_size.0,
+        output_size.1
+    );
+
+    if let Some(reason) = copied_path_reason {
+        log::info!(
+            "Disabling DMA-BUF zero-copy for {} {}x{}; using copied capture path",
+            reason,
+            output_size.0,
+            output_size.1
+        );
+    }
+
+    let should_probe_dmabuf = zero_copy_allowed && encoder_info.supports_dmabuf_zero_copy;
+
+    // Try to set up DMA-buf capture for zero-copy performance
+    let dmabuf_context = if should_probe_dmabuf {
+        match DmabufContext::new() {
+            Ok(ctx) => {
+                log::info!("DMA-buf context initialized successfully");
+                Some(ctx)
+            }
+            Err(e) => {
+                log::warn!(
+                    "Failed to initialize DMA-buf context: {}. Falling back to SHM.",
+                    e
+                );
+                None
+            }
+        }
+    } else {
+        None
+    };
+
+    // Check for DMA-buf support from both compositor and Wayland protocol
+    let wayland_dmabuf_supported = should_probe_dmabuf && wayland_helper.has_dmabuf_support();
+    if should_probe_dmabuf {
+        log::info!(
+            "Wayland linux-dmabuf protocol: {}",
+            if wayland_dmabuf_supported {
+                "available"
+            } else {
+                "not available"
+            }
+        );
+    }
+
+    // Check for DMA-buf format support from screencopy
+    let dmabuf_format = if should_probe_dmabuf && wayland_dmabuf_supported {
+        dmabuf_context
+            .as_ref()
+            .and_then(|ctx| select_dmabuf_format(&formats, &encoder_info, ctx))
+    } else {
+        None
+    };
+
+    let use_dmabuf = should_probe_dmabuf
+        && dmabuf_format.is_some()
+        && dmabuf_context.is_some()
+        && wayland_dmabuf_supported;
+    log::info!(
+        "Encoder path selection: {} ({})",
+        encoder_info.gst_element,
+        encoder_info.zero_copy_display_name()
+    );
 
     let (pipeline, requested_dmabuf) = if use_dmabuf {
         let (drm_format, modifier) = dmabuf_format.unwrap();
@@ -417,7 +522,11 @@ pub fn start_recording(
         log::info!(
             "ZERO_COPY_ACTIVE=false encoder={} path=shm-copied fallback_reason={}",
             encoder_info.gst_element,
-            if !encoder_info.supports_dmabuf_zero_copy {
+            if copied_path_reason == Some("trailing-edge crop") {
+                "trailing_edge_crop_uses_copied_path"
+            } else if !zero_copy_allowed {
+                "crop_below_zero_copy_minimum"
+            } else if !encoder_info.supports_dmabuf_zero_copy {
                 "encoder_not_supported"
             } else if !wayland_dmabuf_supported {
                 "wayland_dmabuf_unavailable"
@@ -1013,42 +1122,11 @@ pub fn start_recording_thread(
     let encoders = detect_encoders()
         .context("Failed to detect available video encoders. Is GStreamer installed?")?;
 
-    let encoder_info = encoders
-        .into_iter()
+    let requested_encoder_info = encoders
+        .iter()
         .find(|e| e.gst_element == encoder)
+        .cloned()
         .with_context(|| format!("Encoder '{}' not available.", encoder))?;
-
-    log::info!(
-        "Using encoder: {} ({:?})",
-        encoder_info.gst_element,
-        encoder_info.codec
-    );
-
-    let dmabuf_context = match DmabufContext::new() {
-        Ok(ctx) => {
-            log::info!("DMA-buf context initialized successfully");
-            Some(ctx)
-        }
-        Err(e) => {
-            log::warn!(
-                "Failed to initialize DMA-buf context: {}. Falling back to SHM.",
-                e
-            );
-            None
-        }
-    };
-    let wayland_dmabuf_supported = wayland_helper.has_dmabuf_support();
-    let dmabuf_format = if wayland_dmabuf_supported {
-        dmabuf_context
-            .as_ref()
-            .and_then(|ctx| select_dmabuf_format(&formats, &encoder_info, ctx))
-    } else {
-        None
-    };
-    let use_dmabuf = encoder_info.supports_dmabuf_zero_copy
-        && dmabuf_context.is_some()
-        && dmabuf_format.is_some()
-        && wayland_dmabuf_supported;
 
     // Calculate crop region if needed
     let (region_x, region_y, record_width, record_height) = region;
@@ -1092,6 +1170,78 @@ pub fn start_recording_thread(
     } else {
         None
     };
+
+    let output_size = pipeline_output_size(crop, buffer_width, buffer_height);
+    let trailing_edge_crop = crop
+        .as_ref()
+        .map(|region| crop_touches_trailing_edge(region, buffer_width, buffer_height))
+        .unwrap_or(false);
+    let copied_path_reason = if trailing_edge_crop {
+        Some("trailing-edge crop")
+    } else if crop.is_some()
+        && (output_size.0 < MIN_HARDWARE_CROP_DIMENSION
+            || output_size.1 < MIN_HARDWARE_CROP_DIMENSION)
+    {
+        Some("tiny crop")
+    } else {
+        None
+    };
+    let encoder_info = select_effective_encoder(
+        requested_encoder_info,
+        &encoders,
+        container,
+        copied_path_reason,
+        output_size,
+    );
+    let zero_copy_allowed = copied_path_reason.is_none();
+
+    log::info!(
+        "Using encoder: {} ({:?}) for output {}x{}",
+        encoder_info.gst_element,
+        encoder_info.codec,
+        output_size.0,
+        output_size.1
+    );
+
+    if let Some(reason) = copied_path_reason {
+        log::info!(
+            "Disabling DMA-BUF zero-copy for {} {}x{}; using copied capture path",
+            reason,
+            output_size.0,
+            output_size.1
+        );
+    }
+
+    let should_probe_dmabuf = zero_copy_allowed && encoder_info.supports_dmabuf_zero_copy;
+    let dmabuf_context = if should_probe_dmabuf {
+        match DmabufContext::new() {
+            Ok(ctx) => {
+                log::info!("DMA-buf context initialized successfully");
+                Some(ctx)
+            }
+            Err(e) => {
+                log::warn!(
+                    "Failed to initialize DMA-buf context: {}. Falling back to SHM.",
+                    e
+                );
+                None
+            }
+        }
+    } else {
+        None
+    };
+    let wayland_dmabuf_supported = should_probe_dmabuf && wayland_helper.has_dmabuf_support();
+    let dmabuf_format = if should_probe_dmabuf && wayland_dmabuf_supported {
+        dmabuf_context
+            .as_ref()
+            .and_then(|ctx| select_dmabuf_format(&formats, &encoder_info, ctx))
+    } else {
+        None
+    };
+    let use_dmabuf = should_probe_dmabuf
+        && dmabuf_context.is_some()
+        && dmabuf_format.is_some()
+        && wayland_dmabuf_supported;
 
     // Create GStreamer pipeline
     log::info!("Creating GStreamer pipeline...");
@@ -1181,7 +1331,11 @@ pub fn start_recording_thread(
         log::info!(
             "ZERO_COPY_ACTIVE=false encoder={} path=shm-copied thread_mode=in_process fallback_reason={}",
             encoder_info.gst_element,
-            if !encoder_info.supports_dmabuf_zero_copy {
+            if copied_path_reason == Some("trailing-edge crop") {
+                "trailing_edge_crop_uses_copied_path"
+            } else if !zero_copy_allowed {
+                "crop_below_zero_copy_minimum"
+            } else if !encoder_info.supports_dmabuf_zero_copy {
                 "encoder_not_supported"
             } else if !wayland_dmabuf_supported {
                 "wayland_dmabuf_unavailable"
