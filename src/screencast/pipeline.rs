@@ -148,6 +148,19 @@ pub(crate) fn crop_touches_trailing_edge(
     right == 0 || bottom == 0
 }
 
+fn encoder_input_caps(encoder: &EncoderInfo, width: u32, height: u32, framerate: u32) -> gst::Caps {
+    let mut caps = gst::Caps::builder("video/x-raw")
+        .field("width", width as i32)
+        .field("height", height as i32)
+        .field("framerate", gst::Fraction::new(framerate as i32, 1));
+
+    if !encoder.hardware {
+        caps = caps.field("format", "I420");
+    }
+
+    caps.build()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -234,6 +247,42 @@ mod tests {
         };
 
         assert!(!crop_touches_trailing_edge(&region, 100, 100));
+    }
+
+    #[test]
+    fn encoder_input_caps_force_i420_for_software_encoder() {
+        gst::init().unwrap();
+
+        let encoder = EncoderInfo {
+            name: "x264 H.264".to_string(),
+            gst_element: "x264enc".to_string(),
+            codec: super::super::encoder::Codec::H264,
+            hardware: false,
+            supports_dmabuf_zero_copy: false,
+            priority: 100,
+        };
+
+        let caps = encoder_input_caps(&encoder, 626, 94, 30).to_string();
+        assert!(caps.contains("format=(string)I420"));
+        assert!(caps.contains("width=(int)626"));
+        assert!(caps.contains("height=(int)94"));
+    }
+
+    #[test]
+    fn encoder_input_caps_do_not_force_i420_for_hardware_encoder() {
+        gst::init().unwrap();
+
+        let encoder = EncoderInfo {
+            name: "VA-API H.264".to_string(),
+            gst_element: "vaapih264enc".to_string(),
+            codec: super::super::encoder::Codec::H264,
+            hardware: true,
+            supports_dmabuf_zero_copy: true,
+            priority: 10,
+        };
+
+        let caps = encoder_input_caps(&encoder, 626, 94, 30).to_string();
+        assert!(!caps.contains("format=(string)I420"));
     }
 
     #[test]
@@ -384,10 +433,7 @@ impl Pipeline {
 
             // Create capsfilter to enforce exact output dimensions
             // This ensures the encoder receives the exact even-aligned dimensions
-            let scale_caps = gst::Caps::builder("video/x-raw")
-                .field("width", clamped_width as i32)
-                .field("height", clamped_height as i32)
-                .build();
+            let scale_caps = encoder_input_caps(encoder, clamped_width, clamped_height, framerate);
             let capsfilter = gst::ElementFactory::make("capsfilter")
                 .property("caps", &scale_caps)
                 .build()
@@ -424,11 +470,19 @@ impl Pipeline {
             }
             muxer.link(&filesink)?;
         } else {
+            let encoder_caps =
+                encoder_input_caps(encoder, capture_width, capture_height, framerate);
+            let capsfilter = gst::ElementFactory::make("capsfilter")
+                .property("caps", &encoder_caps)
+                .build()
+                .context("Failed to create capsfilter element")?;
+
             // Add elements to pipeline without crop
             pipeline.add_many([
                 appsrc.upcast_ref(),
                 &videoconvert,
                 &videoscale,
+                &capsfilter,
                 &encoder_elem,
             ])?;
             if let Some(ref parser) = parser_elem {
@@ -441,6 +495,7 @@ impl Pipeline {
                 appsrc.upcast_ref(),
                 &videoconvert,
                 &videoscale,
+                &capsfilter,
                 &encoder_elem,
             ])?;
             if let Some(ref parser) = parser_elem {
