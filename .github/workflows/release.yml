@@ -20,6 +20,32 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Verify tag matches Cargo.toml version
+        run: |
+          tag_version="${GITHUB_REF_NAME#v}"
+          cargo_version="$(
+            awk '
+              /^\[package\]/ { in_package = 1; next }
+              /^\[/ && in_package { exit }
+              in_package && $1 == "version" {
+                version = $3
+                gsub(/"/, "", version)
+                print version
+                exit
+              }
+            ' Cargo.toml
+          )"
+
+          if [ -z "$cargo_version" ]; then
+            echo "::error::Could not read package version from Cargo.toml"
+            exit 1
+          fi
+
+          if [ "$tag_version" != "$cargo_version" ]; then
+            echo "::error::Tag ${GITHUB_REF_NAME} does not match Cargo.toml version ${cargo_version}; expected v${cargo_version}"
+            exit 1
+          fi
+
       # ── Rust toolchain ─────────────────────────────────────────────────────
       # snappea uses Rust 2024 edition which requires rustc >= 1.85
       - name: Install Rust stable (>= 1.85)
