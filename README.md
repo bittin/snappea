@@ -37,7 +37,7 @@ Disclaimer: This project is based on xdg-desktop-portal-cosmic with added featur
 
 ### From the Cloudsmith Debian Repository (recommended)
 
-<img alt="Static Badge" src="https://img.shields.io/badge/OSS%20hosting%20by-cloudsmith-blue?logo=cloudsmith&style=flat-square&link=https%3A%2F%2Fcloudsmith.com"> </img>
+[![Cloudsmith](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fapi.cloudsmith.io%2Fv1%2Fpackages%2Fcosmetics%2Fsnappea%2F%3Fpage%3D1%26page_size%3D1%26sort%3D-version&query=%24%5B0%5D.version&label=cloudsmith&logo=cloudsmith&color=blue)](https://cloudsmith.io/~cosmetics/repos/snappea/packages/) <img alt="Static Badge" src="https://img.shields.io/badge/OSS%20hosting%20by-cloudsmith-blue?logo=cloudsmith&style=flat-square&link=https%3A%2F%2Fcloudsmith.com"> </img>
 
 SnapPea repository hosting is graciously provided by [Cloudsmith](https://cloudsmith.com).
 
@@ -52,6 +52,28 @@ sudo apt install snappea
 ```
 
 Packages are built automatically on every release and include the binary and desktop entry.
+
+### From Fedora COPR
+
+[![Copr](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fcopr.fedorainfracloud.org%2Fapi_3%2Fpackage%3Fownername%3Dkordus%26projectname%3Dcosmic-apps%26packagename%3Dsnappea%26with_latest_build%3DTrue&query=%24.builds.latest.source_package.version&label=copr&logo=fedora&color=blue)](https://copr.fedorainfracloud.org/coprs/kordus/cosmic-apps/package/snappea/)
+
+COPR packages are maintained by [@lorduskordus](https://github.com/lorduskordus).
+
+**Traditional Fedora:**
+
+```sh
+sudo dnf copr enable kordus/cosmic-apps
+sudo dnf install snappea
+```
+
+**Fedora Atomic:**
+
+```sh
+sudo wget \
+    https://copr.fedorainfracloud.org/coprs/kordus/cosmic-apps/repo/fedora/kordus-cosmic-apps.repo \
+    -O /etc/yum.repos.d/_copr:copr.fedorainfracloud.org:kordus:cosmic-apps.repo
+rpm-ostree install snappea
+```
 
 ### From Source
 
