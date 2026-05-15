@@ -658,6 +658,14 @@ fn extract_video_colors(path: &Path, duration: f64, num_samples: usize) -> Vec<[
 // ── MediaEditor impl ──────────────────────────────────────────────────────
 
 impl MediaEditor {
+    fn speed_at(&self, time: f64) -> f64 {
+        let chunk = match self.cuts.iter().position(|&c| time < c) {
+            Some(i) => i,
+            None => self.cuts.len(),
+        };
+        self.chunk_speeds.get(&chunk).copied().unwrap_or(1.0)
+    }
+
     fn original_fps(&self) -> f64 {
         match &self.media {
             MediaState::Gif { delay_ms, .. } => 1000.0 / (*delay_ms).max(1) as f64,
@@ -1097,20 +1105,23 @@ impl Application for MediaEditor {
                 let fallback = Self::find_next_non_deleted(
                     self.trim_start, &self.cuts, &self.deleted_chunks,
                 ).unwrap_or(self.trim_start);
+                let start_pos = if self.playing
+                    && (self.position < self.trim_start
+                        || self.position >= self.trim_end
+                        || in_deleted)
+                {
+                    fallback
+                } else {
+                    self.position
+                };
+                let speed = self.speed_at(start_pos);
                 match &mut self.media {
                     MediaState::VideoLoaded { video } => {
                         if self.playing {
-                            let start = if self.position < self.trim_start
-                                || self.position >= self.trim_end
-                                || in_deleted
-                            {
-                                fallback
-                            } else {
-                                self.position
-                            };
-                            self.position = start;
+                            self.position = start_pos;
                             video.set_paused(true);
-                            let _ = video.seek(Duration::from_secs_f64(start), true);
+                            let _ = video.set_speed(speed);
+                            let _ = video.seek(Duration::from_secs_f64(start_pos), true);
                             video.set_paused(false);
                         } else {
                             video.set_paused(true);
@@ -1134,23 +1145,41 @@ impl Application for MediaEditor {
                         let loop_start = Self::find_first_non_deleted(
                             &self.cuts, &self.deleted_chunks,
                         ).max(self.trim_start);
+                        let next_non_del = Self::find_next_non_deleted(
+                            pos, &self.cuts, &self.deleted_chunks,
+                        );
+
+                        let chunk_at = |t: f64| -> usize {
+                            match self.cuts.iter().position(|&c| t < c) {
+                                Some(i) => i,
+                                None => self.cuts.len(),
+                            }
+                        };
+                        let speed_for = |t: f64| -> f64 {
+                            self.chunk_speeds.get(&chunk_at(t)).copied().unwrap_or(1.0)
+                        };
 
                         if self.playing && pos >= self.trim_end {
+                            let _ = video.set_speed(speed_for(loop_start));
                             let _ = video.seek(Duration::from_secs_f64(loop_start), true);
                             self.position = loop_start;
                         } else if self.playing && pos < self.trim_start {
                             let _ = video.seek(Duration::from_secs_f64(self.trim_start), true);
                             self.position = self.trim_start;
                         } else if self.playing && in_deleted {
-                            let next = Self::find_next_non_deleted(
-                                pos, &self.cuts, &self.deleted_chunks,
-                            );
-                            let target = match next {
+                            let target = match next_non_del {
                                 Some(t) if t <= self.trim_end => t,
                                 _ => loop_start,
                             };
+                            let _ = video.set_speed(speed_for(target));
                             let _ = video.seek(Duration::from_secs_f64(target), true);
                             self.position = target;
+                        } else if self.playing {
+                            let desired = speed_for(pos);
+                            if (desired - video.speed()).abs() > 0.001 {
+                                let _ = video.set_speed(desired);
+                            }
+                            self.position = pos;
                         } else {
                             self.position = pos;
                         }
