@@ -960,7 +960,7 @@ impl Application for MediaEditor {
                         .and_then(|e| e.to_str())
                         .unwrap_or("mp4"),
                 };
-                let default_name = format!("{}-trimmed.{}", stem, ext);
+                let default_name = fl!("edit-trimmed-filename", stem = stem, ext = ext);
                 let start_dir = self.media_path.parent().map(|p| p.to_path_buf());
                 return Task::perform(
                     async move {
@@ -1089,7 +1089,7 @@ impl Application for MediaEditor {
             .align_x(Alignment::Center)
             .into(),
             widget::text::title3(fl!("edit-title")).into(),
-            widget::text::caption(format!("Version {} ({})", version, git_hash)).into(),
+            widget::text::caption(fl!("app-version", version = version, hash = git_hash)).into(),
             cosmic::widget::divider::horizontal::light().into(),
         ];
 
@@ -1252,9 +1252,10 @@ impl Application for MediaEditor {
 
         // ── Info ──────────────────────────────────────────────────
         let info = widget::text::caption(format!(
-            "{:.2}s / {:.2}s  |  Trim: {:.2}s \u{2013} {:.2}s ({:.1}s)",
+            "{:.2}s / {:.2}s  |  {}: {:.2}s \u{2013} {:.2}s ({:.1}s)",
             self.position,
             self.duration,
+            fl!("edit-trim"),
             self.trim_start,
             self.trim_end,
             self.trimmed_duration(),

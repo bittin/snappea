@@ -292,7 +292,7 @@ where
         column![
             row![
                 text::title4(fl!("app-name")),
-                text::caption(format!("v{} ({})", version, git_hash)),
+                text::caption(fl!("app-version", version = version, hash = git_hash)),
             ]
             .spacing(space_xs)
             .align_y(cosmic::iced::core::Alignment::Center),

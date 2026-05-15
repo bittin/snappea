@@ -131,7 +131,7 @@ impl Screenshot {
             }
         }?;
         let name = chrono::Local::now()
-            .format("Screenshot_%Y-%m-%d_%H-%M-%S.png")
+            .format(&format!("{}_%Y-%m-%d_%H-%M-%S.png", fl!("screenshot-filename-prefix")))
             .to_string();
         path.push(name);
 
@@ -730,7 +730,7 @@ fn handle_settings_msg(app: &mut App, msg: SettingsMsg) -> cosmic::Task<crate::c
         let dialog_task = cosmic::Task::perform(
             async {
                 rfd::AsyncFileDialog::new()
-                    .set_title("Select save location for screenshots")
+                    .set_title(fl!("browse-screenshots-title"))
                     .pick_folder()
                     .await
                     .map(|handle| handle.path().to_string_lossy().to_string())
@@ -772,7 +772,7 @@ fn handle_settings_msg(app: &mut App, msg: SettingsMsg) -> cosmic::Task<crate::c
         let dialog_task = cosmic::Task::perform(
             async {
                 rfd::AsyncFileDialog::new()
-                    .set_title("Select save location for videos")
+                    .set_title(fl!("browse-videos-title"))
                     .pick_folder()
                     .await
                     .map(|handle| handle.path().to_string_lossy().to_string())
@@ -2158,7 +2158,7 @@ fn handle_ocr_status_inner(
                 args.detection.ocr_status = status.clone();
                 args.detection.ocr_overlays = overlays.clone();
                 // Store text for later copying when user clicks the button
-                if !text.is_empty() && text != "No text detected" {
+                if !text.is_empty() && *text != fl!("no-text-detected") {
                     args.detection.ocr_text = Some(text.clone());
                 }
                 log::info!(

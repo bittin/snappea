@@ -2,6 +2,7 @@
 //!
 //! Manages active recording sessions with thread-based control
 
+use crate::fl;
 use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
@@ -159,11 +160,11 @@ fn launch_editor(output_file: &std::path::Path) {
         Err(e) => {
             log::warn!("Failed to launch snappea-edit: {}", e);
             // Fallback: show a notification instead
-            let body = format!("Saved to {}", output_file.display());
+            let body = fl!("saved-to", path = output_file.display().to_string());
             let _ = std::process::Command::new("notify-send")
                 .arg("--app-name=SnapPea")
                 .arg("--icon=video-x-generic")
-                .arg("Recording Saved")
+                .arg(fl!("recording-saved"))
                 .arg(&body)
                 .spawn();
         }

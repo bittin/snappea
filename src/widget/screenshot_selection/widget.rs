@@ -3,6 +3,7 @@
 //! Uses grouped state structs and a single event handler instead of
 //! 96+ individual fields and callbacks.
 
+use crate::fl;
 use cosmic::{
     Element,
     cosmic_theme::Spacing,
@@ -928,7 +929,7 @@ where
                 draw_inactive_overlay_with_hint(
                     renderer,
                     bounds,
-                    "Press 'S' or Screen button to change selection",
+                    &fl!("change-selection-hint"),
                     0.7,
                 );
             });
