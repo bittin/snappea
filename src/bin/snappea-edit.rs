@@ -26,13 +26,13 @@ use snappea::fl;
 
 #[path = "../widget/video_scrubber.rs"]
 mod video_scrubber;
-use video_scrubber::video_scrubber;
 use std::borrow::Cow;
 use std::collections::{HashMap, HashSet};
 use std::fs::File;
 use std::io::BufReader;
 use std::path::{Path, PathBuf};
 use std::time::Duration;
+use video_scrubber::video_scrubber;
 
 // ── Types ─────────────────────────────────────────────────────────────────
 
@@ -710,11 +710,7 @@ impl MediaEditor {
         deleted.contains(&chunk)
     }
 
-    fn find_next_non_deleted(
-        time: f64,
-        cuts: &[f64],
-        deleted: &HashSet<usize>,
-    ) -> Option<f64> {
+    fn find_next_non_deleted(time: f64, cuts: &[f64], deleted: &HashSet<usize>) -> Option<f64> {
         let num_chunks = cuts.len() + 1;
         let chunk = match cuts.iter().position(|&c| time < c) {
             Some(i) => i,
@@ -804,11 +800,7 @@ impl MediaEditor {
             }
             ExportFormat::Video => {
                 if self.ffmpeg_available {
-                    save_video_segments(
-                        &self.media_path,
-                        &segments,
-                        output_path,
-                    )
+                    save_video_segments(&self.media_path, &segments, output_path)
                 } else {
                     Err(anyhow::anyhow!("ffmpeg required for video export"))
                 }
@@ -892,9 +884,7 @@ impl Application for MediaEditor {
                                         .await
                                         .unwrap_or_default()
                                     },
-                                    |colors| {
-                                        cosmic::Action::App(Message::ColorsExtracted(colors))
-                                    },
+                                    |colors| cosmic::Action::App(Message::ColorsExtracted(colors)),
                                 ),
                                 Vec::new(),
                             )
@@ -1124,12 +1114,11 @@ impl Application for MediaEditor {
             // ── Playback ──────────────────────────────────────────────
             Message::TogglePlay => {
                 self.playing = !self.playing;
-                let in_deleted = Self::time_in_deleted(
-                    self.position, &self.cuts, &self.deleted_chunks,
-                );
-                let fallback = Self::find_next_non_deleted(
-                    self.trim_start, &self.cuts, &self.deleted_chunks,
-                ).unwrap_or(self.trim_start);
+                let in_deleted =
+                    Self::time_in_deleted(self.position, &self.cuts, &self.deleted_chunks);
+                let fallback =
+                    Self::find_next_non_deleted(self.trim_start, &self.cuts, &self.deleted_chunks)
+                        .unwrap_or(self.trim_start);
                 let start_pos = if self.playing
                     && (self.position < self.trim_start
                         || self.position >= self.trim_end
@@ -1164,15 +1153,13 @@ impl Application for MediaEditor {
                 if !self.dragging {
                     if let MediaState::VideoLoaded { video } = &mut self.media {
                         let pos = video.position().as_secs_f64();
-                        let in_deleted = Self::time_in_deleted(
-                            pos, &self.cuts, &self.deleted_chunks,
-                        );
-                        let loop_start = Self::find_first_non_deleted(
-                            &self.cuts, &self.deleted_chunks,
-                        ).max(self.trim_start);
-                        let next_non_del = Self::find_next_non_deleted(
-                            pos, &self.cuts, &self.deleted_chunks,
-                        );
+                        let in_deleted =
+                            Self::time_in_deleted(pos, &self.cuts, &self.deleted_chunks);
+                        let loop_start =
+                            Self::find_first_non_deleted(&self.cuts, &self.deleted_chunks)
+                                .max(self.trim_start);
+                        let next_non_del =
+                            Self::find_next_non_deleted(pos, &self.cuts, &self.deleted_chunks);
 
                         let chunk_at = |t: f64| -> usize {
                             match self.cuts.iter().position(|&c| t < c) {
@@ -1381,9 +1368,7 @@ impl Application for MediaEditor {
                             size = format!("{:.1}", size as f64 / 1024.0)
                         )
                     }
-                    Err(e) => {
-                        self.status = fl!("edit-save-failed", error = e.to_string())
-                    }
+                    Err(e) => self.status = fl!("edit-save-failed", error = e.to_string()),
                 }
             }
             Message::SaveAs => {
@@ -1422,9 +1407,7 @@ impl Application for MediaEditor {
                         size = format!("{:.1}", size as f64 / 1024.0)
                     )
                 }
-                Err(e) => {
-                    self.status = fl!("edit-save-failed", error = e.to_string())
-                }
+                Err(e) => self.status = fl!("edit-save-failed", error = e.to_string()),
             },
             Message::SaveAsChosen(None) => {}
             Message::CopyToClipboard => {
@@ -1598,9 +1581,7 @@ impl Application for MediaEditor {
             .align_x(Alignment::Center)
             .align_y(Alignment::Center)
             .into(),
-            MediaState::Gif {
-                gif_frames, ..
-            } => {
+            MediaState::Gif { gif_frames, .. } => {
                 let trim_s = self.frame_at_seconds(self.trim_start);
                 let trim_e = self.frame_at_seconds(self.trim_end);
                 let mut player = gif_player::gif_player(gif_frames)
@@ -1736,10 +1717,8 @@ impl Application for MediaEditor {
             .class(cosmic::theme::Button::Standard)
         };
 
-        let mut cut_items: Vec<cosmic::Element<'_, Message>> = vec![
-            btn_cut.into(),
-            btn_delete_chunk.into(),
-        ];
+        let mut cut_items: Vec<cosmic::Element<'_, Message>> =
+            vec![btn_cut.into(), btn_delete_chunk.into()];
 
         if let Some(sel) = self.selected_chunk {
             let current_speed = self.chunk_speeds.get(&sel).copied().unwrap_or(1.0);

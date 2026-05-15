@@ -1,17 +1,16 @@
 #![allow(clippy::type_complexity)]
 
+use cosmic::iced::Color;
 use cosmic::iced::core::{
     Background, Border, Element, Layout, Length, Pixels, Point, Rectangle, Shell, Size, Widget,
     event::Event,
-    keyboard,
-    layout,
+    keyboard, layout,
     mouse::{self, Cursor},
     renderer::{self, Quad, Renderer as RendererTrait},
     text::{Renderer as TextRenderer, Text},
     touch,
     widget::tree::{self, Tree},
 };
-use cosmic::iced::Color;
 use std::collections::HashSet;
 
 const COLOR_AREA_HEIGHT: f32 = 40.0;
@@ -152,8 +151,7 @@ where
     }
 }
 
-static EMPTY_SET: std::sync::LazyLock<HashSet<usize>> =
-    std::sync::LazyLock::new(HashSet::new);
+static EMPTY_SET: std::sync::LazyLock<HashSet<usize>> = std::sync::LazyLock::new(HashSet::new);
 
 fn time_to_screen_x(time: f64, duration: f64, zoom: f32, scroll_offset: f32, width: f32) -> f32 {
     if duration <= 0.0 {
@@ -202,10 +200,22 @@ fn color_at_time(time: f64, duration: f64, colors: &[[u8; 3]]) -> [u8; 3] {
 
 fn pick_tick_interval(visible_duration: f64) -> (f64, usize) {
     const NICE: &[(f64, usize)] = &[
-        (0.01, 2), (0.02, 2), (0.05, 2),
-        (0.1, 1), (0.2, 1), (0.5, 1),
-        (1.0, 0), (2.0, 0), (5.0, 0), (10.0, 0),
-        (15.0, 0), (30.0, 0), (60.0, 0), (120.0, 0), (300.0, 0), (600.0, 0),
+        (0.01, 2),
+        (0.02, 2),
+        (0.05, 2),
+        (0.1, 1),
+        (0.2, 1),
+        (0.5, 1),
+        (1.0, 0),
+        (2.0, 0),
+        (5.0, 0),
+        (10.0, 0),
+        (15.0, 0),
+        (30.0, 0),
+        (60.0, 0),
+        (120.0, 0),
+        (300.0, 0),
+        (600.0, 0),
     ];
     let target_ticks = 6.0;
     for &(interval, decimals) in NICE {
@@ -224,7 +234,13 @@ fn format_time(seconds: f64, decimals: usize) -> String {
     if decimals == 0 {
         format!("{}:{:02}", mins, secs as u32)
     } else {
-        format!("{}:{:0>width$.prec$}", mins, secs, width = 3 + decimals, prec = decimals)
+        format!(
+            "{}:{:0>width$.prec$}",
+            mins,
+            secs,
+            width = 3 + decimals,
+            prec = decimals
+        )
     }
 }
 
@@ -273,12 +289,7 @@ fn hit_test_boundary(
     None
 }
 
-fn draw_handle(
-    renderer: &mut cosmic::Renderer,
-    center_x: f32,
-    bottom_y: f32,
-    color: Color,
-) {
+fn draw_handle(renderer: &mut cosmic::Renderer, center_x: f32, bottom_y: f32, color: Color) {
     let hx = center_x - HANDLE_WIDTH / 2.0;
     let hy = bottom_y - HANDLE_HEIGHT;
     // Tab body
@@ -363,7 +374,11 @@ impl<Message: Clone + 'static> Widget<Message, cosmic::Theme, cosmic::Renderer>
 
         if state.drag.is_none() && state.zoom > MIN_ZOOM {
             state.scroll_offset = ensure_visible(
-                self.position, self.duration, state.zoom, state.scroll_offset, width,
+                self.position,
+                self.duration,
+                state.zoom,
+                state.scroll_offset,
+                width,
             );
         }
 
@@ -373,12 +388,20 @@ impl<Message: Clone + 'static> Widget<Message, cosmic::Theme, cosmic::Renderer>
                 if let Some(pos) = cursor.position_over(bounds) {
                     let local_x = pos.x - bounds.x;
                     let time = screen_x_to_time(
-                        local_x, self.duration, state.zoom, state.scroll_offset, width,
+                        local_x,
+                        self.duration,
+                        state.zoom,
+                        state.scroll_offset,
+                        width,
                     );
 
                     if let Some(target) = hit_test_boundary(
-                        local_x, self.duration, self.cuts,
-                        state.zoom, state.scroll_offset, width,
+                        local_x,
+                        self.duration,
+                        self.cuts,
+                        state.zoom,
+                        state.scroll_offset,
+                        width,
                     ) {
                         state.drag = Some(target);
                         state.drag_time = match target {
@@ -424,10 +447,8 @@ impl<Message: Clone + 'static> Widget<Message, cosmic::Theme, cosmic::Renderer>
                             }
                         }
                         DragTarget::EdgeStart | DragTarget::EdgeEnd => {
-                            let near_start =
-                                drag_time <= EDGE_SNAP_THRESHOLD * self.duration;
-                            let near_end =
-                                drag_time >= self.duration * (1.0 - EDGE_SNAP_THRESHOLD);
+                            let near_start = drag_time <= EDGE_SNAP_THRESHOLD * self.duration;
+                            let near_end = drag_time >= self.duration * (1.0 - EDGE_SNAP_THRESHOLD);
                             if !near_start && !near_end {
                                 if let Some(ref cb) = self.on_cut_added {
                                     shell.publish(cb(drag_time));
@@ -444,7 +465,11 @@ impl<Message: Clone + 'static> Widget<Message, cosmic::Theme, cosmic::Renderer>
                     if let Some(pos) = cursor.land().position() {
                         let local_x = (pos.x - bounds.x).clamp(0.0, width);
                         let time = screen_x_to_time(
-                            local_x, self.duration, state.zoom, state.scroll_offset, width,
+                            local_x,
+                            self.duration,
+                            state.zoom,
+                            state.scroll_offset,
+                            width,
                         );
                         match target {
                             DragTarget::Playhead => {
@@ -452,9 +477,7 @@ impl<Message: Clone + 'static> Widget<Message, cosmic::Theme, cosmic::Renderer>
                                     shell.publish(cb(time));
                                 }
                             }
-                            DragTarget::Cut(_)
-                            | DragTarget::EdgeStart
-                            | DragTarget::EdgeEnd => {
+                            DragTarget::Cut(_) | DragTarget::EdgeStart | DragTarget::EdgeEnd => {
                                 state.drag_time = time;
                             }
                         }
@@ -476,14 +499,16 @@ impl<Message: Clone + 'static> Widget<Message, cosmic::Theme, cosmic::Renderer>
                             .map(|p| p.x - bounds.x)
                             .unwrap_or(width / 2.0);
                         let time_at_cursor = screen_x_to_time(
-                            mouse_x, self.duration, state.zoom, state.scroll_offset, width,
+                            mouse_x,
+                            self.duration,
+                            state.zoom,
+                            state.scroll_offset,
+                            width,
                         );
                         let factor = (1.0 + ZOOM_SPEED * dy).max(0.5).min(2.0);
                         state.zoom = (state.zoom * factor).clamp(MIN_ZOOM, MAX_ZOOM);
-                        let new_vx =
-                            (time_at_cursor / self.duration) as f32 * width * state.zoom;
-                        state.scroll_offset =
-                            clamp_scroll(new_vx - mouse_x, state.zoom, width);
+                        let new_vx = (time_at_cursor / self.duration) as f32 * width * state.zoom;
+                        state.scroll_offset = clamp_scroll(new_vx - mouse_x, state.zoom, width);
                     } else if state.zoom > MIN_ZOOM {
                         state.scroll_offset =
                             clamp_scroll(state.scroll_offset - dx, state.zoom, width);
@@ -519,17 +544,26 @@ impl<Message: Clone + 'static> Widget<Message, cosmic::Theme, cosmic::Renderer>
         let scroll = state.scroll_offset;
 
         let color_bounds = Rectangle {
-            x: bounds.x, y: bounds.y, width, height: color_h,
+            x: bounds.x,
+            y: bounds.y,
+            width,
+            height: color_h,
         };
         let label_bounds = Rectangle {
-            x: bounds.x, y: bounds.y + color_h, width, height: LABEL_HEIGHT,
+            x: bounds.x,
+            y: bounds.y + color_h,
+            width,
+            height: LABEL_HEIGHT,
         };
 
         // Background
         renderer.fill_quad(
             Quad {
                 bounds: color_bounds,
-                border: Border { radius: 4.0.into(), ..Border::default() },
+                border: Border {
+                    radius: 4.0.into(),
+                    ..Border::default()
+                },
                 ..Quad::default()
             },
             Background::Color(Color::from_rgba(0.15, 0.15, 0.15, 1.0)),
@@ -540,12 +574,17 @@ impl<Message: Clone + 'static> Widget<Message, cosmic::Theme, cosmic::Renderer>
             for i in 0..width as usize {
                 let sx = i as f32;
                 let time = screen_x_to_time(sx, self.duration, zoom, scroll, width);
-                if time < 0.0 || time > self.duration { continue; }
+                if time < 0.0 || time > self.duration {
+                    continue;
+                }
                 let [r, g, b] = color_at_time(time, self.duration, self.colors);
                 renderer.fill_quad(
                     Quad {
                         bounds: Rectangle {
-                            x: bounds.x + sx, y: bounds.y, width: 1.0, height: color_h,
+                            x: bounds.x + sx,
+                            y: bounds.y,
+                            width: 1.0,
+                            height: color_h,
                         },
                         ..Quad::default()
                     },
@@ -557,7 +596,9 @@ impl<Message: Clone + 'static> Widget<Message, cosmic::Theme, cosmic::Renderer>
         // Deleted chunk overlays
         let num_chunks = self.cuts.len() + 1;
         for chunk_idx in 0..num_chunks {
-            if !self.deleted_chunks.contains(&chunk_idx) { continue; }
+            if !self.deleted_chunks.contains(&chunk_idx) {
+                continue;
+            }
             let (t_start, t_end) = chunk_time_range(chunk_idx, self.cuts, self.duration);
             let x_start = time_to_screen_x(t_start, self.duration, zoom, scroll, width);
             let x_end = time_to_screen_x(t_end, self.duration, zoom, scroll, width);
@@ -566,14 +607,24 @@ impl<Message: Clone + 'static> Widget<Message, cosmic::Theme, cosmic::Renderer>
             if cw > 0.0 {
                 renderer.fill_quad(
                     Quad {
-                        bounds: Rectangle { x: bounds.x + cx, y: bounds.y, width: cw, height: color_h },
+                        bounds: Rectangle {
+                            x: bounds.x + cx,
+                            y: bounds.y,
+                            width: cw,
+                            height: color_h,
+                        },
                         ..Quad::default()
                     },
                     Background::Color(Color::from_rgba(0.0, 0.0, 0.0, 0.75)),
                 );
                 renderer.fill_quad(
                     Quad {
-                        bounds: Rectangle { x: bounds.x + cx, y: bounds.y, width: cw, height: color_h },
+                        bounds: Rectangle {
+                            x: bounds.x + cx,
+                            y: bounds.y,
+                            width: cw,
+                            height: color_h,
+                        },
                         ..Quad::default()
                     },
                     Background::Color(Color::from_rgba(0.6, 0.1, 0.1, 0.4)),
@@ -582,7 +633,12 @@ impl<Message: Clone + 'static> Widget<Message, cosmic::Theme, cosmic::Renderer>
                 for y_off in [0.0, color_h - 2.0] {
                     renderer.fill_quad(
                         Quad {
-                            bounds: Rectangle { x: bounds.x + cx, y: bounds.y + y_off, width: cw, height: 2.0 },
+                            bounds: Rectangle {
+                                x: bounds.x + cx,
+                                y: bounds.y + y_off,
+                                width: cw,
+                                height: 2.0,
+                            },
                             ..Quad::default()
                         },
                         Background::Color(del_border),
@@ -596,7 +652,12 @@ impl<Message: Clone + 'static> Widget<Message, cosmic::Theme, cosmic::Renderer>
                     if x_mid >= bounds.x + cx && x_mid <= bounds.x + cx + cw {
                         renderer.fill_quad(
                             Quad {
-                                bounds: Rectangle { x: x_mid - stripe_w / 2.0, y: bounds.y, width: stripe_w, height: color_h },
+                                bounds: Rectangle {
+                                    x: x_mid - stripe_w / 2.0,
+                                    y: bounds.y,
+                                    width: stripe_w,
+                                    height: color_h,
+                                },
                                 ..Quad::default()
                             },
                             Background::Color(Color::from_rgba(0.9, 0.2, 0.2, 0.35)),
@@ -618,7 +679,12 @@ impl<Message: Clone + 'static> Widget<Message, cosmic::Theme, cosmic::Renderer>
                 if cw > 0.0 {
                     renderer.fill_quad(
                         Quad {
-                            bounds: Rectangle { x: bounds.x + cx, y: bounds.y, width: cw, height: color_h },
+                            bounds: Rectangle {
+                                x: bounds.x + cx,
+                                y: bounds.y,
+                                width: cw,
+                                height: color_h,
+                            },
                             ..Quad::default()
                         },
                         Background::Color(Color::from_rgba(0.3, 0.6, 1.0, 0.25)),
@@ -627,7 +693,12 @@ impl<Message: Clone + 'static> Widget<Message, cosmic::Theme, cosmic::Renderer>
                     for y_off in [0.0, color_h - 2.0] {
                         renderer.fill_quad(
                             Quad {
-                                bounds: Rectangle { x: bounds.x + cx, y: bounds.y + y_off, width: cw, height: 2.0 },
+                                bounds: Rectangle {
+                                    x: bounds.x + cx,
+                                    y: bounds.y + y_off,
+                                    width: cw,
+                                    height: 2.0,
+                                },
                                 ..Quad::default()
                             },
                             Background::Color(bc),
@@ -642,12 +713,19 @@ impl<Message: Clone + 'static> Widget<Message, cosmic::Theme, cosmic::Renderer>
         let handle_bottom = bounds.y + color_h;
 
         // Determine effective cut positions (accounting for active drag)
-        let effective_cuts: Vec<(f64, bool)> = self.cuts.iter().enumerate().map(|(i, &c)| {
-            if let Some(DragTarget::Cut(di)) = state.drag {
-                if di == i { return (state.drag_time, true); }
-            }
-            (c, false)
-        }).collect();
+        let effective_cuts: Vec<(f64, bool)> = self
+            .cuts
+            .iter()
+            .enumerate()
+            .map(|(i, &c)| {
+                if let Some(DragTarget::Cut(di)) = state.drag {
+                    if di == i {
+                        return (state.drag_time, true);
+                    }
+                }
+                (c, false)
+            })
+            .collect();
 
         for (cut_time, is_dragging) in &effective_cuts {
             let cx = time_to_screen_x(*cut_time, self.duration, zoom, scroll, width);
@@ -661,7 +739,9 @@ impl<Message: Clone + 'static> Widget<Message, cosmic::Theme, cosmic::Renderer>
                     Quad {
                         bounds: Rectangle {
                             x: bounds.x + cx - CUT_LINE_WIDTH / 2.0,
-                            y: bounds.y, width: CUT_LINE_WIDTH, height: color_h,
+                            y: bounds.y,
+                            width: CUT_LINE_WIDTH,
+                            height: color_h,
                         },
                         ..Quad::default()
                     },
@@ -696,7 +776,9 @@ impl<Message: Clone + 'static> Widget<Message, cosmic::Theme, cosmic::Renderer>
                         Quad {
                             bounds: Rectangle {
                                 x: bounds.x + px - 1.0,
-                                y: bounds.y, width: 2.0, height: color_h,
+                                y: bounds.y,
+                                width: 2.0,
+                                height: color_h,
                             },
                             ..Quad::default()
                         },
@@ -720,7 +802,9 @@ impl<Message: Clone + 'static> Widget<Message, cosmic::Theme, cosmic::Renderer>
                     Quad {
                         bounds: Rectangle {
                             x: bounds.x + ph_x - PLAYHEAD_WIDTH / 2.0,
-                            y: bounds.y, width: PLAYHEAD_WIDTH, height: color_h,
+                            y: bounds.y,
+                            width: PLAYHEAD_WIDTH,
+                            height: color_h,
                         },
                         ..Quad::default()
                     },
@@ -731,9 +815,13 @@ impl<Message: Clone + 'static> Widget<Message, cosmic::Theme, cosmic::Renderer>
                         bounds: Rectangle {
                             x: bounds.x + ph_x - PLAYHEAD_TRI_SIZE / 2.0,
                             y: bounds.y,
-                            width: PLAYHEAD_TRI_SIZE, height: PLAYHEAD_TRI_SIZE,
+                            width: PLAYHEAD_TRI_SIZE,
+                            height: PLAYHEAD_TRI_SIZE,
                         },
-                        border: Border { radius: 1.0.into(), ..Border::default() },
+                        border: Border {
+                            radius: 1.0.into(),
+                            ..Border::default()
+                        },
                         ..Quad::default()
                     },
                     Background::Color(Color::WHITE),
@@ -743,7 +831,10 @@ impl<Message: Clone + 'static> Widget<Message, cosmic::Theme, cosmic::Renderer>
 
         // Time labels
         renderer.fill_quad(
-            Quad { bounds: label_bounds, ..Quad::default() },
+            Quad {
+                bounds: label_bounds,
+                ..Quad::default()
+            },
             Background::Color(Color::from_rgba(0.1, 0.1, 0.1, 1.0)),
         );
 
@@ -759,14 +850,21 @@ impl<Message: Clone + 'static> Widget<Message, cosmic::Theme, cosmic::Renderer>
 
         for i in first_tick..=last_tick {
             let time = i as f64 * tick_interval;
-            if time < 0.0 || time > self.duration { continue; }
+            if time < 0.0 || time > self.duration {
+                continue;
+            }
             let tx = time_to_screen_x(time, self.duration, zoom, scroll, width);
-            if tx < 0.0 || tx > width { continue; }
+            if tx < 0.0 || tx > width {
+                continue;
+            }
 
             renderer.fill_quad(
                 Quad {
                     bounds: Rectangle {
-                        x: bounds.x + tx - 0.5, y: label_y, width: 1.0, height: TICK_HEIGHT,
+                        x: bounds.x + tx - 0.5,
+                        y: label_y,
+                        width: 1.0,
+                        height: TICK_HEIGHT,
                     },
                     ..Quad::default()
                 },
@@ -812,9 +910,15 @@ impl<Message: Clone + 'static> Widget<Message, cosmic::Theme, cosmic::Renderer>
                 if let Some(pos) = cursor.position_over(layout.bounds()) {
                     let local_x = pos.x - layout.bounds().x;
                     if hit_test_boundary(
-                        local_x, self.duration, self.cuts,
-                        state.zoom, state.scroll_offset, layout.bounds().width,
-                    ).is_some() {
+                        local_x,
+                        self.duration,
+                        self.cuts,
+                        state.zoom,
+                        state.scroll_offset,
+                        layout.bounds().width,
+                    )
+                    .is_some()
+                    {
                         mouse::Interaction::ResizingHorizontally
                     } else {
                         mouse::Interaction::Pointer
