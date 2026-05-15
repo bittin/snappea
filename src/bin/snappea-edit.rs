@@ -1710,9 +1710,11 @@ impl Application for MediaEditor {
             );
         }
 
-        let cut_toolbar = widget::row::with_children(cut_items)
-            .spacing(8)
-            .align_y(Alignment::Center);
+        let cut_toolbar = cosmic::widget::flex_row::flex_row(cut_items)
+            .row_spacing(8)
+            .column_spacing(8)
+            .align_items(Alignment::Center)
+            .width(Length::Fill);
 
         // ── Info ──────────────────────────────────────────────────
         let chunk_info = if let Some(sel) = self.selected_chunk {
