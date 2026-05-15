@@ -23,6 +23,7 @@ const PLAYHEAD_TRI_SIZE: f32 = 6.0;
 const MIN_ZOOM: f32 = 1.0;
 const MAX_ZOOM: f32 = 100.0;
 const ZOOM_SPEED: f32 = 0.15;
+const FOLLOW_MARGIN: f32 = 0.15;
 
 struct ScrubberState {
     dragging: bool,
@@ -214,6 +215,27 @@ fn clamp_scroll(scroll: f32, zoom: f32, width: f32) -> f32 {
     scroll.clamp(0.0, max_scroll)
 }
 
+fn ensure_visible(
+    position: f64,
+    duration: f64,
+    zoom: f32,
+    scroll: f32,
+    width: f32,
+) -> f32 {
+    if zoom <= MIN_ZOOM || duration <= 0.0 {
+        return scroll;
+    }
+    let ph_x = time_to_screen_x(position, duration, zoom, scroll, width);
+    let margin = width * FOLLOW_MARGIN;
+    if ph_x < margin {
+        clamp_scroll(scroll - (margin - ph_x), zoom, width)
+    } else if ph_x > width - margin {
+        clamp_scroll(scroll + (ph_x - (width - margin)), zoom, width)
+    } else {
+        scroll
+    }
+}
+
 impl<Message: Clone + 'static> Widget<Message, cosmic::Theme, cosmic::Renderer>
     for VideoScrubber<'_, Message>
 {
@@ -255,6 +277,17 @@ impl<Message: Clone + 'static> Widget<Message, cosmic::Theme, cosmic::Renderer>
         let state = tree.state.downcast_mut::<ScrubberState>();
         let bounds = layout.bounds();
         let width = bounds.width;
+
+        // Auto-scroll to keep playhead visible when not dragging
+        if !state.dragging && state.zoom > MIN_ZOOM {
+            state.scroll_offset = ensure_visible(
+                self.position,
+                self.duration,
+                state.zoom,
+                state.scroll_offset,
+                width,
+            );
+        }
 
         match event {
             Event::Mouse(mouse::Event::ButtonPressed(mouse::Button::Left))
@@ -373,15 +406,23 @@ impl<Message: Clone + 'static> Widget<Message, cosmic::Theme, cosmic::Renderer>
         let zoom = state.zoom;
         let scroll = state.scroll_offset;
 
+        let color_bounds = Rectangle {
+            x: bounds.x,
+            y: bounds.y,
+            width,
+            height: color_h,
+        };
+        let label_bounds = Rectangle {
+            x: bounds.x,
+            y: bounds.y + color_h,
+            width,
+            height: LABEL_HEIGHT,
+        };
+
         // Background
         renderer.fill_quad(
             Quad {
-                bounds: Rectangle {
-                    x: bounds.x,
-                    y: bounds.y,
-                    width,
-                    height: color_h,
-                },
+                bounds: color_bounds,
                 border: Border {
                     radius: 4.0.into(),
                     ..Border::default()
@@ -393,7 +434,6 @@ impl<Message: Clone + 'static> Widget<Message, cosmic::Theme, cosmic::Renderer>
 
         // Draw color columns
         if !self.colors.is_empty() && self.duration > 0.0 {
-            let col_width = 1.0_f32;
             let cols = width as usize;
             for i in 0..cols {
                 let sx = i as f32;
@@ -407,7 +447,7 @@ impl<Message: Clone + 'static> Widget<Message, cosmic::Theme, cosmic::Renderer>
                         bounds: Rectangle {
                             x: bounds.x + sx,
                             y: bounds.y,
-                            width: col_width,
+                            width: 1.0,
                             height: color_h,
                         },
                         ..Quad::default()
@@ -429,6 +469,7 @@ impl<Message: Clone + 'static> Widget<Message, cosmic::Theme, cosmic::Renderer>
             let cx = x_start.max(0.0);
             let cw = (x_end.min(width) - cx).max(0.0);
             if cw > 0.0 {
+                // Heavy dark overlay
                 renderer.fill_quad(
                     Quad {
                         bounds: Rectangle {
@@ -439,26 +480,55 @@ impl<Message: Clone + 'static> Widget<Message, cosmic::Theme, cosmic::Renderer>
                         },
                         ..Quad::default()
                     },
-                    Background::Color(Color::from_rgba(0.0, 0.0, 0.0, 0.6)),
+                    Background::Color(Color::from_rgba(0.0, 0.0, 0.0, 0.75)),
                 );
-                // Draw diagonal lines pattern for deleted
-                let stripe_spacing = 8.0;
+                // Red tint
+                renderer.fill_quad(
+                    Quad {
+                        bounds: Rectangle {
+                            x: bounds.x + cx,
+                            y: bounds.y,
+                            width: cw,
+                            height: color_h,
+                        },
+                        ..Quad::default()
+                    },
+                    Background::Color(Color::from_rgba(0.6, 0.1, 0.1, 0.4)),
+                );
+                // Red border top & bottom
+                let del_border = Color::from_rgba(0.8, 0.2, 0.2, 0.8);
+                for y_off in [0.0, color_h - 2.0] {
+                    renderer.fill_quad(
+                        Quad {
+                            bounds: Rectangle {
+                                x: bounds.x + cx,
+                                y: bounds.y + y_off,
+                                width: cw,
+                                height: 2.0,
+                            },
+                            ..Quad::default()
+                        },
+                        Background::Color(del_border),
+                    );
+                }
+                // Diagonal stripes
+                let stripe_spacing = 10.0;
+                let stripe_w = 2.0;
                 let mut sx = cx - color_h;
                 while sx < cx + cw {
-                    let x1 = sx.max(cx);
-                    let x2 = (sx + color_h).min(cx + cw);
-                    if x2 > x1 {
+                    let x_mid = bounds.x + (sx + color_h / 2.0).max(cx).min(cx + cw);
+                    if x_mid >= bounds.x + cx && x_mid <= bounds.x + cx + cw {
                         renderer.fill_quad(
                             Quad {
                                 bounds: Rectangle {
-                                    x: bounds.x + (x1 + x2) / 2.0 - 0.5,
+                                    x: x_mid - stripe_w / 2.0,
                                     y: bounds.y,
-                                    width: 1.0,
+                                    width: stripe_w,
                                     height: color_h,
                                 },
                                 ..Quad::default()
                             },
-                            Background::Color(Color::from_rgba(1.0, 0.3, 0.3, 0.3)),
+                            Background::Color(Color::from_rgba(0.9, 0.2, 0.2, 0.35)),
                         );
                     }
                     sx += stripe_spacing;
@@ -488,7 +558,6 @@ impl<Message: Clone + 'static> Widget<Message, cosmic::Theme, cosmic::Renderer>
                         },
                         Background::Color(sel_color),
                     );
-                    // Border top and bottom
                     let border_color = Color::from_rgba(0.3, 0.6, 1.0, 0.7);
                     for y_off in [0.0, color_h - 2.0] {
                         renderer.fill_quad(
@@ -512,7 +581,7 @@ impl<Message: Clone + 'static> Widget<Message, cosmic::Theme, cosmic::Renderer>
         let cut_color = Color::from_rgba(1.0, 0.85, 0.0, 0.9);
         for &cut_time in self.cuts {
             let cx = time_to_screen_x(cut_time, self.duration, zoom, scroll, width);
-            if cx >= -CUT_LINE_WIDTH && cx <= width + CUT_LINE_WIDTH {
+            if cx >= 0.0 && cx <= width {
                 renderer.fill_quad(
                     Quad {
                         bounds: Rectangle {
@@ -531,8 +600,7 @@ impl<Message: Clone + 'static> Widget<Message, cosmic::Theme, cosmic::Renderer>
         // Draw playhead
         if self.duration > 0.0 {
             let ph_x = time_to_screen_x(self.position, self.duration, zoom, scroll, width);
-            if ph_x >= -PLAYHEAD_WIDTH && ph_x <= width + PLAYHEAD_WIDTH {
-                // Vertical line
+            if ph_x >= 0.0 && ph_x <= width {
                 renderer.fill_quad(
                     Quad {
                         bounds: Rectangle {
@@ -545,13 +613,11 @@ impl<Message: Clone + 'static> Widget<Message, cosmic::Theme, cosmic::Renderer>
                     },
                     Background::Color(Color::WHITE),
                 );
-                // Triangle at top
-                let tri_y = bounds.y;
                 renderer.fill_quad(
                     Quad {
                         bounds: Rectangle {
                             x: bounds.x + ph_x - PLAYHEAD_TRI_SIZE / 2.0,
-                            y: tri_y,
+                            y: bounds.y,
                             width: PLAYHEAD_TRI_SIZE,
                             height: PLAYHEAD_TRI_SIZE,
                         },
@@ -574,12 +640,7 @@ impl<Message: Clone + 'static> Widget<Message, cosmic::Theme, cosmic::Renderer>
         // Label area background
         renderer.fill_quad(
             Quad {
-                bounds: Rectangle {
-                    x: bounds.x,
-                    y: label_y,
-                    width,
-                    height: LABEL_HEIGHT,
-                },
+                bounds: label_bounds,
                 ..Quad::default()
             },
             Background::Color(Color::from_rgba(0.1, 0.1, 0.1, 1.0)),
@@ -599,11 +660,11 @@ impl<Message: Clone + 'static> Widget<Message, cosmic::Theme, cosmic::Renderer>
                 continue;
             }
             let tx = time_to_screen_x(time, self.duration, zoom, scroll, width);
-            if tx < -50.0 || tx > width + 50.0 {
+            if tx < 0.0 || tx > width {
                 continue;
             }
 
-            // Tick mark
+            // Tick mark — clipped to label bounds
             renderer.fill_quad(
                 Quad {
                     bounds: Rectangle {
@@ -617,13 +678,13 @@ impl<Message: Clone + 'static> Widget<Message, cosmic::Theme, cosmic::Renderer>
                 Background::Color(tick_color),
             );
 
-            // Label
+            // Label — use label_bounds as clip rect
             let label = format_time(time, decimals);
             let label_w = 60.0_f32;
             renderer.fill_text(
                 Text {
                     content: label,
-                    bounds: Size::new(label_w, LABEL_HEIGHT),
+                    bounds: Size::new(label_w, LABEL_HEIGHT - TICK_HEIGHT),
                     size: Pixels(10.0),
                     line_height: cosmic::iced::core::text::LineHeight::Relative(1.0),
                     font: cosmic::iced::Font::default(),
@@ -635,12 +696,7 @@ impl<Message: Clone + 'static> Widget<Message, cosmic::Theme, cosmic::Renderer>
                 },
                 Point::new(bounds.x + tx, label_y + TICK_HEIGHT),
                 label_color,
-                Rectangle {
-                    x: bounds.x,
-                    y: label_y,
-                    width,
-                    height: LABEL_HEIGHT,
-                },
+                label_bounds,
             );
         }
     }
