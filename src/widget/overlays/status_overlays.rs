@@ -13,6 +13,7 @@ use cosmic::iced::core::{
 use cosmic::iced::{Color, Point, Size};
 
 use crate::capture::ocr::OcrStatus;
+use crate::fl;
 
 /// Check if a string looks like a URL
 pub fn is_url(s: &str) -> bool {
@@ -94,7 +95,7 @@ pub fn draw_qr_scanning_indicator(
     draw_status_badge(
         renderer,
         viewport,
-        "Scanning for QR codes...",
+        &fl!("scanning-qr"),
         20.0,
         20.0,
         accent_color,
@@ -121,16 +122,16 @@ pub fn draw_ocr_status_indicator(
     }
 
     let status_text = match ocr_status {
-        OcrStatus::DownloadingModels => "Downloading OCR models...".to_string(),
-        OcrStatus::Running => "Running OCR...".to_string(),
-        OcrStatus::Error(err) => format!(
-            "OCR error: {}",
-            if err.len() > 40 {
+        OcrStatus::DownloadingModels => fl!("downloading-ocr-models"),
+        OcrStatus::Running => fl!("running-ocr"),
+        OcrStatus::Error(err) => {
+            let truncated = if err.len() > 40 {
                 format!("{}...", &err[..37])
             } else {
                 err.clone()
-            }
-        ),
+            };
+            fl!("ocr-error", error = truncated)
+        }
         _ => return,
     };
 

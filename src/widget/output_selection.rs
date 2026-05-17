@@ -1,3 +1,4 @@
+use crate::fl;
 use cosmic::{
     iced::Limits,
     iced::core::{
@@ -167,9 +168,9 @@ impl<Msg: Clone + 'static> Widget<Msg, cosmic::Theme, cosmic::Renderer> for Outp
 
             // Draw hint text
             let hint_text = if self.focused {
-                "Click or press Enter to select this screen"
+                fl!("select-screen-hint")
             } else {
-                "Click to select • Arrow keys to navigate"
+                fl!("select-screen-navigate")
             };
 
             let text_color = Color::WHITE;

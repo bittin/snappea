@@ -100,6 +100,7 @@ set-as-default-portal-description = Use SnapPea as the default screenshot portal
 toolbar-opacity = Toolbar opacity (idle): { $percent }%
 app-name = SnapPea
 app-author = by Hojjat Abdollahi
+app-version = v{ $version } ({ $hash })
 
 # Settings drawer - Picture
 save-location = Save to:
@@ -139,6 +140,66 @@ invalid-ocr-scale = Invalid OCR mapping scale
 tesseract-image-error = Failed to create tesseract image: { $error }
 tesseract-ocr-error = Tesseract OCR failed: { $error }
 
+# Screen selection hints
+select-screen-hint = Click or press Enter to select this screen
+select-screen-navigate = Click to select • Arrow keys to navigate
+change-selection-hint = Press 'S' or Screen button to change selection
+
+# File dialogs
+browse-screenshots-title = Select save location for screenshots
+browse-videos-title = Select save location for videos
+
+# Status overlays
+scanning-qr = Scanning for QR codes...
+downloading-ocr-models = Downloading OCR models...
+running-ocr = Running OCR...
+ocr-error = OCR error: { $error }
+
+# Notifications
+recording-saved = Recording Saved
+saved-to = Saved to { $path }
+
+# Default screenshot filename prefix
+screenshot-filename-prefix = Screenshot
+
 # Command line usage
 cli-usage = Usage: snappea --record --output FILE --output-name NAME --region X,Y,W,H --logical-size W,H --encoder ENC [--container FMT] [--framerate FPS] [--toplevel-index IDX]
 cli-missing-args = Missing required arguments for --record
+
+# Media editor
+edit-title = SnapPea Edit
+edit-about = About
+edit-system-tools = System Tools
+edit-ffmpeg-version = ffmpeg: { $version }
+edit-ffmpeg-not-installed = ffmpeg: not installed (needed for video trimming and GIF conversion)
+edit-gifski-version = gifski: { $version }
+edit-gifski-not-installed = gifski: not installed (cargo install gifski for higher quality GIFs)
+edit-loading = Loading
+edit-loading-video = Loading video...
+edit-encoding-gif = Encoding GIF...
+edit-loaded = Loaded
+edit-no-media = No media
+edit-save = Save
+edit-save-as = Save As...
+edit-discard = Discard
+edit-format = Format
+edit-format-gif = GIF
+edit-format-video = Video
+edit-scale = Scale
+edit-trim = Trim
+edit-trimmed-filename = { $stem }-trimmed.{ $ext }
+edit-optimize-ffmpeg = Optimize (ffmpeg)
+edit-saved-size = Saved ({ $size } KB)
+edit-saved-path-size = Saved { $path } ({ $size } KB)
+edit-save-failed = Save failed: { $error }
+edit-copied-to-clipboard = Copied to clipboard
+edit-copied-file-path = Copied file path to clipboard
+edit-copy-failed = Copy failed: { $error }
+edit-copied = Copied
+edit-cut = Cut
+edit-delete-chunk = Delete
+edit-undelete-chunk = Restore
+edit-cuts = Cuts:
+edit-chunk = Chunk
+edit-deleted = deleted
+edit-speed = Speed
