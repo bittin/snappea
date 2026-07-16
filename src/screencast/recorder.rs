@@ -105,6 +105,46 @@ fn ensure_container_compatible(
     Ok(fallback)
 }
 
+/// Work around a GStreamer VA-API H.265 encoder bug: for output widths that are
+/// not a multiple of 64 (the HEVC coding-tree-unit size), `vah265enc` /
+/// `vaapih265enc` round the coded width up to the next multiple of 64 and fail to
+/// emit a conformance/cropping window, so the saved video is too wide with a
+/// strip of garbage on the right edge (e.g. a 2256px screen becomes 2304px). The
+/// H.264 encoders handle every width correctly, including via the zero-copy path,
+/// so substitute a hardware H.264 encoder in that case. (ffmpeg's HEVC VA-API
+/// encoder is unaffected; this is specific to the GStreamer elements.)
+fn substitute_h265_for_unaligned_width(
+    requested: EncoderInfo,
+    encoders: &[EncoderInfo],
+    width: u32,
+) -> EncoderInfo {
+    if requested.codec != Codec::H265 || width % 64 == 0 {
+        return requested;
+    }
+
+    let Some(h264) = encoders
+        .iter()
+        .find(|e| e.hardware && e.codec == Codec::H264)
+        .or_else(|| encoders.iter().find(|e| e.codec == Codec::H264))
+    else {
+        log::warn!(
+            "H.265 width {}px is not a multiple of 64 (GStreamer VA encoder mis-sizes it), \
+             but no H.264 encoder is available to substitute; output may be too wide",
+            width
+        );
+        return requested;
+    };
+
+    log::info!(
+        "Substituting '{}' for '{}': H.265 width {}px is not 64-aligned, which the GStreamer \
+         VA H.265 encoder encodes at the wrong (rounded-up) width",
+        h264.gst_element,
+        requested.gst_element,
+        width
+    );
+    h264.clone()
+}
+
 fn select_effective_encoder(
     requested: EncoderInfo,
     encoders: &[EncoderInfo],
@@ -401,6 +441,7 @@ pub fn start_recording(
         copied_path_reason,
         output_size,
     );
+    let encoder_info = substitute_h265_for_unaligned_width(encoder_info, &encoders, output_size.0);
     let zero_copy_allowed = copied_path_reason.is_none();
 
     log::info!(
@@ -782,31 +823,29 @@ pub fn start_recording(
             // that plays sped up and "doesn't show the whole recording".
             let timestamp = start_time.elapsed().as_nanos() as u64;
 
-            // Try to get a new frame (non-blocking)
-            let frame_data = match frame_rx.try_recv() {
+            // Try to get a new frame (non-blocking). Avoid cloning the full
+            // frame buffer: on a new frame we move it into `last_frame`; on a
+            // repeat we reuse the stored buffer. push_frame only needs a slice,
+            // so no per-frame allocation/copy is required.
+            match frame_rx.try_recv() {
                 Ok(data) => {
-                    last_frame = Some(data.clone());
+                    last_frame = Some(data);
                     new_frames += 1;
-                    data
                 }
                 Err(_) => {
                     // No new frame available, repeat last frame
-                    match &last_frame {
-                        Some(data) => {
-                            repeated_frames += 1;
-                            data.clone()
-                        }
-                        None => {
-                            // No frame yet, wait a bit
-                            std::thread::sleep(Duration::from_millis(1));
-                            continue;
-                        }
+                    if last_frame.is_none() {
+                        // No frame yet, wait a bit
+                        std::thread::sleep(Duration::from_millis(1));
+                        continue;
                     }
+                    repeated_frames += 1;
                 }
             };
+            let frame_data = last_frame.as_deref().unwrap();
 
             // Push frame to pipeline
-            match pipeline.push_frame(&frame_data, timestamp) {
+            match pipeline.push_frame(frame_data, timestamp) {
                 Ok(()) => {
                     consecutive_errors = 0;
                     frame_count += 1;
@@ -1273,6 +1312,7 @@ pub fn start_recording_thread(
         copied_path_reason,
         output_size,
     );
+    let encoder_info = substitute_h265_for_unaligned_width(encoder_info, &encoders, output_size.0);
     let zero_copy_allowed = copied_path_reason.is_none();
 
     log::info!(
@@ -1546,25 +1586,25 @@ pub fn start_recording_thread(
             // (frame_count-based timestamps cause slow motion when capture is faster than target fps)
             let timestamp = start_time.elapsed().as_nanos() as u64;
 
-            let frame_data = match frame_rx.try_recv() {
+            // Avoid cloning the full frame buffer each iteration: move new
+            // frames into `last_frame`, reuse the stored buffer on repeats, and
+            // push by slice (push_frame borrows, it does not take ownership).
+            match frame_rx.try_recv() {
                 Ok(data) => {
-                    last_frame = Some(data.clone());
+                    last_frame = Some(data);
                     new_frames += 1;
-                    data
                 }
-                Err(_) => match &last_frame {
-                    Some(data) => {
-                        repeated_frames += 1;
-                        data.clone()
-                    }
-                    None => {
+                Err(_) => {
+                    if last_frame.is_none() {
                         std::thread::sleep(Duration::from_millis(1));
                         continue;
                     }
-                },
+                    repeated_frames += 1;
+                }
             };
+            let frame_data = last_frame.as_deref().unwrap();
 
-            match pipeline.push_frame(&frame_data, timestamp) {
+            match pipeline.push_frame(frame_data, timestamp) {
                 Ok(()) => {
                     consecutive_errors = 0;
                     frame_count += 1;

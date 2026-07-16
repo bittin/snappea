@@ -665,7 +665,7 @@ impl<'a, Msg: Clone + 'static> cosmic::widget::Widget<Msg, cosmic::Theme, cosmic
         let radius = cosmic_theme.corner_radii.radius_s;
 
         // Draw the background with appropriate opacity
-        let mut bg_color: cosmic::iced::Color = cosmic_theme.background.component.base.into();
+        let mut bg_color: cosmic::iced::Color = cosmic_theme.background(false).component.base.into();
         bg_color.a *= opacity;
 
         renderer.fill_quad(
@@ -894,7 +894,7 @@ impl<'a, Msg: Clone + 'static> cosmic::widget::Widget<Msg, cosmic::Theme, cosmic
             self.unhovered_opacity
         };
 
-        let mut bg_color: cosmic::iced::Color = cosmic_theme.background.component.base.into();
+        let mut bg_color: cosmic::iced::Color = cosmic_theme.background(false).component.base.into();
         bg_color.a *= opacity;
 
         let mut draw_style = *style;
@@ -1189,6 +1189,8 @@ pub fn build_toolbar<'a, Msg: Clone + 'static>(
     primary_redact_tool: RedactTool,
     redact_mode_active: bool,
     redact_popup_open: bool,
+    magnifier_mode_active: bool,
+    magnifier_popup_open: bool,
     space_s: u16,
     space_xs: u16,
     space_xxs: u16,
@@ -1196,6 +1198,9 @@ pub fn build_toolbar<'a, Msg: Clone + 'static>(
     on_screen_mode: Msg,
     on_copy_to_clipboard: Msg,
     on_save_to_pictures: Msg,
+    on_delayed_capture: Msg,
+    on_cycle_capture_delay: Msg,
+    capture_delay_secs: u32,
     on_record_region: Msg,
     on_stop_recording: Msg,
     on_toggle_recording_annotation: Msg,
@@ -1204,6 +1209,8 @@ pub fn build_toolbar<'a, Msg: Clone + 'static>(
     on_shape_right_click: Msg,
     on_redact_press: Msg,
     on_redact_right_click: Msg,
+    on_magnifier_press: Msg,
+    on_magnifier_right_click: Msg,
     on_ocr: Msg,
     on_ocr_copy: Msg,
     on_qr: Msg,
@@ -1354,6 +1361,25 @@ pub fn build_toolbar<'a, Msg: Clone + 'static>(
         tooltip::Position::Bottom,
     );
 
+    // Delayed screenshot button - left-click captures after a delay, right-click
+    // cycles the delay. Shown in screenshot mode regardless of selection.
+    let btn_delay: Element<'_, Msg> = {
+        let delay_btn = tooltip(
+            button::custom(lucide::icon_with_opacity(
+                AppIcon::Timer,
+                34.0,
+                content_opacity,
+                false,
+            ))
+            .class(cosmic::theme::Button::Icon)
+            .on_press(on_delayed_capture)
+            .padding(space_xs),
+            text::body(fl!("delayed-screenshot", secs = capture_delay_secs)),
+            tooltip::Position::Bottom,
+        );
+        super::tool_button::RightClickWrapper::new(delay_btn, Some(on_cycle_capture_delay)).into()
+    };
+
     // Record button - enabled only when region is selected
     // Custom red circular button with themed border
     let record_icon = container(
@@ -1366,7 +1392,7 @@ pub fn build_toolbar<'a, Msg: Clone + 'static>(
         cosmic::theme::Container::Custom(Box::new(move |theme| {
             let cosmic_theme = theme.cosmic();
             // Check if dark theme by examining background luminance
-            let bg = cosmic_theme.background.base;
+            let bg = cosmic_theme.background(false).base;
             let is_dark = (bg.red * 0.299 + bg.green * 0.587 + bg.blue * 0.114) < 0.5;
             let border_color = if is_dark {
                 Color::from_rgba(1.0, 1.0, 1.0, opacity)
@@ -1425,7 +1451,7 @@ pub fn build_toolbar<'a, Msg: Clone + 'static>(
         let opacity = content_opacity;
         cosmic::theme::Container::Custom(Box::new(move |theme| {
             let cosmic_theme = theme.cosmic();
-            let bg = cosmic_theme.background.base;
+            let bg = cosmic_theme.background(false).base;
             let is_dark = (bg.red * 0.299 + bg.green * 0.587 + bg.blue * 0.114) < 0.5;
             let border_color = if is_dark {
                 Color::from_rgba(1.0, 1.0, 1.0, opacity)
@@ -1509,6 +1535,26 @@ pub fn build_toolbar<'a, Msg: Clone + 'static>(
         has_selection,
         has_selection.then_some(on_redact_press.clone()),
         has_selection.then_some(on_redact_right_click.clone()),
+        space_xs,
+        content_opacity,
+    );
+
+    // Magnifier tool button
+    let btn_magnifier = build_tool_button_with_icon(
+        lucide::icon_with_opacity(
+            AppIcon::Magnifier,
+            34.0,
+            content_opacity,
+            magnifier_mode_active || magnifier_popup_open,
+        ),
+        fl!("magnifier-tool"),
+        0, // single tool: no option-indicator dots
+        0,
+        magnifier_mode_active,
+        magnifier_popup_open,
+        has_selection,
+        has_selection.then_some(on_magnifier_press.clone()),
+        has_selection.then_some(on_magnifier_right_click.clone()),
         space_xs,
         content_opacity,
     );
@@ -1663,7 +1709,7 @@ pub fn build_toolbar<'a, Msg: Clone + 'static>(
             .padding([space_s, space_xxs, space_s, space_xxs])
             .into()
         } else if has_selection {
-            let tool_buttons = column![btn_shapes, btn_redact, btn_ocr, btn_qr]
+            let tool_buttons = column![btn_shapes, btn_redact, btn_magnifier, btn_ocr, btn_qr]
                 .spacing(space_s)
                 .align_x(cosmic::iced::core::Alignment::Center);
 
@@ -1676,7 +1722,7 @@ pub fn build_toolbar<'a, Msg: Clone + 'static>(
                 horizontal::light().width(Length::Fixed(64.0)),
                 tool_buttons,
                 horizontal::light().width(Length::Fixed(64.0)),
-                column![btn_copy, btn_save]
+                column![btn_delay, btn_copy, btn_save]
                     .spacing(space_s)
                     .align_x(cosmic::iced::core::Alignment::Center),
                 horizontal::light().width(Length::Fixed(64.0)),
@@ -1696,7 +1742,7 @@ pub fn build_toolbar<'a, Msg: Clone + 'static>(
                     .spacing(space_s)
                     .align_x(cosmic::iced::core::Alignment::Center),
                 horizontal::light().width(Length::Fixed(64.0)),
-                column![btn_copy, btn_save]
+                column![btn_delay, btn_copy, btn_save]
                     .spacing(space_s)
                     .align_x(cosmic::iced::core::Alignment::Center),
                 horizontal::light().width(Length::Fixed(64.0)),
@@ -1749,7 +1795,7 @@ pub fn build_toolbar<'a, Msg: Clone + 'static>(
             .padding([space_xxs, space_s, space_xxs, space_s])
             .into()
         } else if has_selection {
-            let tool_buttons = row![btn_shapes, btn_redact, btn_ocr, btn_qr]
+            let tool_buttons = row![btn_shapes, btn_redact, btn_magnifier, btn_ocr, btn_qr]
                 .spacing(space_s)
                 .align_y(cosmic::iced::core::Alignment::Center);
 
@@ -1762,7 +1808,7 @@ pub fn build_toolbar<'a, Msg: Clone + 'static>(
                 vertical::light().height(Length::Fixed(64.0)),
                 tool_buttons,
                 vertical::light().height(Length::Fixed(64.0)),
-                row![btn_copy, btn_save]
+                row![btn_delay, btn_copy, btn_save]
                     .spacing(space_s)
                     .align_y(cosmic::iced::core::Alignment::Center),
                 vertical::light().height(Length::Fixed(64.0)),
@@ -1782,7 +1828,7 @@ pub fn build_toolbar<'a, Msg: Clone + 'static>(
                     .spacing(space_s)
                     .align_y(cosmic::iced::core::Alignment::Center),
                 vertical::light().height(Length::Fixed(64.0)),
-                row![btn_copy, btn_save]
+                row![btn_delay, btn_copy, btn_save]
                     .spacing(space_s)
                     .align_y(cosmic::iced::core::Alignment::Center),
                 vertical::light().height(Length::Fixed(64.0)),
@@ -1802,7 +1848,7 @@ pub fn build_toolbar<'a, Msg: Clone + 'static>(
             let theme = theme.cosmic();
             cosmic::iced::widget::container::Style {
                 background: None, // HatContainer draws the background with opacity
-                text_color: Some(theme.background.component.on.into()),
+                text_color: Some(theme.background(false).component.on.into()),
                 border: Border::default(),
                 ..Default::default()
             }
@@ -1825,7 +1871,7 @@ pub fn build_toolbar<'a, Msg: Clone + 'static>(
             let theme = theme.cosmic();
             cosmic::iced::widget::container::Style {
                 background: None, // HatContainer draws the background with opacity
-                text_color: Some(theme.background.component.on.into()),
+                text_color: Some(theme.background(false).component.on.into()),
                 border: Border::default(),
                 ..Default::default()
             }
