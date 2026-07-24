@@ -222,6 +222,8 @@ impl cosmic::Application for App {
         let (tray_tx, tray_rx) = crossbeam_channel::unbounded::<TrayAction>();
         let dummy_id = window::Id::unique();
 
+        core.set_auto_blur(Default::default());
+
         (
             Self {
                 core,
