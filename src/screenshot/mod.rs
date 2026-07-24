@@ -1655,6 +1655,9 @@ fn handle_capture_inner(app: &mut App) -> cosmic::Task<crate::core::app::Msg> {
                 if let Some(ref image_path) = image_path {
                     if let Err(_err) = Screenshot::save_rgba(&final_img, image_path) {
                         log::error!("Failed to capture screenshot: {:?}", _err);
+                        // Must flag failure — otherwise the portal caller receives a
+                        // Success response with a URI to a file that was never written.
+                        success = false;
                     };
                     // Also copy to clipboard if enabled
                     if also_copy_to_clipboard {
@@ -1871,9 +1874,22 @@ fn handle_capture_inner(app: &mut App) -> cosmic::Task<crate::core::app::Msg> {
     }
 
     let response = if success && let Some(image_path1) = image_path {
-        PortalResponse::Success(ScreenshotResult {
-            uri: format!("file:///{}", image_path1.display()),
-        })
+        // Build a proper file:// URI (correct slash count + percent-encoding).
+        // The old `format!("file:///{}", path)` produced `file:////home/...`
+        // (four slashes, because the path already starts with `/`) and left
+        // spaces / non-ASCII characters unencoded, which some callers reject.
+        match url::Url::from_file_path(&image_path1) {
+            Ok(url) => PortalResponse::Success(ScreenshotResult {
+                uri: url.to_string(),
+            }),
+            Err(()) => {
+                log::error!(
+                    "Could not build a file URI for '{}'",
+                    image_path1.display()
+                );
+                PortalResponse::Other
+            }
+        }
     } else if success && image_path.is_none() {
         PortalResponse::Success(ScreenshotResult {
             uri: "clipboard:///".to_string(),
