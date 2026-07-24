@@ -9,7 +9,7 @@ use crate::core::portal::PortalResponse;
 use crate::domain::{
     Action, Annotation, ArrowAnnotation, Choice, CircleOutlineAnnotation, ImageSaveLocation,
     LineAnnotation, MagnifierAnnotation, PencilAnnotation, PixelateAnnotation,
-    RectOutlineAnnotation, RedactAnnotation,
+    RectOutlineAnnotation, RedactAnnotation, TextAnnotation, TextEditing,
 };
 use crate::screencast::encoder::EncoderInfo;
 use crate::screenshot::portal::{ScreenshotOptions, ScreenshotResult};
@@ -87,6 +87,10 @@ pub struct AnnotationState {
     pub pencil_mode: bool,
     /// Points collected so far for the in-progress freehand stroke
     pub pencil_drawing: Option<Vec<(f32, f32)>>,
+    pub texts: Vec<TextAnnotation>,
+    pub text_mode: bool,
+    /// The text annotation currently being typed, if any
+    pub text_editing: Option<TextEditing>,
     pub magnifiers: Vec<MagnifierAnnotation>,
     pub magnifier_mode: bool,
     pub magnifier_drawing: Option<(f32, f32)>,
@@ -119,6 +123,9 @@ impl AnnotationState {
         self.pencils.clear();
         self.pencil_mode = false;
         self.pencil_drawing = None;
+        self.texts.clear();
+        self.text_mode = false;
+        self.text_editing = None;
         self.magnifiers.clear();
         self.magnifier_mode = false;
         self.magnifier_drawing = None;
@@ -141,6 +148,9 @@ impl AnnotationState {
         self.pencils.clear();
         self.pencil_drawing = None;
         self.pencil_mode = false;
+        self.texts.clear();
+        self.text_editing = None;
+        self.text_mode = false;
         self.magnifiers.clear();
         self.magnifier_drawing = None;
         self.magnifier_mode = false;
@@ -193,6 +203,7 @@ impl AnnotationState {
         self.rect_outlines.clear();
         self.lines.clear();
         self.pencils.clear();
+        self.texts.clear();
         self.magnifiers.clear();
         self.redactions.clear();
         self.pixelations.clear();
@@ -204,6 +215,7 @@ impl AnnotationState {
                 Annotation::Circle(c) => self.circles.push(c.clone()),
                 Annotation::Rectangle(r) => self.rect_outlines.push(r.clone()),
                 Annotation::Pencil(p) => self.pencils.push(p.clone()),
+                Annotation::Text(t) => self.texts.push(t.clone()),
                 Annotation::Magnifier(m) => self.magnifiers.push(m.clone()),
                 Annotation::Redact(r) => self.redactions.push(r.clone()),
                 Annotation::Pixelate(p) => self.pixelations.push(p.clone()),
@@ -282,6 +294,7 @@ impl AnnotationState {
             || self.circle_mode
             || self.rect_outline_mode
             || self.pencil_mode
+            || self.text_mode
             || self.magnifier_mode
             || self.redact_mode
             || self.pixelate_mode
@@ -302,6 +315,8 @@ impl AnnotationState {
         self.line_drawing = None;
         self.pencil_mode = false;
         self.pencil_drawing = None;
+        self.text_mode = false;
+        self.text_editing = None;
         self.magnifier_mode = false;
         self.magnifier_drawing = None;
         // Note: `selected_magnifier` is intentionally preserved here so the
@@ -338,6 +353,8 @@ pub struct UiState {
     pub shape_popup_open: bool,
     pub shape_color: ShapeColor,
     pub shape_shadow: bool,
+    /// Font size (logical units) used for new text annotations
+    pub text_font_size: f32,
     pub primary_redact_tool: RedactTool,
     pub redact_popup_open: bool,
     pub pixelation_block_size: u32,
@@ -535,6 +552,93 @@ mod tests {
         };
         assert!(!single.is_valid());
         assert!(pencil().is_valid());
+    }
+
+    fn text_ann(content: &str) -> TextAnnotation {
+        TextAnnotation {
+            x: 40.0,
+            y: 50.0,
+            content: content.to_string(),
+            font_size: 24.0,
+            color: ShapeColor::default(),
+            shadow: true,
+        }
+    }
+
+    #[test]
+    fn text_survives_undo_redo_and_rebuild() {
+        let mut st = AnnotationState::default();
+        st.add(Annotation::Text(text_ann("hello")));
+        st.add(Annotation::Line(line()));
+        st.rebuild_arrays();
+        assert_eq!(st.texts.len(), 1);
+        assert_eq!(st.texts[0].content, "hello");
+
+        st.undo(); // drop the line
+        assert_eq!(st.texts.len(), 1);
+        st.undo(); // drop the text
+        assert!(st.texts.is_empty());
+        st.redo();
+        assert_eq!(st.texts.len(), 1);
+    }
+
+    #[test]
+    fn blank_text_is_not_worth_keeping() {
+        assert!(!text_ann("").is_valid());
+        assert!(!text_ann("   ").is_valid());
+        assert!(!text_ann("\n\t ").is_valid());
+        assert!(text_ann("hi").is_valid());
+    }
+
+    #[test]
+    fn text_counts_as_a_shape_and_is_cleared_with_shapes() {
+        let mut st = AnnotationState::default();
+        st.add(Annotation::Text(text_ann("note")));
+        assert!(Annotation::Text(text_ann("note")).is_shape());
+        assert!(!Annotation::Text(text_ann("note")).is_redaction());
+        assert!(st.has_shapes());
+
+        st.clear_shapes();
+        assert!(st.texts.is_empty());
+        assert!(!st.has_shapes());
+    }
+
+    #[test]
+    fn clear_redactions_keeps_text() {
+        let mut st = AnnotationState::default();
+        st.add(Annotation::Text(text_ann("keep me")));
+        st.add(Annotation::Redact(RedactAnnotation {
+            x: 0.0,
+            y: 0.0,
+            x2: 5.0,
+            y2: 5.0,
+        }));
+        st.clear_redactions();
+        st.rebuild_arrays();
+        assert_eq!(st.texts.len(), 1);
+        assert!(st.redactions.is_empty());
+    }
+
+    #[test]
+    fn clearing_all_drops_the_in_progress_text_edit() {
+        let mut st = AnnotationState::default();
+        st.text_mode = true;
+        st.text_editing = Some(TextEditing {
+            x: 1.0,
+            y: 2.0,
+            content: "half typed".into(),
+        });
+        st.clear_all();
+        assert!(st.text_editing.is_none());
+        assert!(!st.text_mode);
+    }
+
+    #[test]
+    fn any_mode_active_tracks_text() {
+        let mut st = AnnotationState::default();
+        assert!(!st.any_mode_active());
+        st.text_mode = true;
+        assert!(st.any_mode_active());
     }
 
     #[test]

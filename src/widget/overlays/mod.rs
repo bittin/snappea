@@ -7,5 +7,6 @@ pub mod magnifier_overlays;
 pub mod redact_overlays;
 mod shapes_overlay;
 pub mod status_overlays;
+pub mod text_overlays;
 
 pub use shapes_overlay::ShapesOverlay;

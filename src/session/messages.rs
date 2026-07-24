@@ -32,6 +32,31 @@ pub enum DrawAction {
     End(f32, f32),
 }
 
+/// Text annotation editing actions.
+///
+/// Text has its own action set rather than reusing [`DrawAction`]: it is driven
+/// by the keyboard over a lifetime (begin → type → commit), not by a drag
+/// between two points.
+#[derive(Debug, Clone)]
+pub enum TextAction {
+    /// Toggle text placement mode on/off
+    ModeToggle,
+    /// Begin editing a new text annotation at the given global position
+    Begin(f32, f32),
+    /// Append typed characters to the text being edited
+    Insert(String),
+    /// Delete the character before the caret
+    Backspace,
+    /// Insert a line break
+    Newline,
+    /// Finish editing and keep the text
+    Commit,
+    /// Abandon the text being edited
+    Cancel,
+    /// Set the font size used for new text
+    SetFontSize(f32),
+}
+
 /// All drawing/annotation messages
 #[derive(Debug, Clone)]
 pub enum DrawMsg {
@@ -45,6 +70,8 @@ pub enum DrawMsg {
     Line(DrawAction),
     /// Freehand (pencil) annotation actions
     Pencil(DrawAction),
+    /// Text annotation actions
+    Text(TextAction),
     /// Magnifier annotation actions
     Magnifier(DrawAction),
     /// Select a magnifier for editing (index into magnifiers, or None to deselect)
@@ -383,6 +410,30 @@ impl Msg {
     }
     pub fn pencil_end(x: f32, y: f32) -> Self {
         Self::Draw(DrawMsg::Pencil(DrawAction::End(x, y)))
+    }
+    pub fn text_mode_toggle() -> Self {
+        Self::Draw(DrawMsg::Text(TextAction::ModeToggle))
+    }
+    pub fn text_begin(x: f32, y: f32) -> Self {
+        Self::Draw(DrawMsg::Text(TextAction::Begin(x, y)))
+    }
+    pub fn text_insert(s: String) -> Self {
+        Self::Draw(DrawMsg::Text(TextAction::Insert(s)))
+    }
+    pub fn text_backspace() -> Self {
+        Self::Draw(DrawMsg::Text(TextAction::Backspace))
+    }
+    pub fn text_newline() -> Self {
+        Self::Draw(DrawMsg::Text(TextAction::Newline))
+    }
+    pub fn text_commit() -> Self {
+        Self::Draw(DrawMsg::Text(TextAction::Commit))
+    }
+    pub fn text_cancel() -> Self {
+        Self::Draw(DrawMsg::Text(TextAction::Cancel))
+    }
+    pub fn text_font_size(size: f32) -> Self {
+        Self::Draw(DrawMsg::Text(TextAction::SetFontSize(size)))
     }
     pub fn magnifier_mode_toggle() -> Self {
         Self::Draw(DrawMsg::Magnifier(DrawAction::ModeToggle))

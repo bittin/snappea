@@ -119,6 +119,7 @@ pub fn save_tool_config(args: &Args) {
     config.pencil_color = args.ui.pencil_color;
     config.pencil_fade_duration = args.ui.pencil_fade_duration;
     config.pencil_thickness = args.ui.pencil_thickness;
+    config.text_font_size = args.ui.text_font_size;
     config.save();
 }
 
@@ -168,6 +169,14 @@ fn handle_shape_mode_toggle(args: &mut Args) {
                 args.annotations.pencil_drawing = None;
             }
         }
+        ShapeTool::Text => {
+            args.annotations.text_mode = !args.annotations.text_mode;
+            if args.annotations.text_mode {
+                disable_other_modes_except(args, Mode::Text);
+            } else {
+                crate::annotations::handlers::commit_editing_text(args);
+            }
+        }
     }
     // Close popups
     args.close_all_popups();
@@ -197,6 +206,10 @@ fn set_primary_shape_tool(args: &mut Args, tool: ShapeTool) {
         ShapeTool::Pencil => {
             args.annotations.pencil_mode = true;
             disable_other_modes_except(args, Mode::Pencil);
+        }
+        ShapeTool::Text => {
+            args.annotations.text_mode = true;
+            disable_other_modes_except(args, Mode::Text);
         }
     }
     args.close_all_popups();
@@ -400,6 +413,7 @@ enum Mode {
     Circle,
     Rectangle,
     Pencil,
+    Text,
     Magnifier,
     Redact,
     Pixelate,
@@ -425,6 +439,10 @@ fn disable_other_modes_except(args: &mut Args, keep: Mode) {
     if keep != Mode::Pencil {
         args.annotations.pencil_mode = false;
         args.annotations.pencil_drawing = None;
+    }
+    if keep != Mode::Text {
+        args.annotations.text_mode = false;
+        crate::annotations::handlers::commit_editing_text(args);
     }
     if keep != Mode::Magnifier {
         args.annotations.magnifier_mode = false;

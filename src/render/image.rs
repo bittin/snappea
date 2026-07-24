@@ -9,6 +9,7 @@ use super::geometry::{self, arrow, shape};
 use crate::domain::{
     Annotation, ArrowAnnotation, CircleOutlineAnnotation, LineAnnotation, MagnifierAnnotation,
     PencilAnnotation, PixelateAnnotation, Rect, RectOutlineAnnotation, RedactAnnotation,
+    TEXT_LINE_HEIGHT_FACTOR, TextAnnotation,
 };
 
 /// Convert RgbaImage to Pixmap, apply drawing function, and copy back
@@ -431,6 +432,130 @@ pub fn draw_pencils_on_image(
     });
 }
 
+/// Draw text annotations onto an image.
+///
+/// tiny-skia has no text support, so glyphs are shaped with `cosmic-text` (the
+/// same engine the UI uses, reached through libcosmic's re-export) and their
+/// coverage bitmaps are blended in via `SwashCache` — the approach cosmic-viewer
+/// uses for its text tool. Using the same shaper as the live preview keeps the
+/// on-screen text and the saved pixels consistent.
+pub fn draw_texts_on_image(
+    img: &mut RgbaImage,
+    texts: &[TextAnnotation],
+    selection_rect: &Rect,
+    scale: f32,
+) {
+    use cosmic::iced::advanced::graphics::text::{cosmic_text, font_system};
+
+    if texts.is_empty() {
+        return;
+    }
+
+    let Ok(mut font_sys) = font_system().write() else {
+        log::error!("Could not lock the font system; text annotations were not drawn");
+        return;
+    };
+
+    let (img_w, img_h) = (img.width() as i32, img.height() as i32);
+
+    for text in texts {
+        if !text.is_valid() {
+            continue;
+        }
+
+        // Scale the font with the image so text keeps its on-screen proportions
+        // on HiDPI captures.
+        let font_px = (text.font_size * scale).max(1.0);
+        let metrics = cosmic_text::Metrics::new(font_px, font_px * TEXT_LINE_HEIGHT_FACTOR);
+        let mut buffer = cosmic_text::Buffer::new(font_sys.raw(), metrics);
+        // No wrap width: annotations break lines only where the user pressed Enter.
+        buffer.set_size(None, None);
+        buffer.set_text(
+            &text.content,
+            &cosmic_text::Attrs::new(),
+            cosmic_text::Shaping::Advanced,
+            None,
+        );
+        buffer.shape_until_scroll(font_sys.raw(), false);
+
+        let origin_x = (text.x - selection_rect.left as f32) * scale;
+        let origin_y = (text.y - selection_rect.top as f32) * scale;
+
+        let [r, g, b, a] = text.color.to_rgba_u8();
+        let fg = cosmic_text::Color::rgba(r, g, b, a);
+        let shadow_color = cosmic_text::Color::rgba(0, 0, 0, 220);
+        let shadow_offset = (font_px * 0.06).max(1.0);
+
+        let mut swash_cache = cosmic_text::SwashCache::new();
+
+        // Blend one glyph coverage bitmap into the image.
+        let mut blit = |gx: f32,
+                        gy: f32,
+                        cache_key,
+                        color: cosmic_text::Color,
+                        swash_cache: &mut cosmic_text::SwashCache,
+                        font_sys: &mut cosmic_text::FontSystem,
+                        img: &mut RgbaImage| {
+            swash_cache.with_pixels(font_sys, cache_key, color, |off_x, off_y, px_color| {
+                let x = gx as i32 + off_x;
+                let y = gy as i32 + off_y;
+                if x < 0 || y < 0 || x >= img_w || y >= img_h {
+                    return;
+                }
+                let alpha = f32::from(px_color.a()) / 255.0;
+                if alpha <= 0.0 {
+                    return;
+                }
+                let dst = img.get_pixel(x as u32, y as u32);
+                let mix = |s: u8, d: u8| -> u8 {
+                    (f32::from(s) * alpha + f32::from(d) * (1.0 - alpha)).round() as u8
+                };
+                img.put_pixel(
+                    x as u32,
+                    y as u32,
+                    image::Rgba([
+                        mix(px_color.r(), dst[0]),
+                        mix(px_color.g(), dst[1]),
+                        mix(px_color.b(), dst[2]),
+                        dst[3].max((alpha * 255.0).round() as u8),
+                    ]),
+                );
+            });
+        };
+
+        // Two passes so the shadow never lands on top of a glyph.
+        for pass in 0..2 {
+            let drawing_shadow = pass == 0;
+            if drawing_shadow && !text.shadow {
+                continue;
+            }
+            let (dx, dy) = if drawing_shadow {
+                (shadow_offset, shadow_offset)
+            } else {
+                (0.0, 0.0)
+            };
+            let color = if drawing_shadow { shadow_color } else { fg };
+
+            for run in buffer.layout_runs() {
+                for glyph in run.glyphs {
+                    let physical = glyph.physical((0.0, 0.0), 1.0);
+                    let gx = origin_x + dx + glyph.x + glyph.x_offset;
+                    let gy = origin_y + dy + run.line_y + glyph.y_offset;
+                    blit(
+                        gx,
+                        gy,
+                        physical.cache_key,
+                        color,
+                        &mut swash_cache,
+                        font_sys.raw(),
+                        img,
+                    );
+                }
+            }
+        }
+    }
+}
+
 /// Draw circle/ellipse outlines onto an image using tiny-skia
 pub fn draw_circle_outlines_on_image(
     img: &mut RgbaImage,
@@ -762,6 +887,9 @@ pub fn draw_annotations_in_order(
             }
             Annotation::Pencil(pencil) => {
                 draw_pencils_on_image(img, std::slice::from_ref(pencil), selection_rect, scale);
+            }
+            Annotation::Text(text) => {
+                draw_texts_on_image(img, std::slice::from_ref(text), selection_rect, scale);
             }
             Annotation::Magnifier(magnifier) => {
                 draw_magnifiers_on_image(

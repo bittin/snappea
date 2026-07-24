@@ -386,6 +386,7 @@ impl Screenshot {
                         shape_popup_open: false,
                         shape_color: config.shape_color,
                         shape_shadow: config.shape_shadow,
+                        text_font_size: config.text_font_size,
                         primary_redact_tool: config.primary_redact_tool,
                         redact_popup_open: false,
                         pixelation_block_size: config.pixelation_block_size,
@@ -538,8 +539,16 @@ pub fn update_msg(app: &mut App, msg: Msg) -> cosmic::Task<crate::core::app::Msg
 /// Handle Draw messages (annotation drawing)
 /// Delegates to the annotations module handler
 fn handle_draw_msg(app: &mut App, msg: DrawMsg) -> cosmic::Task<crate::core::app::Msg> {
+    // The chosen text size is a persisted preference, not per-annotation state.
+    let persist = matches!(
+        msg,
+        DrawMsg::Text(crate::session::messages::TextAction::SetFontSize(_))
+    );
     if let Some(args) = app.screenshot_args.as_mut() {
         crate::annotations::handlers::handle_draw_msg(args, msg);
+        if persist {
+            crate::widget::tool_handlers::save_tool_config(args);
+        }
     }
     cosmic::Task::none()
 }
@@ -1586,6 +1595,13 @@ fn handle_ocr_msg(app: &mut App, msg: OcrMsg) -> cosmic::Task<crate::core::app::
 // ============================================================================
 
 fn handle_capture_inner(app: &mut App) -> cosmic::Task<crate::core::app::Msg> {
+    // A text label still being typed hasn't reached the annotation list yet.
+    // Commit it first so capturing (e.g. via the toolbar Save button) doesn't
+    // silently discard what the user just wrote.
+    if let Some(args) = app.screenshot_args.as_mut() {
+        crate::annotations::handlers::commit_editing_text(args);
+    }
+
     let destroy_cmds: Vec<cosmic::Task<crate::core::app::Msg>> = app
         .outputs
         .iter()

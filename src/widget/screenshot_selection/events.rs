@@ -31,6 +31,7 @@ pub enum AnnotationType {
     Circle,
     Rectangle,
     Pencil,
+    Text,
     Magnifier,
     Redact,
     Pixelate,
@@ -107,6 +108,8 @@ pub enum ToolPopupEvent {
     ShapeColorSet(ShapeColor),
     /// Shape shadow toggled
     ShapeShadowToggle,
+    /// Text font size selected
+    TextFontSizeSet(f32),
     /// Shape mode toggled (for primary shape)
     ShapeModeToggle,
     /// Redact mode toggled (for primary redact/pixelate)
@@ -313,6 +316,13 @@ impl ScreenshotEvent {
         ))
     }
 
+    pub fn text_begin(x: f32, y: f32) -> Self {
+        Self::Annotation(AnnotationEvent::Started(
+            AnnotationType::Text,
+            Point::new(x, y),
+        ))
+    }
+
     pub fn pencil_move(x: f32, y: f32) -> Self {
         Self::Annotation(AnnotationEvent::PencilMoved(Point::new(x, y)))
     }
@@ -475,6 +485,10 @@ impl ScreenshotEvent {
 
     pub fn shape_shadow_toggle() -> Self {
         Self::ToolPopup(ToolPopupEvent::ShapeShadowToggle)
+    }
+
+    pub fn text_font_size_set(size: f32) -> Self {
+        Self::ToolPopup(ToolPopupEvent::TextFontSizeSet(size))
     }
 
     pub fn shape_mode_toggle() -> Self {
@@ -735,6 +749,12 @@ impl ScreenshotEvent {
                 Msg::pencil_start(p.x, p.y)
             }
             Self::Annotation(AnnotationEvent::PencilMoved(p)) => Msg::pencil_move(p.x, p.y),
+            // Placing text starts an edit; a subsequent click elsewhere ends the
+            // current one (the handler commits before opening the new label).
+            Self::Annotation(AnnotationEvent::Started(AnnotationType::Text, p)) => {
+                Msg::text_begin(p.x, p.y)
+            }
+            Self::Annotation(AnnotationEvent::Ended(AnnotationType::Text, _)) => Msg::text_commit(),
             Self::Annotation(AnnotationEvent::Ended(AnnotationType::Pencil, p)) => {
                 Msg::pencil_end(p.x, p.y)
             }
@@ -770,6 +790,9 @@ impl ScreenshotEvent {
             }
             Self::Annotation(AnnotationEvent::ModeToggle(AnnotationType::Pencil)) => {
                 Msg::pencil_mode_toggle()
+            }
+            Self::Annotation(AnnotationEvent::ModeToggle(AnnotationType::Text)) => {
+                Msg::text_mode_toggle()
             }
             Self::Annotation(AnnotationEvent::ModeToggle(AnnotationType::Magnifier)) => {
                 Msg::magnifier_mode_toggle()
@@ -816,6 +839,7 @@ impl ScreenshotEvent {
             Self::ToolPopup(ToolPopupEvent::ShapeToolSet(tool)) => Msg::set_shape_tool(tool),
             Self::ToolPopup(ToolPopupEvent::ShapeColorSet(color)) => Msg::set_shape_color(color),
             Self::ToolPopup(ToolPopupEvent::ShapeShadowToggle) => Msg::toggle_shape_shadow(),
+            Self::ToolPopup(ToolPopupEvent::TextFontSizeSet(size)) => Msg::text_font_size(size),
             Self::ToolPopup(ToolPopupEvent::ShapeModeToggle) => Msg::shape_mode_toggle(),
             Self::ToolPopup(ToolPopupEvent::RedactModeToggle) => Msg::redact_tool_mode_toggle(),
             Self::ToolPopup(ToolPopupEvent::RedactPopupToggle) => Msg::toggle_redact_popup(),

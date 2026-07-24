@@ -33,6 +33,8 @@ pub struct ShapesOverlay<'a, Message: Clone + 'static> {
     pub line_mode: bool,
     /// Whether freehand drawing mode is active
     pub pencil_mode: bool,
+    /// Whether text placement mode is active
+    pub text_mode: bool,
     /// Current circle drawing start in global coordinates (if any)
     pub circle_drawing: Option<(f32, f32)>,
     /// Current rectangle outline drawing start in global coordinates (if any)
@@ -59,6 +61,8 @@ pub struct ShapesOverlay<'a, Message: Clone + 'static> {
     pub on_pencil_move: Option<Box<dyn Fn(f32, f32) -> Message + 'a>>,
     /// Callback when freehand drawing ends
     pub on_pencil_end: Option<Box<dyn Fn(f32, f32) -> Message + 'a>>,
+    /// Callback when a text annotation is placed at a point
+    pub on_text_begin: Option<Box<dyn Fn(f32, f32) -> Message + 'a>>,
     /// Shape color for preview
     pub shape_color: crate::config::ShapeColor,
     /// Whether to draw shadow on shapes
@@ -205,6 +209,12 @@ impl<'a, Message: Clone + 'static> canvas::Program<Message, cosmic::Theme, cosmi
                 }
                 if self.pencil_mode {
                     if let Some(ref cb) = self.on_pencil_start {
+                        return Some(canvas::Action::publish(cb(gx, gy)).and_capture());
+                    }
+                }
+                // Text is placed on click; typing is then handled by the keyboard.
+                if self.text_mode {
+                    if let Some(ref cb) = self.on_text_begin {
                         return Some(canvas::Action::publish(cb(gx, gy)).and_capture());
                     }
                 }

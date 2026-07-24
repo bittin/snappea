@@ -44,6 +44,7 @@ use crate::widget::{
             PixelationSource, draw_pixelation_preview, draw_redaction_preview,
             draw_redactions_and_pixelations,
         },
+        text_overlays::{draw_text_editing, draw_texts},
         status_overlays::{
             draw_ocr_overlays, draw_ocr_status_indicator, draw_qr_code_overlays,
             draw_qr_scanning_indicator,
@@ -269,6 +270,7 @@ where
             ShapeTool::Circle => annotations.circle_mode,
             ShapeTool::Rectangle => annotations.rect_outline_mode,
             ShapeTool::Pencil => annotations.pencil_mode,
+            ShapeTool::Text => annotations.text_mode,
         };
 
         let redact_mode_active = match ui.primary_redact_tool {
@@ -362,6 +364,7 @@ where
         let on_event_p1 = on_event.clone();
         let on_event_p2 = on_event.clone();
         let on_event_p3 = on_event.clone();
+        let on_event_t1 = on_event.clone();
         let shapes_element = {
             let program = ShapesOverlay {
                 selection_rect,
@@ -374,6 +377,7 @@ where
                 rect_outline_mode: annotations.rect_outline_mode,
                 line_mode: annotations.line_mode,
                 pencil_mode: annotations.pencil_mode,
+                text_mode: annotations.text_mode,
                 circle_drawing: annotations.circle_drawing,
                 rect_outline_drawing: annotations.rect_outline_drawing,
                 line_drawing: annotations.line_drawing,
@@ -404,6 +408,9 @@ where
                 })),
                 on_pencil_end: Some(Box::new(move |x, y| {
                     on_event_p3(ScreenshotEvent::pencil_end(x, y))
+                })),
+                on_text_begin: Some(Box::new(move |x, y| {
+                    on_event_t1(ScreenshotEvent::text_begin(x, y))
                 })),
                 shape_color: ui.shape_color,
                 shape_shadow: ui.shape_shadow,
@@ -489,6 +496,11 @@ where
                 &{
                     let on_event = on_event.clone();
                     move |t| on_event(ScreenshotEvent::shape_tool_set(t))
+                },
+                ui.text_font_size,
+                &{
+                    let on_event = on_event.clone();
+                    move |s| on_event(ScreenshotEvent::text_font_size_set(s))
                 },
                 &move |c| on_event_color(ScreenshotEvent::shape_color_set(c)),
                 on_event(ScreenshotEvent::shape_shadow_toggle()),
@@ -1163,6 +1175,20 @@ where
                 local_end,
                 shape_color,
                 self.ui.shape_shadow,
+            );
+        }
+
+        // Draw text annotations and the label currently being typed
+        draw_texts(renderer, viewport, &self.annotations.texts, output_offset);
+        if let Some(editing) = self.annotations.text_editing.as_ref() {
+            draw_text_editing(
+                renderer,
+                viewport,
+                editing,
+                self.ui.text_font_size,
+                self.ui.shape_color.into(),
+                self.ui.shape_shadow,
+                output_offset,
             );
         }
 

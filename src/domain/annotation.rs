@@ -52,6 +52,58 @@ impl PencilAnnotation {
     }
 }
 
+/// Line-height multiplier applied to the font size when laying out text.
+///
+/// Matches cosmic-viewer's text tool so wrapped/multi-line text has the same
+/// vertical rhythm in both apps.
+pub const TEXT_LINE_HEIGHT_FACTOR: f32 = 1.2;
+
+/// Selectable text sizes (logical units), mirroring cosmic-viewer's presets.
+pub const TEXT_SIZE_PRESETS: [f32; 7] = [12.0, 16.0, 20.0, 24.0, 32.0, 40.0, 64.0];
+
+/// Default text size used for new text annotations.
+pub const TEXT_SIZE_DEFAULT: f32 = 24.0;
+
+/// A text label placed on the screenshot.
+///
+/// `x`/`y` are the **top-left** corner of the text block in global logical
+/// coordinates. Both the live preview and the final image render from this same
+/// origin, so what you type is where it lands.
+#[derive(Clone, Debug, PartialEq)]
+pub struct TextAnnotation {
+    /// Top-left of the text block in global logical coordinates
+    pub x: f32,
+    pub y: f32,
+    /// The text itself; may contain newlines
+    pub content: String,
+    /// Font size in logical units
+    pub font_size: f32,
+    /// Color of the glyphs
+    pub color: ShapeColor,
+    /// Whether to draw a dark drop shadow behind the glyphs (legibility)
+    pub shadow: bool,
+}
+
+impl TextAnnotation {
+    /// Empty or whitespace-only text renders nothing, so it isn't worth keeping.
+    pub fn is_valid(&self) -> bool {
+        !self.content.trim().is_empty()
+    }
+}
+
+/// An in-progress text annotation being typed.
+///
+/// Kept separate from the committed [`TextAnnotation`] list so an unfinished
+/// edit never enters the undo history.
+#[derive(Clone, Debug, PartialEq)]
+pub struct TextEditing {
+    /// Top-left of the text block in global logical coordinates
+    pub x: f32,
+    pub y: f32,
+    /// Text typed so far
+    pub content: String,
+}
+
 /// Redaction annotation (black rectangle) for hiding sensitive content
 #[derive(Clone, Debug, PartialEq)]
 pub struct RedactAnnotation {
@@ -162,13 +214,14 @@ pub enum Annotation {
     Circle(CircleOutlineAnnotation),
     Rectangle(RectOutlineAnnotation),
     Pencil(PencilAnnotation),
+    Text(TextAnnotation),
     Magnifier(MagnifierAnnotation),
     Redact(RedactAnnotation),
     Pixelate(PixelateAnnotation),
 }
 
 impl Annotation {
-    /// Check if this is a shape annotation (arrow, line, circle, rectangle, pencil, magnifier)
+    /// Check if this is a shape annotation (everything except redactions)
     pub fn is_shape(&self) -> bool {
         matches!(
             self,
@@ -177,6 +230,7 @@ impl Annotation {
                 | Annotation::Circle(_)
                 | Annotation::Rectangle(_)
                 | Annotation::Pencil(_)
+                | Annotation::Text(_)
                 | Annotation::Magnifier(_)
         )
     }

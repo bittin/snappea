@@ -5,10 +5,10 @@
 use crate::domain::{
     Annotation, ArrowAnnotation, CircleOutlineAnnotation, LineAnnotation, MAGNIFIER_MAX_ZOOM,
     MAGNIFIER_MIN_ZOOM, MagnifierAnnotation, PencilAnnotation, PixelateAnnotation,
-    RectOutlineAnnotation, RedactAnnotation,
+    RectOutlineAnnotation, RedactAnnotation, TextAnnotation, TextEditing,
 };
 use crate::screenshot::Args;
-use crate::session::messages::{DrawAction, DrawMsg};
+use crate::session::messages::{DrawAction, DrawMsg, TextAction};
 
 /// Handle a DrawMsg, modifying Args state
 ///
@@ -21,6 +21,7 @@ pub fn handle_draw_msg(args: &mut Args, msg: DrawMsg) {
         DrawMsg::Rectangle(action) => handle_rectangle(args, action),
         DrawMsg::Line(action) => handle_line(args, action),
         DrawMsg::Pencil(action) => handle_pencil(args, action),
+        DrawMsg::Text(action) => handle_text(args, action),
         DrawMsg::Magnifier(action) => handle_magnifier(args, action),
         DrawMsg::MagnifierSelect(index) => {
             args.annotations.selected_magnifier = index;
@@ -265,6 +266,80 @@ fn handle_pencil(args: &mut Args, action: DrawAction) {
 }
 
 // ============================================================================
+// Text handlers
+// ============================================================================
+
+/// Commit whatever text is being edited, if it has any visible content.
+///
+/// Shared by the explicit commit action, by starting a new text elsewhere, and
+/// by leaving text mode — so a typed label is never silently lost.
+pub fn commit_editing_text(args: &mut Args) {
+    let Some(editing) = args.annotations.text_editing.take() else {
+        return;
+    };
+    let text = TextAnnotation {
+        x: editing.x,
+        y: editing.y,
+        content: editing.content,
+        font_size: args.ui.text_font_size,
+        color: args.ui.shape_color,
+        shadow: args.ui.shape_shadow,
+    };
+    if text.is_valid() {
+        args.annotations.texts.push(text.clone());
+        args.annotations.add(Annotation::Text(text));
+    }
+}
+
+fn handle_text(args: &mut Args, action: TextAction) {
+    match action {
+        TextAction::ModeToggle => {
+            args.annotations.text_mode = !args.annotations.text_mode;
+            if args.annotations.text_mode {
+                disable_other_modes(args, Mode::Text);
+                args.detection.clear();
+            } else {
+                // Leaving the tool keeps what was typed.
+                commit_editing_text(args);
+            }
+        }
+        TextAction::Begin(x, y) => {
+            if args.annotations.text_mode {
+                // Clicking elsewhere finishes the previous label first.
+                commit_editing_text(args);
+                args.annotations.text_editing = Some(TextEditing {
+                    x,
+                    y,
+                    content: String::new(),
+                });
+            }
+        }
+        TextAction::Insert(s) => {
+            if let Some(editing) = args.annotations.text_editing.as_mut() {
+                editing.content.push_str(&s);
+            }
+        }
+        TextAction::Backspace => {
+            if let Some(editing) = args.annotations.text_editing.as_mut() {
+                editing.content.pop();
+            }
+        }
+        TextAction::Newline => {
+            if let Some(editing) = args.annotations.text_editing.as_mut() {
+                editing.content.push('\n');
+            }
+        }
+        TextAction::Commit => commit_editing_text(args),
+        TextAction::Cancel => {
+            args.annotations.text_editing = None;
+        }
+        TextAction::SetFontSize(size) => {
+            args.ui.text_font_size = size;
+        }
+    }
+}
+
+// ============================================================================
 // Magnifier handlers
 // ============================================================================
 
@@ -391,6 +466,7 @@ enum Mode {
     Circle,
     Rectangle,
     Pencil,
+    Text,
     Magnifier,
     Redact,
     Pixelate,
@@ -416,6 +492,11 @@ fn disable_other_modes(args: &mut Args, keep: Mode) {
     if keep != Mode::Pencil {
         args.annotations.pencil_mode = false;
         args.annotations.pencil_drawing = None;
+    }
+    if keep != Mode::Text {
+        args.annotations.text_mode = false;
+        // Don't drop a half-typed label when switching tools.
+        commit_editing_text(args);
     }
     if keep != Mode::Magnifier {
         args.annotations.magnifier_mode = false;

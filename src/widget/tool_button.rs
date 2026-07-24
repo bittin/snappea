@@ -17,6 +17,7 @@ use cosmic::widget::{button, container, icon, text, toggler, tooltip};
 
 use super::lucide::{self, AppIcon};
 use crate::config::{RedactTool, ShapeColor, ShapeTool};
+use crate::domain::TEXT_SIZE_PRESETS;
 use crate::fl;
 
 /// A wrapper widget that detects right-click and long-press events
@@ -430,6 +431,8 @@ pub fn build_shape_popup<'a, Msg: Clone + 'static>(
     shadow_enabled: bool,
     has_annotations: bool,
     on_select_tool: &(impl Fn(ShapeTool) -> Msg + 'a),
+    current_font_size: f32,
+    on_font_size_change: &(impl Fn(f32) -> Msg + 'a),
     on_color_change: &(impl Fn(ShapeColor) -> Msg + 'a),
     on_shadow_toggle: Msg,
     on_clear: Msg,
@@ -486,6 +489,46 @@ pub fn build_shape_popup<'a, Msg: Clone + 'static>(
     ))
     .width(Length::Fill)
     .align_x(cosmic::iced::core::alignment::Horizontal::Center);
+
+    // Font size presets — only meaningful for the text tool, so only shown then.
+    let font_size_section: Element<'_, Msg> = if current_tool == ShapeTool::Text {
+        let buttons: Vec<Element<'_, Msg>> = TEXT_SIZE_PRESETS
+            .iter()
+            .map(|size| {
+                let size = *size;
+                let is_selected = (size - current_font_size).abs() < 0.5;
+                button::custom(text::caption(format!("{}", size as u32)))
+                    .class(if is_selected {
+                        cosmic::theme::Button::Suggested
+                    } else {
+                        cosmic::theme::Button::Icon
+                    })
+                    .padding(space_xs)
+                    .on_press(on_font_size_change(size))
+                    .into()
+            })
+            .collect();
+
+        column![
+            text::caption(fl!("text-size")),
+            container(
+                row(buttons)
+                    .spacing(space_xs)
+                    .align_y(cosmic::iced::core::Alignment::Center)
+            )
+            .width(Length::Fill)
+            .align_x(cosmic::iced::core::alignment::Horizontal::Center),
+            cosmic::widget::divider::horizontal::light(),
+        ]
+        .spacing(space_xs)
+        .width(Length::Fill)
+        .into()
+    } else {
+        cosmic::iced::widget::space()
+            .width(Length::Fixed(0.0))
+            .height(Length::Fixed(0.0))
+            .into()
+    };
 
     // Color picker - 2 rows of 4 color swatches each to avoid clipping
     let make_color_swatch = |color: &ShapeColor, name: String| {
@@ -602,6 +645,7 @@ pub fn build_shape_popup<'a, Msg: Clone + 'static>(
         shape_buttons,
         shape_subtitle,
         cosmic::widget::divider::horizontal::light(),
+        font_size_section,
         color_section,
         cosmic::widget::divider::horizontal::light(),
         shadow_row,

@@ -79,6 +79,7 @@ pub enum ShapeTool {
     Circle,
     Rectangle,
     Pencil,
+    Text,
 }
 
 impl ShapeTool {
@@ -93,6 +94,7 @@ impl ShapeTool {
         ShapeTool::Circle,
         ShapeTool::Rectangle,
         ShapeTool::Pencil,
+        ShapeTool::Text,
     ];
 
     /// Number of shape tools (used for the split-button option indicator)
@@ -123,6 +125,7 @@ impl ShapeTool {
             ShapeTool::Circle => "insert-ellipse-symbolic",
             ShapeTool::Rectangle => "insert-rectangle-symbolic",
             ShapeTool::Pencil => "insert-drawing-symbolic",
+            ShapeTool::Text => "insert-text-symbolic",
         }
     }
 
@@ -134,6 +137,7 @@ impl ShapeTool {
             ShapeTool::Circle => fl!("oval-circle"),
             ShapeTool::Rectangle => fl!("rectangle-square"),
             ShapeTool::Pencil => fl!("pencil"),
+            ShapeTool::Text => fl!("text"),
         }
     }
 
@@ -145,6 +149,7 @@ impl ShapeTool {
             ShapeTool::Circle => fl!("draw-circle"),
             ShapeTool::Rectangle => fl!("draw-rectangle"),
             ShapeTool::Pencil => fl!("draw-pencil"),
+            ShapeTool::Text => fl!("draw-text"),
         }
     }
 }
@@ -247,6 +252,9 @@ pub struct SnapPeaConfig {
     pub shape_color: ShapeColor,
     /// Whether to add shadow/border to shapes
     pub shape_shadow: bool,
+    /// Font size (logical units) used for new text annotations
+    #[serde(default = "default_text_font_size")]
+    pub text_font_size: f32,
     /// Primary redact tool shown in the button
     pub primary_redact_tool: RedactTool,
     /// Pixelation block size (larger = more pixelated, range 4-64)
@@ -310,6 +318,10 @@ fn default_pencil_thickness() -> f32 {
 
 fn default_toolbar_unhovered_opacity() -> f32 {
     0.5
+}
+
+fn default_text_font_size() -> f32 {
+    crate::domain::TEXT_SIZE_DEFAULT
 }
 
 fn default_custom_save_path() -> String {
@@ -381,6 +393,7 @@ impl Default for SnapPeaConfig {
             shape_color: ShapeColor::default(),
             // Shadow enabled by default (matches current arrow behavior)
             shape_shadow: true,
+            text_font_size: crate::domain::TEXT_SIZE_DEFAULT,
             // Default to Redact as primary redact tool
             primary_redact_tool: RedactTool::Redact,
             // Default pixelation block size (16 is a good balance)
@@ -403,5 +416,42 @@ impl Default for SnapPeaConfig {
             pencil_thickness: default_pencil_thickness(),
             hide_toolbar_to_tray: false,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn shape_tool_cycle_visits_every_tool_once() {
+        let mut seen = Vec::new();
+        let mut tool = ShapeTool::default();
+        for _ in 0..ShapeTool::COUNT {
+            seen.push(tool);
+            tool = tool.next();
+        }
+        // A full cycle returns to the start and covers the whole list.
+        assert_eq!(tool, ShapeTool::default());
+        assert_eq!(seen.len(), ShapeTool::ALL.len());
+        for t in ShapeTool::ALL {
+            assert!(seen.contains(t), "{t:?} missing from the cycle");
+        }
+    }
+
+    #[test]
+    fn shape_tool_index_matches_position_in_all() {
+        for (i, tool) in ShapeTool::ALL.iter().enumerate() {
+            assert_eq!(tool.index(), i);
+        }
+    }
+
+    #[test]
+    fn every_shape_tool_has_a_distinct_icon() {
+        let mut names: Vec<&str> = ShapeTool::ALL.iter().map(|t| t.icon_name()).collect();
+        names.sort_unstable();
+        let count = names.len();
+        names.dedup();
+        assert_eq!(names.len(), count, "two tools share an icon");
     }
 }
