@@ -15,8 +15,9 @@ fn handle_text_editing_key(key: &Key, modifiers: Modifiers) -> Option<Msg> {
         // Enter commits; Shift+Enter adds a line break.
         Key::Named(Named::Enter) if modifiers.shift() => Some(Msg::text_newline()),
         Key::Named(Named::Enter) => Some(Msg::text_commit()),
-        // Escape abandons the text rather than cancelling the whole screenshot.
-        Key::Named(Named::Escape) => Some(Msg::text_cancel()),
+        // Escape finishes the label (keeping it) rather than cancelling the whole
+        // screenshot. Nothing discards a typed label implicitly.
+        Key::Named(Named::Escape) => Some(Msg::text_commit()),
         Key::Named(Named::Backspace) => Some(Msg::text_backspace()),
         Key::Named(Named::Tab) => Some(Msg::text_insert("    ".to_string())),
         // Printable characters. Ctrl/Alt combos are left alone so they can't be
@@ -88,11 +89,12 @@ mod tests {
     }
 
     #[test]
-    fn escape_abandons_text_rather_than_cancelling_the_screenshot() {
-        // Without interception this would cancel the whole capture.
+    fn escape_saves_the_label_rather_than_cancelling_the_screenshot() {
+        // Without interception this would cancel the whole capture; and it must
+        // keep the text, not discard it.
         assert!(matches!(
             text_action(Key::Named(Named::Escape), Modifiers::default()),
-            Some(TextAction::Cancel)
+            Some(TextAction::Commit)
         ));
     }
 
@@ -200,7 +202,7 @@ pub fn handle_key_event(
         }
         // Save/copy shortcuts (always available - empty selection captures all screens)
         Key::Named(Named::Enter) if modifiers.control() => Some(Msg::save_to_pictures()),
-        Key::Named(Named::Escape) => Some(Msg::cancel()),
+        Key::Named(Named::Escape) => Some(Msg::cancel_requested()),
         // Space/Enter to confirm selection in picker mode (screen)
         Key::Character(c) if c.as_str() == " " && in_screen_picker => Some(Msg::confirm()),
         Key::Named(Named::Enter) if in_screen_picker => Some(Msg::confirm()),

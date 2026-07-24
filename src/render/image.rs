@@ -9,7 +9,7 @@ use super::geometry::{self, arrow, shape};
 use crate::domain::{
     Annotation, ArrowAnnotation, CircleOutlineAnnotation, LineAnnotation, MagnifierAnnotation,
     PencilAnnotation, PixelateAnnotation, Rect, RectOutlineAnnotation, RedactAnnotation,
-    TEXT_LINE_HEIGHT_FACTOR, TextAnnotation,
+    SHAPE_OUTLINE_EXTRA, TEXT_LINE_HEIGHT_FACTOR, TextAnnotation,
 };
 
 /// Convert RgbaImage to Pixmap, apply drawing function, and copy back
@@ -103,9 +103,9 @@ pub fn draw_arrows_on_image(
             let end_x = (arrow_ann.end_x - selection_rect.left as f32) * scale;
             let end_y = (arrow_ann.end_y - selection_rect.top as f32) * scale;
 
-            let thickness = arrow::THICKNESS * scale;
+            let thickness = arrow_ann.thickness * scale;
             let head_size = arrow::HEAD_SIZE * scale;
-            let outline = arrow::OUTLINE * scale;
+            let outline = SHAPE_OUTLINE_EXTRA * scale;
 
             // Draw shadow/border first (thicker stroke)
             if arrow_ann.shadow
@@ -258,10 +258,10 @@ pub fn draw_rect_outlines_on_image(
     }
 
     with_pixmap(img, |pixmap| {
-        let thickness = (shape::THICKNESS * scale).max(1.0);
-        let border_thickness = (shape::BORDER_THICKNESS * scale).max(2.0);
-
         for rect in rects {
+            let thickness = (rect.thickness * scale).max(1.0);
+            let border_thickness =
+                ((rect.thickness + SHAPE_OUTLINE_EXTRA) * scale).max(2.0);
             let [r, g, b, a] = rect.color.to_rgba_u8();
 
             let x1 = (rect.start_x - selection_rect.left as f32) * scale;
@@ -325,10 +325,10 @@ pub fn draw_lines_on_image(
     }
 
     with_pixmap(img, |pixmap| {
-        let thickness = (shape::THICKNESS * scale).max(1.0);
-        let border_thickness = (shape::BORDER_THICKNESS * scale).max(2.0);
-
         for line in lines {
+            let thickness = (line.thickness * scale).max(1.0);
+            let border_thickness =
+                ((line.thickness + SHAPE_OUTLINE_EXTRA) * scale).max(2.0);
             let [r, g, b, a] = line.color.to_rgba_u8();
 
             let x1 = (line.start_x - selection_rect.left as f32) * scale;
@@ -382,13 +382,13 @@ pub fn draw_pencils_on_image(
     }
 
     with_pixmap(img, |pixmap| {
-        let thickness = (shape::THICKNESS * scale).max(1.0);
-        let border_thickness = (shape::BORDER_THICKNESS * scale).max(2.0);
-
         for pencil in pencils {
             if !pencil.is_valid() {
                 continue;
             }
+            let thickness = (pencil.thickness * scale).max(1.0);
+            let border_thickness =
+                ((pencil.thickness + SHAPE_OUTLINE_EXTRA) * scale).max(2.0);
             let [r, g, b, a] = pencil.color.to_rgba_u8();
 
             let mut pb = PathBuilder::new();

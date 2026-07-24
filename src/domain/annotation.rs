@@ -17,6 +17,8 @@ pub struct ArrowAnnotation {
     pub color: ShapeColor,
     /// Whether to draw shadow/border
     pub shadow: bool,
+    /// Stroke thickness in logical units
+    pub thickness: f32,
 }
 
 /// Straight line annotation (an arrow without the head)
@@ -32,6 +34,8 @@ pub struct LineAnnotation {
     pub color: ShapeColor,
     /// Whether to draw shadow/border
     pub shadow: bool,
+    /// Stroke thickness in logical units
+    pub thickness: f32,
 }
 
 /// Freehand (pencil) annotation: an open polyline through every sampled point.
@@ -43,6 +47,8 @@ pub struct PencilAnnotation {
     pub color: ShapeColor,
     /// Whether to draw shadow/border
     pub shadow: bool,
+    /// Stroke thickness in logical units
+    pub thickness: f32,
 }
 
 impl PencilAnnotation {
@@ -51,6 +57,13 @@ impl PencilAnnotation {
         self.points.len() >= 2
     }
 }
+
+/// Selectable stroke thickness range for shape annotations (logical units).
+pub const SHAPE_THICKNESS_MIN: f32 = 1.0;
+pub const SHAPE_THICKNESS_MAX: f32 = 12.0;
+pub const SHAPE_THICKNESS_DEFAULT: f32 = 3.0;
+/// How much wider than the stroke the dark legibility outline is drawn.
+pub const SHAPE_OUTLINE_EXTRA: f32 = 2.0;
 
 /// Line-height multiplier applied to the font size when laying out text.
 ///
@@ -102,6 +115,30 @@ pub struct TextEditing {
     pub y: f32,
     /// Text typed so far
     pub content: String,
+    /// Styling captured when the edit began, so committing needs nothing from
+    /// the UI state. This is what lets any code path that ends an edit save the
+    /// label instead of discarding it.
+    pub font_size: f32,
+    pub color: ShapeColor,
+    pub shadow: bool,
+    /// When re-editing an existing label, its index in the unified annotation
+    /// list. On commit the entry is replaced in place (keeping its z-order and
+    /// undo position) instead of a duplicate being appended.
+    pub replacing: Option<usize>,
+}
+
+impl TextEditing {
+    /// Turn the in-progress edit into a committed annotation.
+    pub fn into_annotation(self) -> TextAnnotation {
+        TextAnnotation {
+            x: self.x,
+            y: self.y,
+            content: self.content,
+            font_size: self.font_size,
+            color: self.color,
+            shadow: self.shadow,
+        }
+    }
 }
 
 /// Redaction annotation (black rectangle) for hiding sensitive content
@@ -141,6 +178,8 @@ pub struct RectOutlineAnnotation {
     pub color: ShapeColor,
     /// Whether to draw shadow/border
     pub shadow: bool,
+    /// Stroke thickness in logical units
+    pub thickness: f32,
 }
 
 /// Outline circle/ellipse annotation (no fill)
@@ -156,6 +195,8 @@ pub struct CircleOutlineAnnotation {
     pub color: ShapeColor,
     /// Whether to draw shadow/border
     pub shadow: bool,
+    /// Stroke thickness in logical units
+    pub thickness: f32,
 }
 
 /// Minimum magnifier zoom factor (matches the config slider)

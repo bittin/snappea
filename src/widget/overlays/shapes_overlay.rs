@@ -33,8 +33,6 @@ pub struct ShapesOverlay<'a, Message: Clone + 'static> {
     pub line_mode: bool,
     /// Whether freehand drawing mode is active
     pub pencil_mode: bool,
-    /// Whether text placement mode is active
-    pub text_mode: bool,
     /// Current circle drawing start in global coordinates (if any)
     pub circle_drawing: Option<(f32, f32)>,
     /// Current rectangle outline drawing start in global coordinates (if any)
@@ -61,10 +59,10 @@ pub struct ShapesOverlay<'a, Message: Clone + 'static> {
     pub on_pencil_move: Option<Box<dyn Fn(f32, f32) -> Message + 'a>>,
     /// Callback when freehand drawing ends
     pub on_pencil_end: Option<Box<dyn Fn(f32, f32) -> Message + 'a>>,
-    /// Callback when a text annotation is placed at a point
-    pub on_text_begin: Option<Box<dyn Fn(f32, f32) -> Message + 'a>>,
     /// Shape color for preview
     pub shape_color: crate::config::ShapeColor,
+    /// Stroke thickness used for previews of new shapes
+    pub shape_thickness: f32,
     /// Whether to draw shadow on shapes
     pub shape_shadow: bool,
 }
@@ -212,12 +210,6 @@ impl<'a, Message: Clone + 'static> canvas::Program<Message, cosmic::Theme, cosmi
                         return Some(canvas::Action::publish(cb(gx, gy)).and_capture());
                     }
                 }
-                // Text is placed on click; typing is then handled by the keyboard.
-                if self.text_mode {
-                    if let Some(ref cb) = self.on_text_begin {
-                        return Some(canvas::Action::publish(cb(gx, gy)).and_capture());
-                    }
-                }
             }
             canvas::Event::Mouse(MouseEvent::ButtonReleased(Button::Left)) => {
                 let Some(pos) = cursor.position_in(bounds) else {
@@ -293,9 +285,11 @@ impl<'a, Message: Clone + 'static> canvas::Program<Message, cosmic::Theme, cosmi
 
         let mut frame = Frame::new(renderer, bounds.size());
 
-        let shadow_stroke = Stroke {
+        // Widened per shape below via `shadow_for`, so thicker strokes still get
+        // a visible outline.
+        let shadow_for = |thickness: f32| Stroke {
             style: Color::from_rgba(0.0, 0.0, 0.0, 0.9).into(),
-            width: 5.0,
+            width: thickness + crate::domain::SHAPE_OUTLINE_EXTRA * 2.0,
             ..Stroke::default()
         };
 
@@ -304,7 +298,7 @@ impl<'a, Message: Clone + 'static> canvas::Program<Message, cosmic::Theme, cosmi
             let rect_color: Color = r.color.into();
             let stroke = Stroke {
                 style: rect_color.into(),
-                width: 3.0,
+                width: r.thickness,
                 ..Stroke::default()
             };
             let x1 = r.start_x - self.output_rect.left as f32;
@@ -318,7 +312,7 @@ impl<'a, Message: Clone + 'static> canvas::Program<Message, cosmic::Theme, cosmi
                 Size::new((max_x - min_x).max(1.0), (max_y - min_y).max(1.0)),
             );
             if r.shadow {
-                frame.stroke(&path, shadow_stroke);
+                frame.stroke(&path, shadow_for(stroke.width));
             }
             frame.stroke(&path, stroke);
         }
@@ -328,7 +322,7 @@ impl<'a, Message: Clone + 'static> canvas::Program<Message, cosmic::Theme, cosmi
             let line_color: Color = l.color.into();
             let stroke = Stroke {
                 style: line_color.into(),
-                width: 3.0,
+                width: l.thickness,
                 ..Stroke::default()
             };
             let x1 = l.start_x - self.output_rect.left as f32;
@@ -340,7 +334,7 @@ impl<'a, Message: Clone + 'static> canvas::Program<Message, cosmic::Theme, cosmi
                 b.line_to(Point::new(x2, y2));
             });
             if l.shadow {
-                frame.stroke(&path, shadow_stroke);
+                frame.stroke(&path, shadow_for(stroke.width));
             }
             frame.stroke(&path, stroke);
         }
@@ -353,7 +347,7 @@ impl<'a, Message: Clone + 'static> canvas::Program<Message, cosmic::Theme, cosmi
             let pencil_color: Color = p.color.into();
             let stroke = Stroke {
                 style: pencil_color.into(),
-                width: 3.0,
+                width: p.thickness,
                 ..Stroke::default()
             };
             let ox = self.output_rect.left as f32;
@@ -365,7 +359,7 @@ impl<'a, Message: Clone + 'static> canvas::Program<Message, cosmic::Theme, cosmi
                 }
             });
             if p.shadow {
-                frame.stroke(&path, shadow_stroke);
+                frame.stroke(&path, shadow_for(stroke.width));
             }
             frame.stroke(&path, stroke);
         }
@@ -375,7 +369,7 @@ impl<'a, Message: Clone + 'static> canvas::Program<Message, cosmic::Theme, cosmi
             let circle_color: Color = c.color.into();
             let stroke = Stroke {
                 style: circle_color.into(),
-                width: 3.0,
+                width: c.thickness,
                 ..Stroke::default()
             };
             let x1 = c.start_x - self.output_rect.left as f32;
@@ -400,7 +394,7 @@ impl<'a, Message: Clone + 'static> canvas::Program<Message, cosmic::Theme, cosmi
                 }
             });
             if c.shadow {
-                frame.stroke(&path, shadow_stroke);
+                frame.stroke(&path, shadow_for(stroke.width));
             }
             frame.stroke(&path, stroke);
         }
@@ -414,12 +408,12 @@ impl<'a, Message: Clone + 'static> canvas::Program<Message, cosmic::Theme, cosmi
         };
         let preview_stroke = Stroke {
             style: preview_color.into(),
-            width: 3.0,
+            width: self.shape_thickness,
             ..Stroke::default()
         };
         let preview_shadow_stroke = Stroke {
             style: Color::from_rgba(0.0, 0.0, 0.0, 0.6).into(),
-            width: 5.0,
+            width: self.shape_thickness + crate::domain::SHAPE_OUTLINE_EXTRA * 2.0,
             ..Stroke::default()
         };
 

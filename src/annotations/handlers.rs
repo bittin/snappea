@@ -86,6 +86,7 @@ fn handle_arrow(args: &mut Args, action: DrawAction) {
                     end_y: y,
                     color: args.ui.shape_color,
                     shadow: args.ui.shape_shadow,
+                    thickness: args.ui.shape_thickness,
                 };
                 args.annotations.arrows.push(arrow.clone());
                 args.annotations.add(Annotation::Arrow(arrow));
@@ -124,6 +125,7 @@ fn handle_circle(args: &mut Args, action: DrawAction) {
                     end_y: y,
                     color: args.ui.shape_color,
                     shadow: args.ui.shape_shadow,
+                    thickness: args.ui.shape_thickness,
                 };
                 args.annotations.circles.push(circle.clone());
                 args.annotations.add(Annotation::Circle(circle));
@@ -162,6 +164,7 @@ fn handle_rectangle(args: &mut Args, action: DrawAction) {
                     end_y: y,
                     color: args.ui.shape_color,
                     shadow: args.ui.shape_shadow,
+                    thickness: args.ui.shape_thickness,
                 };
                 args.annotations.rect_outlines.push(rect.clone());
                 args.annotations.add(Annotation::Rectangle(rect));
@@ -202,6 +205,7 @@ fn handle_line(args: &mut Args, action: DrawAction) {
                     end_y: y,
                     color: args.ui.shape_color,
                     shadow: args.ui.shape_shadow,
+                    thickness: args.ui.shape_thickness,
                 };
                 args.annotations.lines.push(line.clone());
                 args.annotations.add(Annotation::Line(line));
@@ -253,6 +257,7 @@ fn handle_pencil(args: &mut Args, action: DrawAction) {
                     points,
                     color: args.ui.shape_color,
                     shadow: args.ui.shape_shadow,
+                    thickness: args.ui.shape_thickness,
                 };
                 // A single click produces one point and nothing visible — drop it
                 // so it doesn't occupy a slot in the undo history.
@@ -274,21 +279,7 @@ fn handle_pencil(args: &mut Args, action: DrawAction) {
 /// Shared by the explicit commit action, by starting a new text elsewhere, and
 /// by leaving text mode — so a typed label is never silently lost.
 pub fn commit_editing_text(args: &mut Args) {
-    let Some(editing) = args.annotations.text_editing.take() else {
-        return;
-    };
-    let text = TextAnnotation {
-        x: editing.x,
-        y: editing.y,
-        content: editing.content,
-        font_size: args.ui.text_font_size,
-        color: args.ui.shape_color,
-        shadow: args.ui.shape_shadow,
-    };
-    if text.is_valid() {
-        args.annotations.texts.push(text.clone());
-        args.annotations.add(Annotation::Text(text));
-    }
+    args.annotations.commit_text_editing();
 }
 
 fn handle_text(args: &mut Args, action: TextAction) {
@@ -307,10 +298,15 @@ fn handle_text(args: &mut Args, action: TextAction) {
             if args.annotations.text_mode {
                 // Clicking elsewhere finishes the previous label first.
                 commit_editing_text(args);
+                args.annotations.selected_text = None;
                 args.annotations.text_editing = Some(TextEditing {
                     x,
                     y,
                     content: String::new(),
+                    font_size: args.ui.text_font_size,
+                    color: args.ui.shape_color,
+                    shadow: args.ui.shape_shadow,
+                    replacing: None,
                 });
             }
         }
@@ -330,11 +326,47 @@ fn handle_text(args: &mut Args, action: TextAction) {
             }
         }
         TextAction::Commit => commit_editing_text(args),
-        TextAction::Cancel => {
-            args.annotations.text_editing = None;
-        }
         TextAction::SetFontSize(size) => {
             args.ui.text_font_size = size;
+            // Applies to the label being typed and to the selected one, so the
+            // picker doubles as an editor for existing text.
+            if let Some(editing) = args.annotations.text_editing.as_mut() {
+                editing.font_size = size;
+            }
+            args.annotations.edit_selected_text(|t| t.font_size = size);
+        }
+        TextAction::Select(index) => {
+            // Selecting a different label finishes any open edit first.
+            commit_editing_text(args);
+            args.annotations.selected_text = index;
+        }
+        TextAction::Move(index, x, y) => {
+            args.annotations.selected_text = Some(index);
+            args.annotations.edit_selected_text(|t| {
+                t.x = x;
+                t.y = y;
+            });
+        }
+        TextAction::EditExisting(index) => {
+            commit_editing_text(args);
+            let Some(unified_idx) = args.annotations.unified_index_of_text(index) else {
+                return;
+            };
+            let Some(text) = args.annotations.texts.get(index).cloned() else {
+                return;
+            };
+            args.annotations.selected_text = Some(index);
+            // Match the label's own size/colour while editing it.
+            args.ui.text_font_size = text.font_size;
+            args.annotations.text_editing = Some(TextEditing {
+                x: text.x,
+                y: text.y,
+                content: text.content,
+                font_size: text.font_size,
+                color: text.color,
+                shadow: text.shadow,
+                replacing: Some(unified_idx),
+            });
         }
     }
 }

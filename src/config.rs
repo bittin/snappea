@@ -252,6 +252,9 @@ pub struct SnapPeaConfig {
     pub shape_color: ShapeColor,
     /// Whether to add shadow/border to shapes
     pub shape_shadow: bool,
+    /// Stroke thickness (logical units) used for new shape annotations
+    #[serde(default = "default_shape_thickness")]
+    pub shape_thickness: f32,
     /// Font size (logical units) used for new text annotations
     #[serde(default = "default_text_font_size")]
     pub text_font_size: f32,
@@ -318,6 +321,10 @@ fn default_pencil_thickness() -> f32 {
 
 fn default_toolbar_unhovered_opacity() -> f32 {
     0.5
+}
+
+fn default_shape_thickness() -> f32 {
+    crate::domain::SHAPE_THICKNESS_DEFAULT
 }
 
 fn default_text_font_size() -> f32 {
@@ -393,6 +400,7 @@ impl Default for SnapPeaConfig {
             shape_color: ShapeColor::default(),
             // Shadow enabled by default (matches current arrow behavior)
             shape_shadow: true,
+            shape_thickness: crate::domain::SHAPE_THICKNESS_DEFAULT,
             text_font_size: crate::domain::TEXT_SIZE_DEFAULT,
             // Default to Redact as primary redact tool
             primary_redact_tool: RedactTool::Redact,

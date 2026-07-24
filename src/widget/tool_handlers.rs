@@ -29,10 +29,22 @@ pub fn handle_tool_msg(args: &mut Args, msg: ToolMsg) -> bool {
         }
         ToolMsg::SetShapeColor(color) => {
             args.ui.shape_color = color;
+            // Recolour the selected text label too, so the picker edits existing
+            // text rather than only affecting the next annotation.
+            args.annotations.edit_selected_text(|t| t.color = color);
+            true // needs config save
+        }
+        ToolMsg::SetShapeThickness(v) => {
+            args.ui.shape_thickness = v;
+            false // saved on release, not during drag
+        }
+        ToolMsg::SaveShapeThickness => {
             true // needs config save
         }
         ToolMsg::ToggleShapeShadow => {
             args.ui.shape_shadow = !args.ui.shape_shadow;
+            let shadow = args.ui.shape_shadow;
+            args.annotations.edit_selected_text(|t| t.shadow = shadow);
             true // needs config save
         }
         ToolMsg::SetRedactTool(tool) => {
@@ -113,6 +125,7 @@ pub fn save_tool_config(args: &Args) {
     config.primary_shape_tool = args.ui.primary_shape_tool;
     config.shape_color = args.ui.shape_color;
     config.shape_shadow = args.ui.shape_shadow;
+    config.shape_thickness = args.ui.shape_thickness;
     config.primary_redact_tool = args.ui.primary_redact_tool;
     config.pixelation_block_size = args.ui.pixelation_block_size;
     config.magnifier_magnification = args.ui.magnifier_magnification;

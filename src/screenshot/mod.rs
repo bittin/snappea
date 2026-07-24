@@ -386,7 +386,9 @@ impl Screenshot {
                         shape_popup_open: false,
                         shape_color: config.shape_color,
                         shape_shadow: config.shape_shadow,
+                        shape_thickness: config.shape_thickness,
                         text_font_size: config.text_font_size,
+                        exit_armed: false,
                         primary_redact_tool: config.primary_redact_tool,
                         redact_popup_open: false,
                         pixelation_block_size: config.pixelation_block_size,
@@ -545,6 +547,9 @@ fn handle_draw_msg(app: &mut App, msg: DrawMsg) -> cosmic::Task<crate::core::app
         DrawMsg::Text(crate::session::messages::TextAction::SetFontSize(_))
     );
     if let Some(args) = app.screenshot_args.as_mut() {
+        // Any further annotation work means the pending exit confirmation is
+        // stale — the next Escape should ask again rather than discard.
+        args.ui.exit_armed = false;
         crate::annotations::handlers::handle_draw_msg(args, msg);
         if persist {
             crate::widget::tool_handlers::save_tool_config(args);
@@ -973,6 +978,22 @@ fn handle_capture_msg(app: &mut App, msg: CaptureMsg) -> cosmic::Task<crate::cor
     match msg {
         CaptureMsg::Capture => handle_capture_inner(app),
         CaptureMsg::Cancel => handle_cancel_inner(app),
+        CaptureMsg::CancelRequested => {
+            // Escape with work in progress arms an exit confirmation instead of
+            // discarding it outright; a second Escape goes through.
+            let needs_confirm = app
+                .screenshot_args
+                .as_ref()
+                .is_some_and(|args| !args.ui.exit_armed && args.annotations.has_unsaved_work());
+            if needs_confirm {
+                if let Some(args) = app.screenshot_args.as_mut() {
+                    args.ui.exit_armed = true;
+                }
+                cosmic::Task::none()
+            } else {
+                handle_cancel_inner(app)
+            }
+        }
         CaptureMsg::CopyToClipboard => {
             if let Some(args) = app.screenshot_args.as_mut() {
                 args.session.location = ImageSaveLocation::Clipboard;

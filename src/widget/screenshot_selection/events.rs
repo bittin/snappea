@@ -49,6 +49,12 @@ pub enum AnnotationEvent {
     Ended(AnnotationType, Point),
     /// Mode toggled for an annotation type
     ModeToggle(AnnotationType),
+    /// Select a text label for editing (index into texts, or None to deselect)
+    TextSelect(Option<usize>),
+    /// Move the text label at `index` so its top-left is at the given global point
+    TextMove(usize, Point),
+    /// Re-open the text label at `index` for typing
+    TextEditExisting(usize),
     /// Select a magnifier for editing (index into magnifiers, or None to deselect)
     MagnifierSelect(Option<usize>),
     /// Move the magnifier at `index` so its center is at the given global point
@@ -108,6 +114,10 @@ pub enum ToolPopupEvent {
     ShapeColorSet(ShapeColor),
     /// Shape shadow toggled
     ShapeShadowToggle,
+    /// Shape stroke thickness changed (during drag)
+    ShapeThicknessSet(f32),
+    /// Shape stroke thickness committed (on release)
+    ShapeThicknessSave,
     /// Text font size selected
     TextFontSizeSet(f32),
     /// Shape mode toggled (for primary shape)
@@ -323,6 +333,18 @@ impl ScreenshotEvent {
         ))
     }
 
+    pub fn text_select(index: Option<usize>) -> Self {
+        Self::Annotation(AnnotationEvent::TextSelect(index))
+    }
+
+    pub fn text_move(index: usize, x: f32, y: f32) -> Self {
+        Self::Annotation(AnnotationEvent::TextMove(index, Point::new(x, y)))
+    }
+
+    pub fn text_edit_existing(index: usize) -> Self {
+        Self::Annotation(AnnotationEvent::TextEditExisting(index))
+    }
+
     pub fn pencil_move(x: f32, y: f32) -> Self {
         Self::Annotation(AnnotationEvent::PencilMoved(Point::new(x, y)))
     }
@@ -485,6 +507,14 @@ impl ScreenshotEvent {
 
     pub fn shape_shadow_toggle() -> Self {
         Self::ToolPopup(ToolPopupEvent::ShapeShadowToggle)
+    }
+
+    pub fn shape_thickness_set(v: f32) -> Self {
+        Self::ToolPopup(ToolPopupEvent::ShapeThicknessSet(v))
+    }
+
+    pub fn shape_thickness_save() -> Self {
+        Self::ToolPopup(ToolPopupEvent::ShapeThicknessSave)
     }
 
     pub fn text_font_size_set(size: f32) -> Self {
@@ -755,6 +785,9 @@ impl ScreenshotEvent {
                 Msg::text_begin(p.x, p.y)
             }
             Self::Annotation(AnnotationEvent::Ended(AnnotationType::Text, _)) => Msg::text_commit(),
+            Self::Annotation(AnnotationEvent::TextSelect(i)) => Msg::text_select(i),
+            Self::Annotation(AnnotationEvent::TextMove(i, p)) => Msg::text_move(i, p.x, p.y),
+            Self::Annotation(AnnotationEvent::TextEditExisting(i)) => Msg::text_edit_existing(i),
             Self::Annotation(AnnotationEvent::Ended(AnnotationType::Pencil, p)) => {
                 Msg::pencil_end(p.x, p.y)
             }
@@ -839,6 +872,8 @@ impl ScreenshotEvent {
             Self::ToolPopup(ToolPopupEvent::ShapeToolSet(tool)) => Msg::set_shape_tool(tool),
             Self::ToolPopup(ToolPopupEvent::ShapeColorSet(color)) => Msg::set_shape_color(color),
             Self::ToolPopup(ToolPopupEvent::ShapeShadowToggle) => Msg::toggle_shape_shadow(),
+            Self::ToolPopup(ToolPopupEvent::ShapeThicknessSet(v)) => Msg::set_shape_thickness(v),
+            Self::ToolPopup(ToolPopupEvent::ShapeThicknessSave) => Msg::save_shape_thickness(),
             Self::ToolPopup(ToolPopupEvent::TextFontSizeSet(size)) => Msg::text_font_size(size),
             Self::ToolPopup(ToolPopupEvent::ShapeModeToggle) => Msg::shape_mode_toggle(),
             Self::ToolPopup(ToolPopupEvent::RedactModeToggle) => Msg::redact_tool_mode_toggle(),

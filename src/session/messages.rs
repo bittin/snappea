@@ -51,10 +51,14 @@ pub enum TextAction {
     Newline,
     /// Finish editing and keep the text
     Commit,
-    /// Abandon the text being edited
-    Cancel,
-    /// Set the font size used for new text
+    /// Set the font size used for new text (and for the selected label, if any)
     SetFontSize(f32),
+    /// Select a text label for editing (index into `texts`, or None to deselect)
+    Select(Option<usize>),
+    /// Move the label at `index` so its top-left is at (global x, y)
+    Move(usize, f32, f32),
+    /// Re-open the label at `index` for typing
+    EditExisting(usize),
 }
 
 /// All drawing/annotation messages
@@ -126,6 +130,10 @@ pub enum ToolMsg {
     SetShapeColor(ShapeColor),
     /// Toggle shadow on shapes
     ToggleShapeShadow,
+    /// Set shape stroke thickness (UI only, no save)
+    SetShapeThickness(f32),
+    /// Save the current shape stroke thickness to config
+    SaveShapeThickness,
 
     /// Set the primary redact tool
     SetRedactTool(RedactTool),
@@ -202,6 +210,9 @@ pub enum CaptureMsg {
     Capture,
     /// Cancel screenshot
     Cancel,
+    /// Escape was pressed. Cancels immediately unless there is unsaved
+    /// annotation work, in which case it asks for confirmation first.
+    CancelRequested,
     /// Copy to clipboard
     CopyToClipboard,
     /// Save to Pictures folder
@@ -429,11 +440,17 @@ impl Msg {
     pub fn text_commit() -> Self {
         Self::Draw(DrawMsg::Text(TextAction::Commit))
     }
-    pub fn text_cancel() -> Self {
-        Self::Draw(DrawMsg::Text(TextAction::Cancel))
-    }
     pub fn text_font_size(size: f32) -> Self {
         Self::Draw(DrawMsg::Text(TextAction::SetFontSize(size)))
+    }
+    pub fn text_select(index: Option<usize>) -> Self {
+        Self::Draw(DrawMsg::Text(TextAction::Select(index)))
+    }
+    pub fn text_move(index: usize, x: f32, y: f32) -> Self {
+        Self::Draw(DrawMsg::Text(TextAction::Move(index, x, y)))
+    }
+    pub fn text_edit_existing(index: usize) -> Self {
+        Self::Draw(DrawMsg::Text(TextAction::EditExisting(index)))
     }
     pub fn magnifier_mode_toggle() -> Self {
         Self::Draw(DrawMsg::Magnifier(DrawAction::ModeToggle))
@@ -510,6 +527,12 @@ impl Msg {
     }
     pub fn set_shape_color(color: ShapeColor) -> Self {
         Self::Tool(ToolMsg::SetShapeColor(color))
+    }
+    pub fn set_shape_thickness(v: f32) -> Self {
+        Self::Tool(ToolMsg::SetShapeThickness(v))
+    }
+    pub fn save_shape_thickness() -> Self {
+        Self::Tool(ToolMsg::SaveShapeThickness)
     }
     pub fn toggle_shape_shadow() -> Self {
         Self::Tool(ToolMsg::ToggleShapeShadow)
@@ -612,6 +635,9 @@ impl Msg {
     // Capture shortcuts
     pub fn cancel() -> Self {
         Self::Capture(CaptureMsg::Cancel)
+    }
+    pub fn cancel_requested() -> Self {
+        Self::Capture(CaptureMsg::CancelRequested)
     }
     pub fn copy_to_clipboard() -> Self {
         Self::Capture(CaptureMsg::CopyToClipboard)

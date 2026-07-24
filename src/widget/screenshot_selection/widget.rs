@@ -32,6 +32,7 @@ use super::helpers::{
     filter_qr_codes_for_output,
 };
 use crate::render::mesh::{draw_arrow_preview, draw_arrows};
+use crate::render::text::text_contains;
 use crate::widget::{
     drawing::{draw_inactive_overlay_with_hint, draw_selection_frame_with_handles},
     output_selection::OutputSelection,
@@ -44,10 +45,10 @@ use crate::widget::{
             PixelationSource, draw_pixelation_preview, draw_redaction_preview,
             draw_redactions_and_pixelations,
         },
-        text_overlays::{draw_text_editing, draw_texts},
+        text_overlays::{draw_text_editing, draw_text_selection, draw_texts},
         status_overlays::{
             draw_ocr_overlays, draw_ocr_status_indicator, draw_qr_code_overlays,
-            draw_qr_scanning_indicator,
+            draw_qr_scanning_indicator, draw_status_badge,
         },
     },
     rectangle_selection::RectangleSelection,
@@ -63,13 +64,37 @@ const MAGNIFIER_RING_GRAB: f32 = 12.0;
 /// Zoom change per mouse wheel notch when scrolling over a selected magnifier
 const MAGNIFIER_SCROLL_STEP: f32 = 0.5;
 
-/// Transient (per-frame-persistent) drag state for editing a magnifier.
+/// Maximum gap between two clicks (and how far apart they may land) to count as
+/// a double-click that re-opens a text label for editing.
+const DOUBLE_CLICK_MS: u128 = 400;
+const DOUBLE_CLICK_SLOP: f32 = 6.0;
+
+/// Transient (per-frame-persistent) interaction state for direct manipulation.
 ///
 /// Lives in the widget's `Tree` state so it survives view rebuilds without
 /// round-tripping through the application message loop.
 #[derive(Default)]
-struct MagnifierDragState {
+struct InteractionState {
     drag: Option<MagnifierDrag>,
+    /// Active text-label drag: (texts index, grab offset from its top-left)
+    text_drag: Option<(usize, f32, f32)>,
+    /// Last left-click (time, global x, y) for double-click detection
+    last_click: Option<(std::time::Instant, f32, f32)>,
+}
+
+impl InteractionState {
+    /// Record a click and report whether it completes a double-click.
+    fn note_click(&mut self, gx: f32, gy: f32) -> bool {
+        let now = std::time::Instant::now();
+        let is_double = self.last_click.is_some_and(|(t, px, py)| {
+            now.duration_since(t).as_millis() <= DOUBLE_CLICK_MS
+                && (gx - px).abs() <= DOUBLE_CLICK_SLOP
+                && (gy - py).abs() <= DOUBLE_CLICK_SLOP
+        });
+        // Reset after a double so a third click starts fresh.
+        self.last_click = if is_double { None } else { Some((now, gx, gy)) };
+        is_double
+    }
 }
 
 enum MagnifierDrag {
@@ -364,7 +389,6 @@ where
         let on_event_p1 = on_event.clone();
         let on_event_p2 = on_event.clone();
         let on_event_p3 = on_event.clone();
-        let on_event_t1 = on_event.clone();
         let shapes_element = {
             let program = ShapesOverlay {
                 selection_rect,
@@ -377,7 +401,6 @@ where
                 rect_outline_mode: annotations.rect_outline_mode,
                 line_mode: annotations.line_mode,
                 pencil_mode: annotations.pencil_mode,
-                text_mode: annotations.text_mode,
                 circle_drawing: annotations.circle_drawing,
                 rect_outline_drawing: annotations.rect_outline_drawing,
                 line_drawing: annotations.line_drawing,
@@ -409,10 +432,8 @@ where
                 on_pencil_end: Some(Box::new(move |x, y| {
                     on_event_p3(ScreenshotEvent::pencil_end(x, y))
                 })),
-                on_text_begin: Some(Box::new(move |x, y| {
-                    on_event_t1(ScreenshotEvent::text_begin(x, y))
-                })),
                 shape_color: ui.shape_color,
+                shape_thickness: ui.shape_thickness,
                 shape_shadow: ui.shape_shadow,
             };
 
@@ -497,6 +518,12 @@ where
                     let on_event = on_event.clone();
                     move |t| on_event(ScreenshotEvent::shape_tool_set(t))
                 },
+                ui.shape_thickness,
+                {
+                    let on_event = on_event.clone();
+                    move |v| on_event(ScreenshotEvent::shape_thickness_set(v))
+                },
+                on_event(ScreenshotEvent::shape_thickness_save()),
                 ui.text_font_size,
                 &{
                     let on_event = on_event.clone();
@@ -621,6 +648,10 @@ where
     // Helper methods to check current mode
     fn is_arrow_mode(&self) -> bool {
         self.annotations.arrow_mode
+    }
+
+    fn is_text_mode(&self) -> bool {
+        self.annotations.text_mode
     }
 
     fn is_redact_mode(&self) -> bool {
@@ -1175,11 +1206,43 @@ where
                 local_end,
                 shape_color,
                 self.ui.shape_shadow,
+                self.ui.shape_thickness,
+            );
+        }
+
+        // Escape-to-exit confirmation hint
+        if self.ui.exit_armed {
+            let msg = fl!("press-escape-again");
+            // Roughly centre the badge horizontally; draw_status_badge sizes
+            // itself from the string length.
+            let approx_w = msg.len() as f32 * 16.0 * 0.55 + 32.0;
+            draw_status_badge(
+                renderer,
+                viewport,
+                &msg,
+                (viewport.width - approx_w) / 2.0,
+                24.0,
+                cosmic::iced::Color::from_rgb(0.95, 0.6, 0.1),
+                8.0,
             );
         }
 
         // Draw text annotations and the label currently being typed
-        draw_texts(renderer, viewport, &self.annotations.texts, output_offset);
+        // While re-editing a label, hide the committed copy so it isn't drawn
+        // under the live preview.
+        let editing_existing = self
+            .annotations
+            .text_editing
+            .as_ref()
+            .and_then(|e| e.replacing.map(|_| self.annotations.selected_text))
+            .flatten();
+        draw_texts(
+            renderer,
+            viewport,
+            &self.annotations.texts,
+            output_offset,
+            editing_existing,
+        );
         if let Some(editing) = self.annotations.text_editing.as_ref() {
             draw_text_editing(
                 renderer,
@@ -1190,6 +1253,17 @@ where
                 self.ui.shape_shadow,
                 output_offset,
             );
+        }
+
+        // Outline the selected label so it's clear what a colour/size change
+        // will affect.
+        // Not gated on text mode: the config popup disables modes, and the
+        // outline is what tells you which label a colour/size change will hit.
+        if let Some(sel) = self.annotations.selected_text
+            && let Some(t) = self.annotations.texts.get(sel)
+        {
+            let accent: cosmic::iced::Color = theme.cosmic().accent_color().into();
+            draw_text_selection(renderer, t, accent, output_offset);
         }
 
         // Draw completed magnifier annotations (zoomed loupes).
@@ -2027,9 +2101,94 @@ where
                 }
             }
 
+            // Handle text tool: place new, or select / drag / re-edit existing.
+            //
+            // Handled here rather than in ShapesOverlay because children receive
+            // events first and would swallow the click before hit-testing.
+            if self.is_text_mode() {
+                let state = tree.state.downcast_mut::<InteractionState>();
+                let off_x = self.output_rect.left as f32;
+                let off_y = self.output_rect.top as f32;
+                let cursor_gx = pos.x + off_x;
+                let cursor_gy = pos.y + off_y;
+
+                let inside_selection =
+                    if let Some((sel_x, sel_y, sel_w, sel_h)) = self.selection_rect {
+                        inside_inner_selection(sel_x, sel_y, sel_w, sel_h)
+                    } else {
+                        false
+                    };
+
+                match mouse_event {
+                    MouseEvent::ButtonPressed(Button::Left) => {
+                        // Topmost label under the cursor wins.
+                        let hit = self
+                            .annotations
+                            .texts
+                            .iter()
+                            .enumerate()
+                            .rev()
+                            .find(|(_, t)| text_contains(t, cursor_gx, cursor_gy))
+                            .map(|(i, t)| (i, t.x, t.y));
+
+                        let is_double = state.note_click(cursor_gx, cursor_gy);
+
+                        if let Some((i, tx, ty)) = hit {
+                            if is_double {
+                                // Double-click re-opens the label for typing.
+                                shell.publish(
+                                    self.emit(ScreenshotEvent::text_edit_existing(i)),
+                                );
+                            } else {
+                                state.text_drag =
+                                    Some((i, cursor_gx - tx, cursor_gy - ty));
+                                shell.publish(
+                                    self.emit(ScreenshotEvent::text_select(Some(i))),
+                                );
+                            }
+                            shell.capture_event();
+                            return;
+                        }
+
+                        // Empty space inside the selection: deselect, then start a
+                        // new label there.
+                        if inside_selection {
+                            if let Some((sel_x, sel_y, sel_w, sel_h)) = self.selection_rect {
+                                let (cx, cy) =
+                                    clamp_to_selection(pos.x, pos.y, sel_x, sel_y, sel_w, sel_h);
+                                shell.publish(self.emit(ScreenshotEvent::text_begin(
+                                    cx + off_x,
+                                    cy + off_y,
+                                )));
+                            }
+                            shell.capture_event();
+                            return;
+                        }
+                    }
+                    MouseEvent::CursorMoved { .. } => {
+                        if let Some((index, grab_dx, grab_dy)) = state.text_drag {
+                            shell.publish(self.emit(ScreenshotEvent::text_move(
+                                index,
+                                cursor_gx - grab_dx,
+                                cursor_gy - grab_dy,
+                            )));
+                            shell.capture_event();
+                            return;
+                        }
+                    }
+                    MouseEvent::ButtonReleased(Button::Left) => {
+                        if state.text_drag.take().is_some() {
+                            shell.capture_event();
+                            return;
+                        }
+                    }
+                    _ => {}
+                }
+            }
+
             // Handle magnifier tool: create new, or select / move / resize existing
             if self.is_magnifier_mode() {
-                let drag_state = tree.state.downcast_mut::<MagnifierDragState>();
+                let drag_state = tree.state.downcast_mut::<InteractionState>();
 
                 let off_x = self.output_rect.left as f32;
                 let off_y = self.output_rect.top as f32;
@@ -2262,6 +2421,23 @@ where
             }
         }
 
+        // In text mode, hovering an existing label shows a grab cursor so it's
+        // discoverable that labels can be dragged / double-clicked.
+        if self.is_text_mode()
+            && let Some(p) = cursor.position()
+        {
+            let gx = p.x + self.output_rect.left as f32;
+            let gy = p.y + self.output_rect.top as f32;
+            if self
+                .annotations
+                .texts
+                .iter()
+                .any(|t| text_contains(t, gx, gy))
+            {
+                return cosmic::iced::mouse::Interaction::Grab;
+            }
+        }
+
         // If in drawing mode (annotation active), show appropriate cursor based on position
         if self.is_any_drawing_mode() {
             if let Some(cursor_pos) = cursor.position() {
@@ -2390,11 +2566,11 @@ where
     }
 
     fn tag(&self) -> cosmic::iced::core::widget::tree::Tag {
-        cosmic::iced::core::widget::tree::Tag::of::<MagnifierDragState>()
+        cosmic::iced::core::widget::tree::Tag::of::<InteractionState>()
     }
 
     fn state(&self) -> cosmic::iced::core::widget::tree::State {
-        cosmic::iced::core::widget::tree::State::new(MagnifierDragState::default())
+        cosmic::iced::core::widget::tree::State::new(InteractionState::default())
     }
 
     fn id(&self) -> Option<cosmic::widget::Id> {
@@ -2444,5 +2620,47 @@ where
 {
     fn from(widget: ScreenshotSelectionWidget<'a, E>) -> Self {
         Self::new(widget)
+    }
+}
+
+#[cfg(test)]
+mod interaction_tests {
+    use super::{DOUBLE_CLICK_SLOP, InteractionState};
+
+    #[test]
+    fn a_single_click_is_not_a_double() {
+        let mut st = InteractionState::default();
+        assert!(!st.note_click(10.0, 10.0));
+    }
+
+    #[test]
+    fn two_quick_clicks_in_place_are_a_double() {
+        let mut st = InteractionState::default();
+        assert!(!st.note_click(10.0, 10.0));
+        assert!(st.note_click(10.0, 10.0));
+    }
+
+    #[test]
+    fn small_jitter_between_clicks_still_counts() {
+        let mut st = InteractionState::default();
+        st.note_click(10.0, 10.0);
+        assert!(st.note_click(10.0 + DOUBLE_CLICK_SLOP - 1.0, 10.0));
+    }
+
+    #[test]
+    fn clicks_far_apart_are_two_singles() {
+        // Clicking one label then another shouldn't open an editor.
+        let mut st = InteractionState::default();
+        st.note_click(10.0, 10.0);
+        assert!(!st.note_click(400.0, 300.0));
+    }
+
+    #[test]
+    fn a_third_click_does_not_re_trigger() {
+        // After a double fires, the next click starts a fresh pair.
+        let mut st = InteractionState::default();
+        st.note_click(5.0, 5.0);
+        assert!(st.note_click(5.0, 5.0));
+        assert!(!st.note_click(5.0, 5.0));
     }
 }

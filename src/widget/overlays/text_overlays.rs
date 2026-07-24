@@ -64,14 +64,18 @@ fn draw_block(
 ///
 /// `output_offset` is the global position of this output's top-left corner, used
 /// to convert the annotations' global coordinates to output-local ones.
+///
+/// `skip` hides one label by index — used while re-editing it, so the committed
+/// copy isn't drawn underneath the live preview.
 pub fn draw_texts(
     renderer: &mut cosmic::Renderer,
     viewport: &Rectangle,
     texts: &[TextAnnotation],
     output_offset: (f32, f32),
+    skip: Option<usize>,
 ) {
-    for text in texts {
-        if !text.is_valid() {
+    for (i, text) in texts.iter().enumerate() {
+        if !text.is_valid() || skip == Some(i) {
             continue;
         }
         draw_block(
@@ -85,6 +89,36 @@ pub fn draw_texts(
             text.y - output_offset.1,
         );
     }
+}
+
+/// Draw a dashed-looking selection box around the selected label.
+pub fn draw_text_selection(
+    renderer: &mut cosmic::Renderer,
+    text: &TextAnnotation,
+    accent: Color,
+    output_offset: (f32, f32),
+) {
+    use cosmic::iced::core::{Border, Renderer as _, renderer::Quad};
+
+    let (gx, gy, w, h) = crate::render::text::text_bounds(text);
+    renderer.fill_quad(
+        Quad {
+            bounds: Rectangle {
+                x: gx - output_offset.0,
+                y: gy - output_offset.1,
+                width: w,
+                height: h,
+            },
+            border: Border {
+                radius: 2.0.into(),
+                width: 1.5,
+                color: accent,
+            },
+            shadow: cosmic::iced::core::Shadow::default(),
+            snap: false,
+        },
+        Color::TRANSPARENT,
+    );
 }
 
 /// Draw the text annotation currently being typed, with a trailing caret.

@@ -337,7 +337,7 @@ pub fn draw_arrows(
                 end_x,
                 end_y,
                 arrow_params::BORDER_COLOR,
-                arrow_params::THICKNESS + 2.0 * arrow_params::OUTLINE_PX,
+                arrow.thickness + 2.0 * arrow_params::OUTLINE_PX,
                 arrow_params::HEAD_SIZE + arrow_params::OUTLINE_PX,
             )
         {
@@ -356,7 +356,7 @@ pub fn draw_arrows(
             end_x,
             end_y,
             arrow_color,
-            arrow_params::THICKNESS,
+            arrow.thickness,
             arrow_params::HEAD_SIZE,
         ) {
             renderer.with_layer(*viewport, |renderer| {
@@ -386,6 +386,7 @@ pub fn draw_arrow_preview(
     end: (f32, f32),
     color: Color,
     with_shadow: bool,
+    thickness: f32,
 ) {
     use cosmic::iced::core::Renderer as CoreRenderer;
 
@@ -403,7 +404,7 @@ pub fn draw_arrow_preview(
             end_x,
             end_y,
             preview_border_color,
-            arrow_params::THICKNESS + 2.0 * arrow_params::OUTLINE_PX,
+            thickness + 2.0 * arrow_params::OUTLINE_PX,
             arrow_params::HEAD_SIZE + arrow_params::OUTLINE_PX,
         )
     {
@@ -422,7 +423,7 @@ pub fn draw_arrow_preview(
         end_x,
         end_y,
         preview_color,
-        arrow_params::THICKNESS,
+        thickness,
         arrow_params::HEAD_SIZE,
     ) {
         renderer.with_layer(*viewport, |renderer| {

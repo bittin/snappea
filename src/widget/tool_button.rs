@@ -17,7 +17,7 @@ use cosmic::widget::{button, container, icon, text, toggler, tooltip};
 
 use super::lucide::{self, AppIcon};
 use crate::config::{RedactTool, ShapeColor, ShapeTool};
-use crate::domain::TEXT_SIZE_PRESETS;
+use crate::domain::{SHAPE_THICKNESS_MAX, SHAPE_THICKNESS_MIN, TEXT_SIZE_PRESETS};
 use crate::fl;
 
 /// A wrapper widget that detects right-click and long-press events
@@ -431,6 +431,9 @@ pub fn build_shape_popup<'a, Msg: Clone + 'static>(
     shadow_enabled: bool,
     has_annotations: bool,
     on_select_tool: &(impl Fn(ShapeTool) -> Msg + 'a),
+    current_thickness: f32,
+    on_thickness_change: impl Fn(f32) -> Msg + 'a,
+    on_thickness_save: Msg,
     current_font_size: f32,
     on_font_size_change: &(impl Fn(f32) -> Msg + 'a),
     on_color_change: &(impl Fn(ShapeColor) -> Msg + 'a),
@@ -489,6 +492,30 @@ pub fn build_shape_popup<'a, Msg: Clone + 'static>(
     ))
     .width(Length::Fill)
     .align_x(cosmic::iced::core::alignment::Horizontal::Center);
+
+    // Stroke thickness — applies to every tool except text, which sizes by font.
+    let thickness_section: Element<'_, Msg> = if current_tool == ShapeTool::Text {
+        cosmic::iced::widget::space()
+            .width(Length::Fixed(0.0))
+            .height(Length::Fixed(0.0))
+            .into()
+    } else {
+        column![
+            text::caption(fl!("thickness", size = (current_thickness as u32))),
+            cosmic::widget::slider(
+                SHAPE_THICKNESS_MIN..=SHAPE_THICKNESS_MAX,
+                current_thickness,
+                on_thickness_change,
+            )
+            .step(1.0)
+            .on_release(on_thickness_save)
+            .width(Length::Fill),
+            cosmic::widget::divider::horizontal::light(),
+        ]
+        .spacing(space_xs)
+        .width(Length::Fill)
+        .into()
+    };
 
     // Font size presets — only meaningful for the text tool, so only shown then.
     let font_size_section: Element<'_, Msg> = if current_tool == ShapeTool::Text {
@@ -645,6 +672,7 @@ pub fn build_shape_popup<'a, Msg: Clone + 'static>(
         shape_buttons,
         shape_subtitle,
         cosmic::widget::divider::horizontal::light(),
+        thickness_section,
         font_size_section,
         color_section,
         cosmic::widget::divider::horizontal::light(),
