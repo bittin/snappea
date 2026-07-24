@@ -1183,6 +1183,10 @@ fn handle_capture_msg(app: &mut App, msg: CaptureMsg) -> cosmic::Task<crate::cor
                         output_dir.display(),
                         e
                     );
+                    crate::core::notify::notify_error(
+                        "Recording failed",
+                        format!("Could not create output directory '{}': {e}", output_dir.display()),
+                    );
                     return cosmic::Task::none();
                 }
             }
@@ -1253,6 +1257,10 @@ fn handle_capture_msg(app: &mut App, msg: CaptureMsg) -> cosmic::Task<crate::cor
                 }
                 None => {
                     log::error!("Output '{}' not found in wayland_helper", output_name);
+                    crate::core::notify::notify_error(
+                        "Recording failed",
+                        format!("Display output '{output_name}' could not be found."),
+                    );
                     return cosmic::Task::none();
                 }
             };
@@ -1281,7 +1289,7 @@ fn handle_capture_msg(app: &mut App, msg: CaptureMsg) -> cosmic::Task<crate::cor
             let output_file_for_thread = output_file.clone();
             let encoder_clone = encoder.clone();
             let thread_handle = std::thread::spawn(move || {
-                crate::screencast::start_recording_thread(
+                let result = crate::screencast::start_recording_thread(
                     wayland_helper,
                     capture_source,
                     output_file_for_thread,
@@ -1292,7 +1300,18 @@ fn handle_capture_msg(app: &mut App, msg: CaptureMsg) -> cosmic::Task<crate::cor
                     framerate,
                     show_cursor,
                     stop_flag_clone,
-                )
+                );
+                // The UI has already switched to the "recording" state by the time
+                // this thread runs, so a failure here is otherwise invisible to the
+                // user. Surface it as a desktop notification.
+                if let Err(ref e) = result {
+                    log::error!("Recording failed: {:#}", e);
+                    crate::core::notify::notify_error(
+                        "Recording failed",
+                        format!("{:#}", e),
+                    );
+                }
+                result
             });
 
             // Register the recording handle
