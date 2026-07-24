@@ -152,6 +152,22 @@ fn handle_shape_mode_toggle(args: &mut Args) {
                 args.annotations.rect_outline_drawing = None;
             }
         }
+        ShapeTool::Line => {
+            args.annotations.line_mode = !args.annotations.line_mode;
+            if args.annotations.line_mode {
+                disable_other_modes_except(args, Mode::Line);
+            } else {
+                args.annotations.line_drawing = None;
+            }
+        }
+        ShapeTool::Pencil => {
+            args.annotations.pencil_mode = !args.annotations.pencil_mode;
+            if args.annotations.pencil_mode {
+                disable_other_modes_except(args, Mode::Pencil);
+            } else {
+                args.annotations.pencil_drawing = None;
+            }
+        }
     }
     // Close popups
     args.close_all_popups();
@@ -173,6 +189,14 @@ fn set_primary_shape_tool(args: &mut Args, tool: ShapeTool) {
         ShapeTool::Rectangle => {
             args.annotations.rect_outline_mode = true;
             disable_other_modes_except(args, Mode::Rectangle);
+        }
+        ShapeTool::Line => {
+            args.annotations.line_mode = true;
+            disable_other_modes_except(args, Mode::Line);
+        }
+        ShapeTool::Pencil => {
+            args.annotations.pencil_mode = true;
+            disable_other_modes_except(args, Mode::Pencil);
         }
     }
     args.close_all_popups();
@@ -372,8 +396,10 @@ fn handle_pencil_popup(args: &mut Args, action: ToolPopupAction) {
 #[derive(Clone, Copy, PartialEq)]
 enum Mode {
     Arrow,
+    Line,
     Circle,
     Rectangle,
+    Pencil,
     Magnifier,
     Redact,
     Pixelate,
@@ -391,6 +417,14 @@ fn disable_other_modes_except(args: &mut Args, keep: Mode) {
     if keep != Mode::Rectangle {
         args.annotations.rect_outline_mode = false;
         args.annotations.rect_outline_drawing = None;
+    }
+    if keep != Mode::Line {
+        args.annotations.line_mode = false;
+        args.annotations.line_drawing = None;
+    }
+    if keep != Mode::Pencil {
+        args.annotations.pencil_mode = false;
+        args.annotations.pencil_drawing = None;
     }
     if keep != Mode::Magnifier {
         args.annotations.magnifier_mode = false;

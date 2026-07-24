@@ -8,7 +8,8 @@ use crate::config::{
 use crate::core::portal::PortalResponse;
 use crate::domain::{
     Action, Annotation, ArrowAnnotation, Choice, CircleOutlineAnnotation, ImageSaveLocation,
-    MagnifierAnnotation, PixelateAnnotation, RectOutlineAnnotation, RedactAnnotation,
+    LineAnnotation, MagnifierAnnotation, PencilAnnotation, PixelateAnnotation,
+    RectOutlineAnnotation, RedactAnnotation,
 };
 use crate::screencast::encoder::EncoderInfo;
 use crate::screenshot::portal::{ScreenshotOptions, ScreenshotResult};
@@ -26,6 +27,14 @@ pub struct PortalContext {
     pub parent_window: String,
     pub options: ScreenshotOptions,
     pub tx: Sender<PortalResponse<ScreenshotResult>>,
+    /// Whether a D-Bus caller is actually awaiting the response on `tx`.
+    ///
+    /// True for a real `org.freedesktop.impl.portal.Screenshot` request (the
+    /// caller expects a file URI back); false for user-initiated captures
+    /// (PrintScreen/control) where the response is discarded. When true, a file
+    /// must always be written even if the user chose "copy to clipboard", so the
+    /// caller receives a usable URI rather than `clipboard:///`.
+    pub expects_response: bool,
 }
 
 #[derive(Clone, Debug)]
@@ -71,6 +80,13 @@ pub struct AnnotationState {
     pub rect_outlines: Vec<RectOutlineAnnotation>,
     pub rect_outline_mode: bool,
     pub rect_outline_drawing: Option<(f32, f32)>,
+    pub lines: Vec<LineAnnotation>,
+    pub line_mode: bool,
+    pub line_drawing: Option<(f32, f32)>,
+    pub pencils: Vec<PencilAnnotation>,
+    pub pencil_mode: bool,
+    /// Points collected so far for the in-progress freehand stroke
+    pub pencil_drawing: Option<Vec<(f32, f32)>>,
     pub magnifiers: Vec<MagnifierAnnotation>,
     pub magnifier_mode: bool,
     pub magnifier_drawing: Option<(f32, f32)>,
@@ -97,6 +113,12 @@ impl AnnotationState {
         self.rect_outlines.clear();
         self.rect_outline_mode = false;
         self.rect_outline_drawing = None;
+        self.lines.clear();
+        self.line_mode = false;
+        self.line_drawing = None;
+        self.pencils.clear();
+        self.pencil_mode = false;
+        self.pencil_drawing = None;
         self.magnifiers.clear();
         self.magnifier_mode = false;
         self.magnifier_drawing = None;
@@ -113,27 +135,24 @@ impl AnnotationState {
         self.rect_outlines.clear();
         self.rect_outline_drawing = None;
         self.rect_outline_mode = false;
+        self.lines.clear();
+        self.line_drawing = None;
+        self.line_mode = false;
+        self.pencils.clear();
+        self.pencil_drawing = None;
+        self.pencil_mode = false;
         self.magnifiers.clear();
         self.magnifier_drawing = None;
         self.magnifier_mode = false;
         self.selected_magnifier = None;
         // Also filter unified annotations array
-        self.annotations
-            .retain(|a| matches!(a, Annotation::Redact(_) | Annotation::Pixelate(_)));
+        self.annotations.retain(|a| a.is_redaction());
         self.annotation_index = self.annotations.len();
     }
 
     pub fn clear_redactions(&mut self) {
         // Clear only redaction annotations from the unified array
-        self.annotations.retain(|a| {
-            matches!(
-                a,
-                Annotation::Arrow(_)
-                    | Annotation::Circle(_)
-                    | Annotation::Rectangle(_)
-                    | Annotation::Magnifier(_)
-            )
-        });
+        self.annotations.retain(|a| a.is_shape());
         self.annotation_index = self.annotations.len();
 
         // Clear redaction arrays
@@ -172,6 +191,8 @@ impl AnnotationState {
         self.arrows.clear();
         self.circles.clear();
         self.rect_outlines.clear();
+        self.lines.clear();
+        self.pencils.clear();
         self.magnifiers.clear();
         self.redactions.clear();
         self.pixelations.clear();
@@ -179,8 +200,10 @@ impl AnnotationState {
         for annotation in self.annotations.iter().take(self.annotation_index) {
             match annotation {
                 Annotation::Arrow(a) => self.arrows.push(a.clone()),
+                Annotation::Line(l) => self.lines.push(l.clone()),
                 Annotation::Circle(c) => self.circles.push(c.clone()),
                 Annotation::Rectangle(r) => self.rect_outlines.push(r.clone()),
+                Annotation::Pencil(p) => self.pencils.push(p.clone()),
                 Annotation::Magnifier(m) => self.magnifiers.push(m.clone()),
                 Annotation::Redact(r) => self.redactions.push(r.clone()),
                 Annotation::Pixelate(p) => self.pixelations.push(p.clone()),
@@ -230,6 +253,40 @@ impl AnnotationState {
         self.rebuild_arrays();
     }
 
+    /// Whether any shape annotation exists (drives the shape "clear" button).
+    ///
+    /// Derived from the unified list so a new annotation type is covered
+    /// automatically via [`Annotation::is_shape`].
+    pub fn has_shapes(&self) -> bool {
+        self.annotations
+            .iter()
+            .take(self.annotation_index)
+            .any(Annotation::is_shape)
+    }
+
+    /// Whether any redaction annotation exists (drives the redact "clear" button).
+    pub fn has_redactions(&self) -> bool {
+        self.annotations
+            .iter()
+            .take(self.annotation_index)
+            .any(Annotation::is_redaction)
+    }
+
+    /// Whether any annotation drawing mode is currently active.
+    ///
+    /// Used to suppress selection-rectangle dragging while a tool owns the
+    /// mouse. Keep this in sync when adding a new annotation tool.
+    pub fn any_mode_active(&self) -> bool {
+        self.arrow_mode
+            || self.line_mode
+            || self.circle_mode
+            || self.rect_outline_mode
+            || self.pencil_mode
+            || self.magnifier_mode
+            || self.redact_mode
+            || self.pixelate_mode
+    }
+
     pub fn disable_all_modes(&mut self) {
         self.arrow_mode = false;
         self.arrow_drawing = None;
@@ -241,6 +298,10 @@ impl AnnotationState {
         self.circle_drawing = None;
         self.rect_outline_mode = false;
         self.rect_outline_drawing = None;
+        self.line_mode = false;
+        self.line_drawing = None;
+        self.pencil_mode = false;
+        self.pencil_drawing = None;
         self.magnifier_mode = false;
         self.magnifier_drawing = None;
         // Note: `selected_magnifier` is intentionally preserved here so the
@@ -372,6 +433,121 @@ mod tests {
             color: ShapeColor::default(),
             shadow: true,
         }
+    }
+
+    fn line() -> LineAnnotation {
+        LineAnnotation {
+            start_x: 1.0,
+            start_y: 2.0,
+            end_x: 30.0,
+            end_y: 40.0,
+            color: ShapeColor::default(),
+            shadow: true,
+        }
+    }
+
+    fn pencil() -> PencilAnnotation {
+        PencilAnnotation {
+            points: vec![(0.0, 0.0), (5.0, 5.0), (10.0, 2.0)],
+            color: ShapeColor::default(),
+            shadow: true,
+        }
+    }
+
+    #[test]
+    fn rebuild_arrays_restores_lines_and_pencils() {
+        let mut st = AnnotationState::default();
+        st.add(Annotation::Line(line()));
+        st.add(Annotation::Pencil(pencil()));
+        st.rebuild_arrays();
+
+        assert_eq!(st.lines.len(), 1);
+        assert_eq!(st.pencils.len(), 1);
+        assert_eq!(st.pencils[0].points.len(), 3);
+    }
+
+    #[test]
+    fn undo_redo_round_trips_lines_and_pencils() {
+        let mut st = AnnotationState::default();
+        st.add(Annotation::Line(line()));
+        st.add(Annotation::Pencil(pencil()));
+        st.rebuild_arrays();
+
+        st.undo(); // drop the pencil
+        assert_eq!(st.lines.len(), 1);
+        assert_eq!(st.pencils.len(), 0);
+
+        st.undo(); // drop the line
+        assert_eq!(st.lines.len(), 0);
+
+        st.redo();
+        st.redo();
+        assert_eq!(st.lines.len(), 1);
+        assert_eq!(st.pencils.len(), 1);
+    }
+
+    #[test]
+    fn line_and_pencil_count_as_shapes_not_redactions() {
+        assert!(Annotation::Line(line()).is_shape());
+        assert!(Annotation::Pencil(pencil()).is_shape());
+        assert!(!Annotation::Line(line()).is_redaction());
+        assert!(!Annotation::Pencil(pencil()).is_redaction());
+
+        let mut st = AnnotationState::default();
+        st.add(Annotation::Line(line()));
+        st.add(Annotation::Pencil(pencil()));
+        assert!(st.has_shapes());
+        assert!(!st.has_redactions());
+
+        // Clearing shapes must remove both new types.
+        st.clear_shapes();
+        assert!(!st.has_shapes());
+        assert!(st.lines.is_empty());
+        assert!(st.pencils.is_empty());
+    }
+
+    #[test]
+    fn clear_redactions_keeps_lines_and_pencils() {
+        let mut st = AnnotationState::default();
+        st.add(Annotation::Line(line()));
+        st.add(Annotation::Pencil(pencil()));
+        st.add(Annotation::Redact(RedactAnnotation {
+            x: 0.0,
+            y: 0.0,
+            x2: 5.0,
+            y2: 5.0,
+        }));
+        st.clear_redactions();
+        st.rebuild_arrays();
+
+        assert_eq!(st.lines.len(), 1);
+        assert_eq!(st.pencils.len(), 1);
+        assert!(st.redactions.is_empty());
+    }
+
+    #[test]
+    fn single_point_pencil_stroke_is_invalid() {
+        // A click without a drag produces one point and nothing visible.
+        let single = PencilAnnotation {
+            points: vec![(1.0, 1.0)],
+            color: ShapeColor::default(),
+            shadow: false,
+        };
+        assert!(!single.is_valid());
+        assert!(pencil().is_valid());
+    }
+
+    #[test]
+    fn any_mode_active_tracks_line_and_pencil() {
+        let mut st = AnnotationState::default();
+        assert!(!st.any_mode_active());
+
+        st.line_mode = true;
+        assert!(st.any_mode_active());
+        st.line_mode = false;
+
+        st.pencil_mode = true;
+        assert!(st.any_mode_active());
     }
 
     #[test]

@@ -75,17 +75,65 @@ pub enum VideoSaveLocationChoice {
 pub enum ShapeTool {
     #[default]
     Arrow,
+    Line,
     Circle,
     Rectangle,
+    Pencil,
 }
 
 impl ShapeTool {
+    /// Every shape tool, in the order shown in the picker and cycled by `next()`.
+    ///
+    /// Driving the UI from this slice (rather than hand-written match arms per
+    /// button) means adding a tool only requires extending this list plus the
+    /// per-tool metadata below.
+    pub const ALL: &'static [ShapeTool] = &[
+        ShapeTool::Arrow,
+        ShapeTool::Line,
+        ShapeTool::Circle,
+        ShapeTool::Rectangle,
+        ShapeTool::Pencil,
+    ];
+
+    /// Number of shape tools (used for the split-button option indicator)
+    pub const COUNT: usize = Self::ALL.len();
+
     /// Get the next shape tool in the cycle
     pub fn next(self) -> Self {
+        let i = self.index();
+        Self::ALL[(i + 1) % Self::COUNT]
+    }
+
+    /// Position of this tool in the cycle (for the split-button indicator)
+    pub fn index(self) -> usize {
+        Self::ALL
+            .iter()
+            .position(|t| *t == self)
+            .unwrap_or_default()
+    }
+
+    /// Freedesktop symbolic icon name for this tool.
+    ///
+    /// Matches the icon set cosmic-viewer uses for its annotate tools so the
+    /// two apps look consistent.
+    pub fn icon_name(self) -> &'static str {
         match self {
-            ShapeTool::Arrow => ShapeTool::Circle,
-            ShapeTool::Circle => ShapeTool::Rectangle,
-            ShapeTool::Rectangle => ShapeTool::Arrow,
+            ShapeTool::Arrow => "insert-arrow-symbolic",
+            ShapeTool::Line => "insert-line-symbolic",
+            ShapeTool::Circle => "insert-ellipse-symbolic",
+            ShapeTool::Rectangle => "insert-rectangle-symbolic",
+            ShapeTool::Pencil => "insert-drawing-symbolic",
+        }
+    }
+
+    /// Short label shown next to the icon in the tool picker
+    pub fn label(self) -> String {
+        match self {
+            ShapeTool::Arrow => fl!("arrow"),
+            ShapeTool::Line => fl!("line"),
+            ShapeTool::Circle => fl!("oval-circle"),
+            ShapeTool::Rectangle => fl!("rectangle-square"),
+            ShapeTool::Pencil => fl!("pencil"),
         }
     }
 
@@ -93,8 +141,10 @@ impl ShapeTool {
     pub fn tooltip(self) -> String {
         match self {
             ShapeTool::Arrow => fl!("draw-arrow"),
+            ShapeTool::Line => fl!("draw-line"),
             ShapeTool::Circle => fl!("draw-circle"),
             ShapeTool::Rectangle => fl!("draw-rectangle"),
+            ShapeTool::Pencil => fl!("draw-pencil"),
         }
     }
 }

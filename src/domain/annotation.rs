@@ -19,6 +19,39 @@ pub struct ArrowAnnotation {
     pub shadow: bool,
 }
 
+/// Straight line annotation (an arrow without the head)
+#[derive(Clone, Debug, PartialEq)]
+pub struct LineAnnotation {
+    /// Start point in global logical coordinates
+    pub start_x: f32,
+    pub start_y: f32,
+    /// End point in global logical coordinates
+    pub end_x: f32,
+    pub end_y: f32,
+    /// Color of this line
+    pub color: ShapeColor,
+    /// Whether to draw shadow/border
+    pub shadow: bool,
+}
+
+/// Freehand (pencil) annotation: an open polyline through every sampled point.
+#[derive(Clone, Debug, PartialEq)]
+pub struct PencilAnnotation {
+    /// Sampled points in global logical coordinates, in draw order
+    pub points: Vec<(f32, f32)>,
+    /// Color of this stroke
+    pub color: ShapeColor,
+    /// Whether to draw shadow/border
+    pub shadow: bool,
+}
+
+impl PencilAnnotation {
+    /// A stroke needs at least two points to be visible.
+    pub fn is_valid(&self) -> bool {
+        self.points.len() >= 2
+    }
+}
+
 /// Redaction annotation (black rectangle) for hiding sensitive content
 #[derive(Clone, Debug, PartialEq)]
 pub struct RedactAnnotation {
@@ -125,21 +158,25 @@ impl MagnifierAnnotation {
 #[derive(Clone, Debug, PartialEq)]
 pub enum Annotation {
     Arrow(ArrowAnnotation),
+    Line(LineAnnotation),
     Circle(CircleOutlineAnnotation),
     Rectangle(RectOutlineAnnotation),
+    Pencil(PencilAnnotation),
     Magnifier(MagnifierAnnotation),
     Redact(RedactAnnotation),
     Pixelate(PixelateAnnotation),
 }
 
 impl Annotation {
-    /// Check if this is a shape annotation (arrow, circle, rectangle, magnifier)
+    /// Check if this is a shape annotation (arrow, line, circle, rectangle, pencil, magnifier)
     pub fn is_shape(&self) -> bool {
         matches!(
             self,
             Annotation::Arrow(_)
+                | Annotation::Line(_)
                 | Annotation::Circle(_)
                 | Annotation::Rectangle(_)
+                | Annotation::Pencil(_)
                 | Annotation::Magnifier(_)
         )
     }

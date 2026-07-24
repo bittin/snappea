@@ -356,6 +356,8 @@ impl Screenshot {
                     parent_window: parent_window.to_string(),
                     options: options.clone(),
                     tx,
+                    // A real portal caller is blocked on this response awaiting a URI.
+                    expects_response: true,
                 },
                 capture: CaptureData { output_images },
                 session: SessionState {
@@ -466,12 +468,8 @@ pub(crate) fn view(app: &App, id: window::Id) -> cosmic::Element<'_, Msg> {
     let theme = app.core.system_theme().cosmic();
 
     // Calculate derived state
-    let has_any_annotations = !args.annotations.arrows.is_empty()
-        || !args.annotations.circles.is_empty()
-        || !args.annotations.rect_outlines.is_empty()
-        || !args.annotations.magnifiers.is_empty();
-    let has_any_redactions =
-        !args.annotations.redactions.is_empty() || !args.annotations.pixelations.is_empty();
+    let has_any_annotations = args.annotations.has_shapes();
+    let has_any_redactions = args.annotations.has_redactions();
     let has_ocr_text = args.detection.ocr_text.is_some();
 
     let is_active_output = {
@@ -1607,13 +1605,26 @@ fn handle_capture_inner(app: &mut App) -> cosmic::Task<crate::core::app::Msg> {
         ui,
         ..
     } = args;
+    let expects_response = portal.expects_response;
     let tx = portal.tx;
     let choice = session.choice;
     let mut images = capture.output_images;
-    let location = session.location;
+    let mut location = session.location;
     let annotations = args_annotations.annotations;
     let annotation_index = args_annotations.annotation_index;
-    let also_copy_to_clipboard = session.also_copy_to_clipboard;
+    let mut also_copy_to_clipboard = session.also_copy_to_clipboard;
+
+    // A portal caller always expects a file URI in return. If the user chose
+    // "copy to clipboard" (location == Clipboard, which produces no file), still
+    // write a file so we can hand back a usable URI — and keep copying to the
+    // clipboard as well. Without this the caller would receive `clipboard:///`.
+    if expects_response && location == ImageSaveLocation::Clipboard {
+        location = match ui.save_location_setting {
+            SaveLocationChoice::Documents => ImageSaveLocation::Documents,
+            _ => ImageSaveLocation::Pictures,
+        };
+        also_copy_to_clipboard = true;
+    }
 
     // Only use annotations up to annotation_index (respects undo)
     let annotations = &annotations[..annotation_index];

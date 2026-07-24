@@ -1247,6 +1247,8 @@ pub(crate) fn direct_screenshot_subscription(
                             choose_destination: None,
                         },
                         tx,
+                        // User-initiated capture; the response is discarded (see `_rx` above).
+                        expects_response: false,
                     },
                     capture: CaptureData { output_images },
                     session: SessionState {
@@ -2067,6 +2069,8 @@ async fn trigger_screenshot(
                 choose_destination: None,
             },
             tx: portal_tx,
+            // Control-triggered capture; the response is discarded (see `_portal_rx`).
+            expects_response: false,
         },
         capture: CaptureData { output_images },
         session: SessionState {

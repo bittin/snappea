@@ -401,23 +401,11 @@ pub fn build_shape_button<'a, Msg: Clone + 'static>(
     _space_xxs: u16,
     content_opacity: f32,
 ) -> Element<'a, Msg> {
-    let option_index = match current_tool {
-        ShapeTool::Arrow => 0,
-        ShapeTool::Circle => 1,
-        ShapeTool::Rectangle => 2,
-    };
-
-    let icon = match current_tool {
-        ShapeTool::Arrow => AppIcon::Arrow,
-        ShapeTool::Circle => AppIcon::Circle,
-        ShapeTool::Rectangle => AppIcon::Square,
-    };
-
-    build_tool_button_with_icon(
-        lucide::icon_with_opacity(icon, 34.0, content_opacity, is_active || is_popup_open),
+    build_tool_button(
+        current_tool.icon_name(),
         current_tool.tooltip(),
-        3, // 3 shape options
-        option_index,
+        ShapeTool::COUNT,
+        current_tool.index(),
         is_active,
         is_popup_open,
         is_enabled,
@@ -428,6 +416,12 @@ pub fn build_shape_button<'a, Msg: Clone + 'static>(
     )
 }
 
+/// Width of the shape popup.
+///
+/// Wide enough for the tool rows (icon + label + selected check) as well as the
+/// 4-per-row colour swatches.
+const SHAPE_POPUP_WIDTH: f32 = 260.0;
+
 /// Build the shape settings popup element
 #[allow(clippy::too_many_arguments)]
 pub fn build_shape_popup<'a, Msg: Clone + 'static>(
@@ -435,80 +429,56 @@ pub fn build_shape_popup<'a, Msg: Clone + 'static>(
     current_color: ShapeColor,
     shadow_enabled: bool,
     has_annotations: bool,
-    on_select_arrow: Msg,
-    on_select_circle: Msg,
-    on_select_rectangle: Msg,
+    on_select_tool: &(impl Fn(ShapeTool) -> Msg + 'a),
     on_color_change: &(impl Fn(ShapeColor) -> Msg + 'a),
     on_shadow_toggle: Msg,
     on_clear: Msg,
     space_s: u16,
     space_xs: u16,
 ) -> Element<'a, Msg> {
-    let icon_size = 32.0;
-
-    // Shape selection buttons in a row
-    let btn_arrow = tooltip(
-        button::custom(lucide::icon_with_opacity(
-            AppIcon::Arrow,
-            icon_size,
-            1.0,
-            current_tool == ShapeTool::Arrow,
-        ))
-        .class(if current_tool == ShapeTool::Arrow {
-            cosmic::theme::Button::Suggested
-        } else {
-            cosmic::theme::Button::Icon
-        })
-        .on_press(on_select_arrow)
-        .padding(space_xs),
-        text::body(fl!("arrow")),
-        tooltip::Position::Bottom,
-    );
-
-    let btn_circle = tooltip(
-        button::custom(lucide::icon_with_opacity(
-            AppIcon::Circle,
-            icon_size,
-            1.0,
-            current_tool == ShapeTool::Circle,
-        ))
-        .class(if current_tool == ShapeTool::Circle {
-            cosmic::theme::Button::Suggested
-        } else {
-            cosmic::theme::Button::Icon
-        })
-        .on_press(on_select_circle)
-        .padding(space_xs),
-        text::body(fl!("oval-circle")),
-        tooltip::Position::Bottom,
-    );
-
-    let btn_rectangle = tooltip(
-        button::custom(lucide::icon_with_opacity(
-            AppIcon::Square,
-            icon_size,
-            1.0,
-            current_tool == ShapeTool::Rectangle,
-        ))
-        .class(if current_tool == ShapeTool::Rectangle {
-            cosmic::theme::Button::Suggested
-        } else {
-            cosmic::theme::Button::Icon
-        })
-        .on_press(on_select_rectangle)
-        .padding(space_xs),
-        text::body(fl!("rectangle-square")),
-        tooltip::Position::Bottom,
-    );
-
-    // Center the shape buttons in the popup
-    let shape_buttons = container(
-        row![btn_arrow, btn_circle, btn_rectangle]
+    // Tool list: one row per tool (icon + label + selected check).
+    //
+    // A vertical list rather than a row of icon-only buttons: five icons in a
+    // row overflowed the fixed popup width and the last two were clipped. This
+    // also mirrors cosmic-viewer's shape picker and self-documents each tool.
+    let tool_rows: Vec<Element<'_, Msg>> = ShapeTool::ALL
+        .iter()
+        .map(|tool| {
+            let tool = *tool;
+            let is_selected = tool == current_tool;
+            let item = row![
+                icon::Icon::from(icon::from_name(tool.icon_name()).size(16)),
+                text::body(tool.label()).width(Length::Fill),
+                if is_selected {
+                    Element::from(icon::Icon::from(
+                        icon::from_name("object-select-symbolic").size(16),
+                    ))
+                } else {
+                    Element::from(
+                        cosmic::iced::widget::space().width(Length::Fixed(16.0)),
+                    )
+                },
+            ]
             .spacing(space_xs)
-            .align_y(cosmic::iced::core::Alignment::Center),
-    )
-    .width(Length::Fill)
-    .align_x(cosmic::iced::core::alignment::Horizontal::Center);
+            .align_y(cosmic::iced::core::Alignment::Center)
+            .width(Length::Fill);
+
+            button::custom(item)
+                .class(if is_selected {
+                    cosmic::theme::Button::Suggested
+                } else {
+                    cosmic::theme::Button::Icon
+                })
+                .width(Length::Fill)
+                .padding(space_xs)
+                .on_press(on_select_tool(tool))
+                .into()
+        })
+        .collect();
+
+    let shape_buttons = cosmic::iced::widget::Column::with_children(tool_rows)
+        .spacing(2)
+        .width(Length::Fill);
 
     // Subtitle with keyboard shortcuts
     let shape_subtitle = container(text::caption(fl!("shape-cycle-hint")).class(
@@ -626,7 +596,8 @@ pub fn build_shape_popup<'a, Msg: Clone + 'static>(
     let clear_row = container(clear_button).width(Length::Fill);
 
     // Assemble popup content
-    // Width needs to fit: 4 color swatches per row * (24px + 2*2 padding + spacing) + popup padding
+    // Width needs to fit: 4 color swatches per row * (24px + 2*2 padding + spacing)
+    // + popup padding, and the tool rows' icon + label + check mark.
     let popup_content = column![
         shape_buttons,
         shape_subtitle,
@@ -639,7 +610,7 @@ pub fn build_shape_popup<'a, Msg: Clone + 'static>(
     ]
     .spacing(space_s)
     .padding(space_s)
-    .width(Length::Fixed(230.0));
+    .width(Length::Fixed(SHAPE_POPUP_WIDTH));
 
     container(popup_content)
         .class(cosmic::theme::Container::Custom(Box::new(|theme| {

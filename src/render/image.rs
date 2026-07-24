@@ -7,8 +7,8 @@ use tiny_skia::{Color, LineCap, LineJoin, Paint, PathBuilder, Pixmap, Stroke, Tr
 
 use super::geometry::{self, arrow, shape};
 use crate::domain::{
-    Annotation, ArrowAnnotation, CircleOutlineAnnotation, MagnifierAnnotation, PixelateAnnotation,
-    Rect, RectOutlineAnnotation, RedactAnnotation,
+    Annotation, ArrowAnnotation, CircleOutlineAnnotation, LineAnnotation, MagnifierAnnotation,
+    PencilAnnotation, PixelateAnnotation, Rect, RectOutlineAnnotation, RedactAnnotation,
 };
 
 /// Convert RgbaImage to Pixmap, apply drawing function, and copy back
@@ -301,6 +301,125 @@ pub fn draw_rect_outlines_on_image(
             paint.set_color_rgba8(r, g, b, a);
             paint.anti_alias = true;
 
+            let stroke = Stroke {
+                width: thickness,
+                line_cap: LineCap::Round,
+                line_join: LineJoin::Round,
+                ..Default::default()
+            };
+            pixmap.stroke_path(&path, &paint, &stroke, Transform::identity(), None);
+        }
+    });
+}
+
+/// Draw straight lines onto an image using tiny-skia
+pub fn draw_lines_on_image(
+    img: &mut RgbaImage,
+    lines: &[LineAnnotation],
+    selection_rect: &Rect,
+    scale: f32,
+) {
+    if lines.is_empty() {
+        return;
+    }
+
+    with_pixmap(img, |pixmap| {
+        let thickness = (shape::THICKNESS * scale).max(1.0);
+        let border_thickness = (shape::BORDER_THICKNESS * scale).max(2.0);
+
+        for line in lines {
+            let [r, g, b, a] = line.color.to_rgba_u8();
+
+            let x1 = (line.start_x - selection_rect.left as f32) * scale;
+            let y1 = (line.start_y - selection_rect.top as f32) * scale;
+            let x2 = (line.end_x - selection_rect.left as f32) * scale;
+            let y2 = (line.end_y - selection_rect.top as f32) * scale;
+
+            let mut pb = PathBuilder::new();
+            pb.move_to(x1, y1);
+            pb.line_to(x2, y2);
+            let Some(path) = pb.finish() else {
+                continue;
+            };
+
+            if line.shadow {
+                let mut paint = Paint::default();
+                paint.set_color_rgba8(0, 0, 0, 220);
+                paint.anti_alias = true;
+                let stroke = Stroke {
+                    width: border_thickness,
+                    line_cap: LineCap::Round,
+                    line_join: LineJoin::Round,
+                    ..Default::default()
+                };
+                pixmap.stroke_path(&path, &paint, &stroke, Transform::identity(), None);
+            }
+
+            let mut paint = Paint::default();
+            paint.set_color_rgba8(r, g, b, a);
+            paint.anti_alias = true;
+            let stroke = Stroke {
+                width: thickness,
+                line_cap: LineCap::Round,
+                line_join: LineJoin::Round,
+                ..Default::default()
+            };
+            pixmap.stroke_path(&path, &paint, &stroke, Transform::identity(), None);
+        }
+    });
+}
+
+/// Draw freehand (pencil) strokes onto an image using tiny-skia
+pub fn draw_pencils_on_image(
+    img: &mut RgbaImage,
+    pencils: &[PencilAnnotation],
+    selection_rect: &Rect,
+    scale: f32,
+) {
+    if pencils.is_empty() {
+        return;
+    }
+
+    with_pixmap(img, |pixmap| {
+        let thickness = (shape::THICKNESS * scale).max(1.0);
+        let border_thickness = (shape::BORDER_THICKNESS * scale).max(2.0);
+
+        for pencil in pencils {
+            if !pencil.is_valid() {
+                continue;
+            }
+            let [r, g, b, a] = pencil.color.to_rgba_u8();
+
+            let mut pb = PathBuilder::new();
+            for (i, (px, py)) in pencil.points.iter().enumerate() {
+                let x = (px - selection_rect.left as f32) * scale;
+                let y = (py - selection_rect.top as f32) * scale;
+                if i == 0 {
+                    pb.move_to(x, y);
+                } else {
+                    pb.line_to(x, y);
+                }
+            }
+            let Some(path) = pb.finish() else {
+                continue;
+            };
+
+            if pencil.shadow {
+                let mut paint = Paint::default();
+                paint.set_color_rgba8(0, 0, 0, 220);
+                paint.anti_alias = true;
+                let stroke = Stroke {
+                    width: border_thickness,
+                    line_cap: LineCap::Round,
+                    line_join: LineJoin::Round,
+                    ..Default::default()
+                };
+                pixmap.stroke_path(&path, &paint, &stroke, Transform::identity(), None);
+            }
+
+            let mut paint = Paint::default();
+            paint.set_color_rgba8(r, g, b, a);
+            paint.anti_alias = true;
             let stroke = Stroke {
                 width: thickness,
                 line_cap: LineCap::Round,
@@ -637,6 +756,12 @@ pub fn draw_annotations_in_order(
             }
             Annotation::Rectangle(rect) => {
                 draw_rect_outlines_on_image(img, std::slice::from_ref(rect), selection_rect, scale);
+            }
+            Annotation::Line(line) => {
+                draw_lines_on_image(img, std::slice::from_ref(line), selection_rect, scale);
+            }
+            Annotation::Pencil(pencil) => {
+                draw_pencils_on_image(img, std::slice::from_ref(pencil), selection_rect, scale);
             }
             Annotation::Magnifier(magnifier) => {
                 draw_magnifiers_on_image(

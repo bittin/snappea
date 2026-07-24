@@ -103,3 +103,64 @@ pub fn circle_from_points(x1: f32, y1: f32, x2: f32, y2: f32) -> (f32, f32, f32)
     let radius = (((x2 - x1).abs() + (y2 - y1).abs()) * 0.25).max(1.0);
     (cx, cy, radius)
 }
+
+/// Snap a line's end point to the nearest 45° increment around its start,
+/// preserving the drag length. Used when Ctrl is held while drawing a line.
+#[inline]
+pub fn snap_to_45_degrees(sx: f32, sy: f32, ex: f32, ey: f32) -> (f32, f32) {
+    let (dx, dy) = (ex - sx, ey - sy);
+    let len = dx.hypot(dy);
+    if len < f32::EPSILON {
+        return (ex, ey);
+    }
+    const STEP: f32 = std::f32::consts::FRAC_PI_4; // 45°
+    let angle = (dy.atan2(dx) / STEP).round() * STEP;
+    (sx + len * angle.cos(), sy + len * angle.sin())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn approx(a: f32, b: f32) -> bool {
+        (a - b).abs() < 0.01
+    }
+
+    #[test]
+    fn snap_45_locks_near_horizontal_to_horizontal() {
+        // A drag 100 right and 8 up should flatten to pure horizontal.
+        let (x, y) = snap_to_45_degrees(0.0, 0.0, 100.0, -8.0);
+        assert!(approx(y, 0.0), "expected horizontal, got y={y}");
+        assert!(approx(x, 100.31), "length should be preserved, got x={x}");
+    }
+
+    #[test]
+    fn snap_45_locks_near_vertical_to_vertical() {
+        let (x, y) = snap_to_45_degrees(0.0, 0.0, 5.0, 80.0);
+        assert!(approx(x, 0.0), "expected vertical, got x={x}");
+        assert!(y > 0.0);
+    }
+
+    #[test]
+    fn snap_45_keeps_diagonal_diagonal() {
+        let (x, y) = snap_to_45_degrees(0.0, 0.0, 50.0, 47.0);
+        assert!(approx(x, y), "expected 45 degrees, got ({x}, {y})");
+    }
+
+    #[test]
+    fn snap_45_preserves_drag_length() {
+        let (sx, sy) = (10.0f32, 20.0f32);
+        let (ex, ey) = (70.0f32, 55.0f32);
+        let original = (ex - sx).hypot(ey - sy);
+        let (x, y) = snap_to_45_degrees(sx, sy, ex, ey);
+        let snapped = (x - sx).hypot(y - sy);
+        assert!(approx(original, snapped), "{original} vs {snapped}");
+    }
+
+    #[test]
+    fn snap_45_handles_zero_length_drag() {
+        // Must not produce NaN when start == end.
+        let (x, y) = snap_to_45_degrees(3.0, 4.0, 3.0, 4.0);
+        assert!(approx(x, 3.0) && approx(y, 4.0));
+    }
+}

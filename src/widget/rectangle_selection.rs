@@ -63,20 +63,13 @@ pub struct RectangleSelection<'a, Msg> {
     screenshot_image: &'a image::RgbaImage,
     /// Scale factor (physical pixels per logical pixel)
     image_scale: f32,
-    /// Whether arrow drawing mode is active (skip rectangle capturing)
-    arrow_mode: bool,
-    /// Whether redact drawing mode is active (skip rectangle capturing)
-    redact_mode: bool,
-    /// Whether pixelate drawing mode is active (skip rectangle capturing)
-    pixelate_mode: bool,
-    /// Whether circle drawing mode is active (skip rectangle capturing)
-    circle_mode: bool,
-    /// Whether rectangle-outline drawing mode is active (skip rectangle capturing)
-    rect_outline_mode: bool,
-    /// Whether magnifier drawing mode is active (skip rectangle capturing)
-    magnifier_mode: bool,
-    /// Whether any popup or drawer is open (skip rectangle capturing)
-    popup_open: bool,
+    /// Whether selection dragging must be suppressed because some annotation
+    /// tool is active or a popup/drawer is open.
+    ///
+    /// This is a single flag rather than one per tool: the widget only ever
+    /// needs "is anything else claiming the mouse?", and folding it into one
+    /// value means a newly added annotation tool can't be forgotten here.
+    suppress_selection: bool,
     /// Whether magnifier is enabled
     magnifier_enabled: bool,
     /// Whether recording is active (hide selection UI)
@@ -98,13 +91,7 @@ impl<'a, Msg: Clone> RectangleSelection<'a, Msg> {
         on_move_offset: impl Fn(Option<(i32, i32)>) -> Msg + 'static,
         screenshot_image: &'a image::RgbaImage,
         image_scale: f32,
-        arrow_mode: bool,
-        redact_mode: bool,
-        pixelate_mode: bool,
-        circle_mode: bool,
-        rect_outline_mode: bool,
-        magnifier_mode: bool,
-        popup_open: bool,
+        suppress_selection: bool,
         magnifier_enabled: bool,
         is_recording: bool,
         move_offset: Option<(i32, i32)>,
@@ -120,13 +107,7 @@ impl<'a, Msg: Clone> RectangleSelection<'a, Msg> {
             widget_id: widget::Id::new(format!("rectangle-selection-{window_id:?}")),
             screenshot_image,
             image_scale,
-            arrow_mode,
-            redact_mode,
-            pixelate_mode,
-            circle_mode,
-            rect_outline_mode,
-            magnifier_mode,
-            popup_open,
+            suppress_selection,
             magnifier_enabled,
             is_recording,
             move_offset,
@@ -436,15 +417,9 @@ impl<'a, Msg: 'static + Clone> Widget<Msg, cosmic::Theme, cosmic::Renderer>
                     return;
                 }
 
-                // Skip rectangle drawing when arrow, redact, pixelate, shape mode is active, or popup is open
-                if self.arrow_mode
-                    || self.redact_mode
-                    || self.pixelate_mode
-                    || self.circle_mode
-                    || self.rect_outline_mode
-                    || self.magnifier_mode
-                    || self.popup_open
-                {
+                // Skip rectangle drawing while an annotation tool owns the mouse
+                // or a popup/drawer is open.
+                if self.suppress_selection {
                     return;
                 }
 

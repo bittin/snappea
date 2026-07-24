@@ -26,6 +26,8 @@ pub enum DrawAction {
     ModeToggle,
     /// Start drawing at position
     Start(f32, f32),
+    /// Drag moved to position while drawing (used by freehand/pencil to append a point)
+    Move(f32, f32),
     /// End drawing at position
     End(f32, f32),
 }
@@ -39,6 +41,10 @@ pub enum DrawMsg {
     Circle(DrawAction),
     /// Rectangle outline annotation actions
     Rectangle(DrawAction),
+    /// Straight line annotation actions
+    Line(DrawAction),
+    /// Freehand (pencil) annotation actions
+    Pencil(DrawAction),
     /// Magnifier annotation actions
     Magnifier(DrawAction),
     /// Select a magnifier for editing (index into magnifiers, or None to deselect)
@@ -356,6 +362,27 @@ impl Msg {
     }
     pub fn rectangle_end(x: f32, y: f32) -> Self {
         Self::Draw(DrawMsg::Rectangle(DrawAction::End(x, y)))
+    }
+    pub fn line_mode_toggle() -> Self {
+        Self::Draw(DrawMsg::Line(DrawAction::ModeToggle))
+    }
+    pub fn line_start(x: f32, y: f32) -> Self {
+        Self::Draw(DrawMsg::Line(DrawAction::Start(x, y)))
+    }
+    pub fn line_end(x: f32, y: f32) -> Self {
+        Self::Draw(DrawMsg::Line(DrawAction::End(x, y)))
+    }
+    pub fn pencil_mode_toggle() -> Self {
+        Self::Draw(DrawMsg::Pencil(DrawAction::ModeToggle))
+    }
+    pub fn pencil_start(x: f32, y: f32) -> Self {
+        Self::Draw(DrawMsg::Pencil(DrawAction::Start(x, y)))
+    }
+    pub fn pencil_move(x: f32, y: f32) -> Self {
+        Self::Draw(DrawMsg::Pencil(DrawAction::Move(x, y)))
+    }
+    pub fn pencil_end(x: f32, y: f32) -> Self {
+        Self::Draw(DrawMsg::Pencil(DrawAction::End(x, y)))
     }
     pub fn magnifier_mode_toggle() -> Self {
         Self::Draw(DrawMsg::Magnifier(DrawAction::ModeToggle))

@@ -3,8 +3,9 @@
 //! Handles DrawMsg for all annotation drawing operations.
 
 use crate::domain::{
-    Annotation, ArrowAnnotation, CircleOutlineAnnotation, MAGNIFIER_MAX_ZOOM, MAGNIFIER_MIN_ZOOM,
-    MagnifierAnnotation, PixelateAnnotation, RectOutlineAnnotation, RedactAnnotation,
+    Annotation, ArrowAnnotation, CircleOutlineAnnotation, LineAnnotation, MAGNIFIER_MAX_ZOOM,
+    MAGNIFIER_MIN_ZOOM, MagnifierAnnotation, PencilAnnotation, PixelateAnnotation,
+    RectOutlineAnnotation, RedactAnnotation,
 };
 use crate::screenshot::Args;
 use crate::session::messages::{DrawAction, DrawMsg};
@@ -18,6 +19,8 @@ pub fn handle_draw_msg(args: &mut Args, msg: DrawMsg) {
         DrawMsg::Arrow(action) => handle_arrow(args, action),
         DrawMsg::Circle(action) => handle_circle(args, action),
         DrawMsg::Rectangle(action) => handle_rectangle(args, action),
+        DrawMsg::Line(action) => handle_line(args, action),
+        DrawMsg::Pencil(action) => handle_pencil(args, action),
         DrawMsg::Magnifier(action) => handle_magnifier(args, action),
         DrawMsg::MagnifierSelect(index) => {
             args.annotations.selected_magnifier = index;
@@ -71,6 +74,8 @@ fn handle_arrow(args: &mut Args, action: DrawAction) {
                 args.annotations.arrow_drawing = Some((x, y));
             }
         }
+        // Only freehand tracks intermediate drag positions.
+        DrawAction::Move(..) => {}
         DrawAction::End(x, y) => {
             if let Some((start_x, start_y)) = args.annotations.arrow_drawing.take() {
                 let arrow = ArrowAnnotation {
@@ -108,6 +113,7 @@ fn handle_circle(args: &mut Args, action: DrawAction) {
                 args.annotations.circle_drawing = Some((x, y));
             }
         }
+        DrawAction::Move(..) => {}
         DrawAction::End(x, y) => {
             if let Some((start_x, start_y)) = args.annotations.circle_drawing.take() {
                 let circle = CircleOutlineAnnotation {
@@ -145,6 +151,7 @@ fn handle_rectangle(args: &mut Args, action: DrawAction) {
                 args.annotations.rect_outline_drawing = Some((x, y));
             }
         }
+        DrawAction::Move(..) => {}
         DrawAction::End(x, y) => {
             if let Some((start_x, start_y)) = args.annotations.rect_outline_drawing.take() {
                 let rect = RectOutlineAnnotation {
@@ -157,6 +164,101 @@ fn handle_rectangle(args: &mut Args, action: DrawAction) {
                 };
                 args.annotations.rect_outlines.push(rect.clone());
                 args.annotations.add(Annotation::Rectangle(rect));
+            }
+        }
+    }
+}
+
+// ============================================================================
+// Line handlers
+// ============================================================================
+
+fn handle_line(args: &mut Args, action: DrawAction) {
+    match action {
+        DrawAction::ModeToggle => {
+            args.annotations.line_mode = !args.annotations.line_mode;
+            if !args.annotations.line_mode {
+                args.annotations.line_drawing = None;
+            } else {
+                disable_other_modes(args, Mode::Line);
+                args.detection.clear();
+            }
+        }
+        DrawAction::Start(x, y) => {
+            if args.annotations.line_mode {
+                args.annotations.line_drawing = Some((x, y));
+            }
+        }
+        // A line is defined by its endpoints; intermediate drag positions are
+        // only used for the live preview, which reads the cursor directly.
+        DrawAction::Move(..) => {}
+        DrawAction::End(x, y) => {
+            if let Some((start_x, start_y)) = args.annotations.line_drawing.take() {
+                let line = LineAnnotation {
+                    start_x,
+                    start_y,
+                    end_x: x,
+                    end_y: y,
+                    color: args.ui.shape_color,
+                    shadow: args.ui.shape_shadow,
+                };
+                args.annotations.lines.push(line.clone());
+                args.annotations.add(Annotation::Line(line));
+            }
+        }
+    }
+}
+
+// ============================================================================
+// Pencil (freehand) handlers
+// ============================================================================
+
+/// Minimum distance (in global logical units) between two consecutive sampled
+/// points. Filters out redundant samples from high-frequency mouse motion.
+const PENCIL_MIN_STEP: f32 = 1.5;
+
+fn handle_pencil(args: &mut Args, action: DrawAction) {
+    match action {
+        DrawAction::ModeToggle => {
+            args.annotations.pencil_mode = !args.annotations.pencil_mode;
+            if !args.annotations.pencil_mode {
+                args.annotations.pencil_drawing = None;
+            } else {
+                disable_other_modes(args, Mode::Pencil);
+                args.detection.clear();
+            }
+        }
+        DrawAction::Start(x, y) => {
+            if args.annotations.pencil_mode {
+                args.annotations.pencil_drawing = Some(vec![(x, y)]);
+            }
+        }
+        DrawAction::Move(x, y) => {
+            if let Some(points) = args.annotations.pencil_drawing.as_mut() {
+                let far_enough = points.last().is_none_or(|(lx, ly)| {
+                    (x - lx).hypot(y - ly) >= PENCIL_MIN_STEP
+                });
+                if far_enough {
+                    points.push((x, y));
+                }
+            }
+        }
+        DrawAction::End(x, y) => {
+            if let Some(mut points) = args.annotations.pencil_drawing.take() {
+                if points.last().is_none_or(|(lx, ly)| *lx != x || *ly != y) {
+                    points.push((x, y));
+                }
+                let pencil = PencilAnnotation {
+                    points,
+                    color: args.ui.shape_color,
+                    shadow: args.ui.shape_shadow,
+                };
+                // A single click produces one point and nothing visible — drop it
+                // so it doesn't occupy a slot in the undo history.
+                if pencil.is_valid() {
+                    args.annotations.pencils.push(pencil.clone());
+                    args.annotations.add(Annotation::Pencil(pencil));
+                }
             }
         }
     }
@@ -183,6 +285,7 @@ fn handle_magnifier(args: &mut Args, action: DrawAction) {
                 args.annotations.magnifier_drawing = Some((x, y));
             }
         }
+        DrawAction::Move(..) => {}
         DrawAction::End(x, y) => {
             if let Some((start_x, start_y)) = args.annotations.magnifier_drawing.take() {
                 let magnifier = MagnifierAnnotation {
@@ -224,6 +327,7 @@ fn handle_redact(args: &mut Args, action: DrawAction) {
                 args.annotations.redact_drawing = Some((x, y));
             }
         }
+        DrawAction::Move(..) => {}
         DrawAction::End(x, y) => {
             if let Some((start_x, start_y)) = args.annotations.redact_drawing.take() {
                 let redact = RedactAnnotation {
@@ -259,6 +363,7 @@ fn handle_pixelate(args: &mut Args, action: DrawAction) {
                 args.annotations.pixelate_drawing = Some((x, y));
             }
         }
+        DrawAction::Move(..) => {}
         DrawAction::End(x, y) => {
             if let Some((start_x, start_y)) = args.annotations.pixelate_drawing.take() {
                 let pixelate = PixelateAnnotation {
@@ -282,8 +387,10 @@ fn handle_pixelate(args: &mut Args, action: DrawAction) {
 #[derive(Clone, Copy, PartialEq)]
 enum Mode {
     Arrow,
+    Line,
     Circle,
     Rectangle,
+    Pencil,
     Magnifier,
     Redact,
     Pixelate,
@@ -301,6 +408,14 @@ fn disable_other_modes(args: &mut Args, keep: Mode) {
     if keep != Mode::Rectangle {
         args.annotations.rect_outline_mode = false;
         args.annotations.rect_outline_drawing = None;
+    }
+    if keep != Mode::Line {
+        args.annotations.line_mode = false;
+        args.annotations.line_drawing = None;
+    }
+    if keep != Mode::Pencil {
+        args.annotations.pencil_mode = false;
+        args.annotations.pencil_drawing = None;
     }
     if keep != Mode::Magnifier {
         args.annotations.magnifier_mode = false;

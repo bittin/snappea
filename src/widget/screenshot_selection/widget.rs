@@ -222,13 +222,8 @@ where
                 move |offset| on_event_clone2(ScreenshotEvent::set_move_offset(offset)),
                 &screenshot_image.rgba,
                 image_scale,
-                annotations.arrow_mode,
-                annotations.redact_mode,
-                annotations.pixelate_mode,
-                annotations.circle_mode,
-                annotations.rect_outline_mode,
-                annotations.magnifier_mode,
-                ui.shape_popup_open
+                annotations.any_mode_active()
+                    || ui.shape_popup_open
                     || ui.redact_popup_open
                     || ui.magnifier_popup_open
                     || ui.settings_drawer_open,
@@ -270,8 +265,10 @@ where
 
         let shape_mode_active = match ui.primary_shape_tool {
             ShapeTool::Arrow => annotations.arrow_mode,
+            ShapeTool::Line => annotations.line_mode,
             ShapeTool::Circle => annotations.circle_mode,
             ShapeTool::Rectangle => annotations.rect_outline_mode,
+            ShapeTool::Pencil => annotations.pencil_mode,
         };
 
         let redact_mode_active = match ui.primary_redact_tool {
@@ -360,16 +357,27 @@ where
         let on_event_c2 = on_event.clone();
         let on_event_r1 = on_event.clone();
         let on_event_r2 = on_event.clone();
+        let on_event_l1 = on_event.clone();
+        let on_event_l2 = on_event.clone();
+        let on_event_p1 = on_event.clone();
+        let on_event_p2 = on_event.clone();
+        let on_event_p3 = on_event.clone();
         let shapes_element = {
             let program = ShapesOverlay {
                 selection_rect,
                 output_rect,
                 circles: annotations.circles.clone(),
                 rect_outlines: annotations.rect_outlines.clone(),
+                lines: annotations.lines.clone(),
+                pencils: annotations.pencils.clone(),
                 circle_mode: annotations.circle_mode,
                 rect_outline_mode: annotations.rect_outline_mode,
+                line_mode: annotations.line_mode,
+                pencil_mode: annotations.pencil_mode,
                 circle_drawing: annotations.circle_drawing,
                 rect_outline_drawing: annotations.rect_outline_drawing,
+                line_drawing: annotations.line_drawing,
+                pencil_drawing: annotations.pencil_drawing.clone(),
                 on_circle_start: Some(Box::new(move |x, y| {
                     on_event_c1(ScreenshotEvent::circle_start(x, y))
                 })),
@@ -381,6 +389,21 @@ where
                 })),
                 on_rect_end: Some(Box::new(move |x, y| {
                     on_event_r2(ScreenshotEvent::rectangle_end(x, y))
+                })),
+                on_line_start: Some(Box::new(move |x, y| {
+                    on_event_l1(ScreenshotEvent::line_start(x, y))
+                })),
+                on_line_end: Some(Box::new(move |x, y| {
+                    on_event_l2(ScreenshotEvent::line_end(x, y))
+                })),
+                on_pencil_start: Some(Box::new(move |x, y| {
+                    on_event_p1(ScreenshotEvent::pencil_start(x, y))
+                })),
+                on_pencil_move: Some(Box::new(move |x, y| {
+                    on_event_p2(ScreenshotEvent::pencil_move(x, y))
+                })),
+                on_pencil_end: Some(Box::new(move |x, y| {
+                    on_event_p3(ScreenshotEvent::pencil_end(x, y))
                 })),
                 shape_color: ui.shape_color,
                 shape_shadow: ui.shape_shadow,
@@ -463,9 +486,10 @@ where
                 ui.shape_color,
                 ui.shape_shadow,
                 has_any_annotations,
-                on_event(ScreenshotEvent::shape_tool_set(ShapeTool::Arrow)),
-                on_event(ScreenshotEvent::shape_tool_set(ShapeTool::Circle)),
-                on_event(ScreenshotEvent::shape_tool_set(ShapeTool::Rectangle)),
+                &{
+                    let on_event = on_event.clone();
+                    move |t| on_event(ScreenshotEvent::shape_tool_set(t))
+                },
                 &move |c| on_event_color(ScreenshotEvent::shape_color_set(c)),
                 on_event(ScreenshotEvent::shape_shadow_toggle()),
                 on_event(ScreenshotEvent::clear_shapes()),
@@ -587,14 +611,6 @@ where
         self.annotations.arrow_mode
     }
 
-    fn is_circle_mode(&self) -> bool {
-        self.annotations.circle_mode
-    }
-
-    fn is_rectangle_mode(&self) -> bool {
-        self.annotations.rect_outline_mode
-    }
-
     fn is_redact_mode(&self) -> bool {
         self.annotations.redact_mode
     }
@@ -608,12 +624,7 @@ where
     }
 
     fn is_any_drawing_mode(&self) -> bool {
-        self.is_arrow_mode()
-            || self.is_circle_mode()
-            || self.is_rectangle_mode()
-            || self.is_redact_mode()
-            || self.is_pixelate_mode()
-            || self.is_magnifier_mode()
+        self.annotations.any_mode_active()
     }
 }
 

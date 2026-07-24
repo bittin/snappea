@@ -27,8 +27,10 @@ impl Point {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum AnnotationType {
     Arrow,
+    Line,
     Circle,
     Rectangle,
+    Pencil,
     Magnifier,
     Redact,
     Pixelate,
@@ -39,6 +41,9 @@ pub enum AnnotationType {
 pub enum AnnotationEvent {
     /// Drawing started at position
     Started(AnnotationType, Point),
+    /// Freehand drag reached a new point. Only the pencil tool samples
+    /// intermediate positions, so this carries no `AnnotationType`.
+    PencilMoved(Point),
     /// Drawing ended at position
     Ended(AnnotationType, Point),
     /// Mode toggled for an annotation type
@@ -283,6 +288,38 @@ impl ScreenshotEvent {
     pub fn rectangle_end(x: f32, y: f32) -> Self {
         Self::Annotation(AnnotationEvent::Ended(
             AnnotationType::Rectangle,
+            Point::new(x, y),
+        ))
+    }
+
+    pub fn line_start(x: f32, y: f32) -> Self {
+        Self::Annotation(AnnotationEvent::Started(
+            AnnotationType::Line,
+            Point::new(x, y),
+        ))
+    }
+
+    pub fn line_end(x: f32, y: f32) -> Self {
+        Self::Annotation(AnnotationEvent::Ended(
+            AnnotationType::Line,
+            Point::new(x, y),
+        ))
+    }
+
+    pub fn pencil_start(x: f32, y: f32) -> Self {
+        Self::Annotation(AnnotationEvent::Started(
+            AnnotationType::Pencil,
+            Point::new(x, y),
+        ))
+    }
+
+    pub fn pencil_move(x: f32, y: f32) -> Self {
+        Self::Annotation(AnnotationEvent::PencilMoved(Point::new(x, y)))
+    }
+
+    pub fn pencil_end(x: f32, y: f32) -> Self {
+        Self::Annotation(AnnotationEvent::Ended(
+            AnnotationType::Pencil,
             Point::new(x, y),
         ))
     }
@@ -688,6 +725,19 @@ impl ScreenshotEvent {
             Self::Annotation(AnnotationEvent::Ended(AnnotationType::Rectangle, p)) => {
                 Msg::rectangle_end(p.x, p.y)
             }
+            Self::Annotation(AnnotationEvent::Started(AnnotationType::Line, p)) => {
+                Msg::line_start(p.x, p.y)
+            }
+            Self::Annotation(AnnotationEvent::Ended(AnnotationType::Line, p)) => {
+                Msg::line_end(p.x, p.y)
+            }
+            Self::Annotation(AnnotationEvent::Started(AnnotationType::Pencil, p)) => {
+                Msg::pencil_start(p.x, p.y)
+            }
+            Self::Annotation(AnnotationEvent::PencilMoved(p)) => Msg::pencil_move(p.x, p.y),
+            Self::Annotation(AnnotationEvent::Ended(AnnotationType::Pencil, p)) => {
+                Msg::pencil_end(p.x, p.y)
+            }
             Self::Annotation(AnnotationEvent::Started(AnnotationType::Magnifier, p)) => {
                 Msg::magnifier_start(p.x, p.y)
             }
@@ -714,6 +764,12 @@ impl ScreenshotEvent {
             }
             Self::Annotation(AnnotationEvent::ModeToggle(AnnotationType::Rectangle)) => {
                 Msg::rectangle_mode_toggle()
+            }
+            Self::Annotation(AnnotationEvent::ModeToggle(AnnotationType::Line)) => {
+                Msg::line_mode_toggle()
+            }
+            Self::Annotation(AnnotationEvent::ModeToggle(AnnotationType::Pencil)) => {
+                Msg::pencil_mode_toggle()
             }
             Self::Annotation(AnnotationEvent::ModeToggle(AnnotationType::Magnifier)) => {
                 Msg::magnifier_mode_toggle()
