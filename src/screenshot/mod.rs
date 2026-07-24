@@ -1153,7 +1153,7 @@ fn handle_capture_msg(app: &mut App, msg: CaptureMsg) -> cosmic::Task<crate::cor
             let config = crate::config::SnapPeaConfig::load();
             // WebM is no longer a recording format (realtime software VP9 is slow and
             // blocky — it's an editor export instead). Coerce any stale saved value.
-            let container = match config.video_container {
+            let mut container = match config.video_container {
                 crate::config::Container::Webm => crate::config::Container::Mp4,
                 other => other,
             };
@@ -1187,9 +1187,6 @@ fn handle_capture_msg(app: &mut App, msg: CaptureMsg) -> cosmic::Task<crate::cor
                 }
             }
 
-            let output_file =
-                output_dir.join(format!("recording-{}.{}", timestamp, container.extension()));
-
             // Determine encoder (from config or best_encoder)
             let encoder = config
                 .video_encoder
@@ -1199,6 +1196,32 @@ fn handle_capture_msg(app: &mut App, msg: CaptureMsg) -> cosmic::Task<crate::cor
                         .map(|e| e.gst_element)
                 })
                 .unwrap_or_else(|| "x264enc".to_string());
+
+            // Coerce the container to one the chosen codec can actually mux into.
+            // e.g. VP9/AV1 can't be muxed into MP4 here, so fall back to the
+            // codec's default container rather than silently producing no file.
+            if let Some(codec) = crate::screencast::encoder::detect_encoders()
+                .ok()
+                .and_then(|list| {
+                    list.iter()
+                        .find(|e| e.gst_element == encoder)
+                        .map(|e| e.codec)
+                })
+            {
+                if !codec.supports_container(container) {
+                    let fallback = codec.default_container();
+                    log::warn!(
+                        "Codec {} cannot be muxed into {:?}; using {:?} instead",
+                        codec.name(),
+                        container,
+                        fallback
+                    );
+                    container = fallback;
+                }
+            }
+
+            let output_file =
+                output_dir.join(format!("recording-{}.{}", timestamp, container.extension()));
 
             let framerate = config.video_framerate;
             let show_cursor = args.ui.video_show_cursor;
