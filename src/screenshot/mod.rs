@@ -433,7 +433,9 @@ impl Screenshot {
             }))
             .await
         {
-            log::error!("Failed to send screenshot event, {}", err);
+            // Distinct from the *response* path below: this means the UI event
+            // loop isn't listening, so the request can't be shown at all.
+            log::error!("Could not hand the screenshot request to the UI: {}", err);
             return PortalResponse::Other;
         }
         if let Some(res) = rx.recv().await {
@@ -536,6 +538,32 @@ pub fn update_msg(app: &mut App, msg: Msg) -> cosmic::Task<crate::core::app::Msg
         // === Capture messages - capture workflow ===
         Msg::Capture(capture_msg) => handle_capture_msg(app, capture_msg),
     }
+}
+
+/// Deliver the portal response, if anyone is actually waiting for it.
+///
+/// User-initiated captures (PrintScreen, or the CLI's control interface) drop
+/// the receiver as soon as the session is created, so a failed send there is
+/// normal and says nothing about whether the capture worked. Logging it as an
+/// ERROR made every ordinary recording print
+/// `ERROR snappea::screenshot Failed to send screenshot event`, which sent
+/// people debugging issue #17 chasing a failure that never happened.
+fn send_portal_response(
+    tx: Sender<PortalResponse<ScreenshotResult>>,
+    expects_response: bool,
+    response: PortalResponse<ScreenshotResult>,
+) {
+    tokio::spawn(async move {
+        if tx.send(response).await.is_err() {
+            if expects_response {
+                log::error!("Portal caller is no longer waiting for the screenshot response");
+            } else {
+                log::debug!(
+                    "No portal caller awaiting the response (user-initiated capture); ignoring"
+                );
+            }
+        }
+    });
 }
 
 /// Handle Draw messages (annotation drawing)
@@ -1548,12 +1576,11 @@ fn handle_capture_msg(app: &mut App, msg: CaptureMsg) -> cosmic::Task<crate::cor
             // Screenshot windows were already destroyed when recording started
             // Just clean up state so next PrintScreen works
             if let Some(args) = app.screenshot_args.take() {
-                let tx = args.portal.tx;
-                tokio::spawn(async move {
-                    if let Err(_err) = tx.send(PortalResponse::Cancelled).await {
-                        log::error!("Failed to send screenshot event");
-                    }
-                });
+                send_portal_response(
+                    args.portal.tx,
+                    args.portal.expects_response,
+                    PortalResponse::Cancelled,
+                );
             }
 
             // Note: Don't clear app.outputs - those are Wayland outputs that remain valid
@@ -1946,11 +1973,7 @@ fn handle_capture_inner(app: &mut App) -> cosmic::Task<crate::core::app::Msg> {
         PortalResponse::Other
     };
 
-    tokio::spawn(async move {
-        if let Err(_err) = tx.send(response).await {
-            log::error!("Failed to send screenshot event");
-        }
-    });
+    send_portal_response(tx, expects_response, response);
     // Clipboard writes must be sequenced BEFORE surface destroys.
     // Wayland's wl_data_device.set_selection requires the client to hold keyboard
     // focus at call time. The overlay surfaces have KeyboardInteractivity::Exclusive,
@@ -1976,12 +1999,7 @@ fn handle_cancel_inner(app: &mut App) -> cosmic::Task<crate::core::app::Msg> {
         return cosmic::Task::batch(cmds);
     };
     let Args { portal, .. } = args;
-    let tx = portal.tx;
-    tokio::spawn(async move {
-        if let Err(_err) = tx.send(PortalResponse::Cancelled).await {
-            log::error!("Failed to send screenshot event");
-        }
-    });
+    send_portal_response(portal.tx, portal.expects_response, PortalResponse::Cancelled);
 
     cosmic::Task::batch(cmds)
 }
@@ -2386,17 +2404,14 @@ fn handle_ocr_copy_and_close_inner(app: &mut App) -> cosmic::Task<crate::core::a
 
     if let Some(args) = app.screenshot_args.take() {
         let tx = args.portal.tx;
+        let expects_response = args.portal.expects_response;
         let ocr_text = args.detection.ocr_text;
 
         if let Some(text) = ocr_text {
             cmds.push(clipboard::write(text));
         }
 
-        tokio::spawn(async move {
-            if let Err(_err) = tx.send(PortalResponse::Cancelled).await {
-                log::error!("Failed to send screenshot event");
-            }
-        });
+        send_portal_response(tx, expects_response, PortalResponse::Cancelled);
     }
     cosmic::Task::batch(cmds)
 }
@@ -2411,6 +2426,7 @@ fn handle_qr_copy_and_close_inner(app: &mut App) -> cosmic::Task<crate::core::ap
 
     if let Some(args) = app.screenshot_args.take() {
         let tx = args.portal.tx;
+        let expects_response = args.portal.expects_response;
         let qr_codes = args.detection.qr_codes;
 
         // Copy first QR code content
@@ -2418,11 +2434,7 @@ fn handle_qr_copy_and_close_inner(app: &mut App) -> cosmic::Task<crate::core::ap
             cmds.push(clipboard::write(qr.content.clone()));
         }
 
-        tokio::spawn(async move {
-            if let Err(_err) = tx.send(PortalResponse::Cancelled).await {
-                log::error!("Failed to send screenshot event");
-            }
-        });
+        send_portal_response(tx, expects_response, PortalResponse::Cancelled);
     }
     cosmic::Task::batch(cmds)
 }
@@ -2460,12 +2472,11 @@ fn handle_open_url_inner(app: &mut App, url: String) -> cosmic::Task<crate::core
         log::error!("Failed to find screenshot Args for OpenUrl message.");
         return cosmic::Task::batch(cmds);
     };
-    let tx = args.portal.tx;
-    tokio::spawn(async move {
-        if let Err(_err) = tx.send(PortalResponse::Cancelled).await {
-            log::error!("Failed to send screenshot event");
-        }
-    });
+    send_portal_response(
+        args.portal.tx,
+        args.portal.expects_response,
+        PortalResponse::Cancelled,
+    );
 
     cosmic::Task::batch(cmds)
 }
