@@ -154,9 +154,7 @@ where
 
     // Screenshot delay dropdown (for the delayed-capture toolbar button)
     static DELAY_NAMES: &[&str] = &["1s", "2s", "3s", "5s", "10s", "15s"];
-    let selected_delay_idx = DELAY_OPTIONS
-        .iter()
-        .position(|s| *s == capture_delay_secs);
+    let selected_delay_idx = DELAY_OPTIONS.iter().position(|s| *s == capture_delay_secs);
     let capture_delay_dropdown = dropdown(DELAY_NAMES, selected_delay_idx, move |idx| {
         let secs = DELAY_OPTIONS.get(idx).copied().unwrap_or(3);
         on_capture_delay_select(secs)
@@ -259,7 +257,7 @@ where
     let container_options: Vec<Container> = CONTAINER_OPTIONS
         .iter()
         .copied()
-        .filter(|c| selected_codec.map_or(true, |codec| codec.supports_container(*c)))
+        .filter(|c| selected_codec.is_none_or(|codec| codec.supports_container(*c)))
         .collect();
     let container_names: &'static [String] = Box::leak(
         container_options

@@ -5,7 +5,7 @@
 use crate::domain::{
     Annotation, ArrowAnnotation, CircleOutlineAnnotation, LineAnnotation, MAGNIFIER_MAX_ZOOM,
     MAGNIFIER_MIN_ZOOM, MagnifierAnnotation, PencilAnnotation, PixelateAnnotation,
-    RectOutlineAnnotation, RedactAnnotation, TextAnnotation, TextEditing,
+    RectOutlineAnnotation, RedactAnnotation, TextEditing,
 };
 use crate::screenshot::Args;
 use crate::session::messages::{DrawAction, DrawMsg, TextAction};
@@ -240,9 +240,9 @@ fn handle_pencil(args: &mut Args, action: DrawAction) {
         }
         DrawAction::Move(x, y) => {
             if let Some(points) = args.annotations.pencil_drawing.as_mut() {
-                let far_enough = points.last().is_none_or(|(lx, ly)| {
-                    (x - lx).hypot(y - ly) >= PENCIL_MIN_STEP
-                });
+                let far_enough = points
+                    .last()
+                    .is_none_or(|(lx, ly)| (x - lx).hypot(y - ly) >= PENCIL_MIN_STEP);
                 if far_enough {
                     points.push((x, y));
                 }
@@ -407,8 +407,7 @@ fn handle_magnifier(args: &mut Args, action: DrawAction) {
                 args.annotations.magnifiers.push(magnifier.clone());
                 args.annotations.add(Annotation::Magnifier(magnifier));
                 // Select the newly created magnifier so it can be tweaked
-                args.annotations.selected_magnifier =
-                    Some(args.annotations.magnifiers.len() - 1);
+                args.annotations.selected_magnifier = Some(args.annotations.magnifiers.len() - 1);
             }
         }
     }

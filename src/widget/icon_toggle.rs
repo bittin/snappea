@@ -431,8 +431,7 @@ impl<'a, Msg: Clone + 'a> cosmic::widget::Widget<Msg, cosmic::Theme, cosmic::Ren
 
         if let cosmic::iced::core::Event::Mouse(mouse::Event::ButtonPressed(mouse::Button::Left)) =
             event
-        {
-            if let Some(pos) = cursor.position() {
+            && let Some(pos) = cursor.position() {
                 let bounds = layout.bounds();
                 let icon_a_bounds = self.icon_a_bounds(bounds);
                 let icon_b_bounds = self.icon_b_bounds(bounds);
@@ -440,14 +439,11 @@ impl<'a, Msg: Clone + 'a> cosmic::widget::Widget<Msg, cosmic::Theme, cosmic::Ren
                 if icon_a_bounds.contains(pos) && self.is_b_selected {
                     shell.publish(on_toggle(false));
                     shell.capture_event();
-                    return;
                 } else if icon_b_bounds.contains(pos) && !self.is_b_selected {
                     shell.publish(on_toggle(true));
                     shell.capture_event();
-                    return;
                 }
             }
-        }
     }
 
     fn mouse_interaction(

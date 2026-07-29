@@ -260,8 +260,7 @@ pub fn draw_rect_outlines_on_image(
     with_pixmap(img, |pixmap| {
         for rect in rects {
             let thickness = (rect.thickness * scale).max(1.0);
-            let border_thickness =
-                ((rect.thickness + SHAPE_OUTLINE_EXTRA) * scale).max(2.0);
+            let border_thickness = ((rect.thickness + SHAPE_OUTLINE_EXTRA) * scale).max(2.0);
             let [r, g, b, a] = rect.color.to_rgba_u8();
 
             let x1 = (rect.start_x - selection_rect.left as f32) * scale;
@@ -327,8 +326,7 @@ pub fn draw_lines_on_image(
     with_pixmap(img, |pixmap| {
         for line in lines {
             let thickness = (line.thickness * scale).max(1.0);
-            let border_thickness =
-                ((line.thickness + SHAPE_OUTLINE_EXTRA) * scale).max(2.0);
+            let border_thickness = ((line.thickness + SHAPE_OUTLINE_EXTRA) * scale).max(2.0);
             let [r, g, b, a] = line.color.to_rgba_u8();
 
             let x1 = (line.start_x - selection_rect.left as f32) * scale;
@@ -387,8 +385,7 @@ pub fn draw_pencils_on_image(
                 continue;
             }
             let thickness = (pencil.thickness * scale).max(1.0);
-            let border_thickness =
-                ((pencil.thickness + SHAPE_OUTLINE_EXTRA) * scale).max(2.0);
+            let border_thickness = ((pencil.thickness + SHAPE_OUTLINE_EXTRA) * scale).max(2.0);
             let [r, g, b, a] = pencil.color.to_rgba_u8();
 
             let mut pb = PathBuilder::new();
@@ -489,7 +486,7 @@ pub fn draw_texts_on_image(
         let mut swash_cache = cosmic_text::SwashCache::new();
 
         // Blend one glyph coverage bitmap into the image.
-        let mut blit = |gx: f32,
+        let blit = |gx: f32,
                         gy: f32,
                         cache_key,
                         color: cosmic_text::Color,
@@ -697,8 +694,9 @@ pub fn draw_magnifiers_on_image(
         if sub_x1 <= sub_x0 || sub_y1 <= sub_y0 {
             continue;
         }
-        let src = image::imageops::crop_imm(&*img, sub_x0, sub_y0, sub_x1 - sub_x0, sub_y1 - sub_y0)
-            .to_image();
+        let src =
+            image::imageops::crop_imm(&*img, sub_x0, sub_y0, sub_x1 - sub_x0, sub_y1 - sub_y0)
+                .to_image();
 
         let px_start = (cx - radius).floor().max(0.0) as u32;
         let py_start = (cy - radius).floor().max(0.0) as u32;

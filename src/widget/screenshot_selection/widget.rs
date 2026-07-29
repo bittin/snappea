@@ -38,18 +38,16 @@ use crate::widget::{
     output_selection::OutputSelection,
     overlays::{
         ShapesOverlay,
-        magnifier_overlays::{
-            draw_magnifier_handles, draw_magnifier_preview, draw_magnifiers,
-        },
+        magnifier_overlays::{draw_magnifier_handles, draw_magnifier_preview, draw_magnifiers},
         redact_overlays::{
             PixelationSource, draw_pixelation_preview, draw_redaction_preview,
             draw_redactions_and_pixelations,
         },
-        text_overlays::{draw_text_editing, draw_text_selection, draw_texts},
         status_overlays::{
             draw_ocr_overlays, draw_ocr_status_indicator, draw_qr_code_overlays,
             draw_qr_scanning_indicator, draw_status_badge,
         },
+        text_overlays::{draw_text_editing, draw_text_selection, draw_texts},
     },
     rectangle_selection::RectangleSelection,
     settings_drawer::build_settings_drawer,
@@ -99,7 +97,11 @@ impl InteractionState {
 
 enum MagnifierDrag {
     /// Moving the loupe; grab offset is (cursor - center) in global logical coords
-    Move { index: usize, grab_dx: f32, grab_dy: f32 },
+    Move {
+        index: usize,
+        grab_dx: f32,
+        grab_dy: f32,
+    },
     /// Resizing the loupe (radius follows the cursor)
     Resize { index: usize },
 }
@@ -1367,8 +1369,8 @@ where
         }
 
         // Draw selection frame (hide while recording)
-        if !self.ui.is_recording {
-            if let Some((sel_x, sel_y, sel_w, sel_h)) = self.selection_rect {
+        if !self.ui.is_recording
+            && let Some((sel_x, sel_y, sel_w, sel_h)) = self.selection_rect {
                 let output_width = (self.output_rect.right - self.output_rect.left) as f32;
                 let output_height = (self.output_rect.bottom - self.output_rect.top) as f32;
                 draw_selection_frame_with_handles(
@@ -1379,7 +1381,6 @@ where
                     corner_radius,
                 );
             }
-        }
 
         // Draw menu
         let _ = children_iter;
@@ -1542,19 +1543,17 @@ where
         use cosmic::iced::core::Event;
         use cosmic::iced::core::mouse::{Button, Event as MouseEvent};
 
-        if self.output_ctx.is_active_output {
-            if matches!(event, Event::Mouse(_)) {
-                if let Some(menu_layout) = layout.children().nth(3) {
+        if self.output_ctx.is_active_output
+            && matches!(event, Event::Mouse(_))
+                && let Some(menu_layout) = layout.children().nth(3) {
                     shell.publish(self.emit(ScreenshotEvent::toolbar_bounds(menu_layout.bounds())));
                 }
-            }
-        }
 
         // During recording with annotation mode OFF, pass through mouse events
         // that are outside the toolbar (allows interacting with desktop)
-        if self.ui.is_recording && !self.ui.recording_annotation_mode {
-            if let Event::Mouse(_) = &event {
-                if let Some(pos) = cursor.position() {
+        if self.ui.is_recording && !self.ui.recording_annotation_mode
+            && let Event::Mouse(_) = &event
+                && let Some(pos) = cursor.position() {
                     let layout_children: Vec<_> = layout.children().collect();
                     let toolbar_bounds = layout_children.get(3).map(|l| l.bounds());
 
@@ -1586,8 +1585,6 @@ where
                         return;
                     }
                 }
-            }
-        }
 
         // Handle click-outside-to-close for popups (both left and right click)
         if let Event::Mouse(MouseEvent::ButtonPressed(button)) = &event
@@ -1733,12 +1730,11 @@ where
         }
 
         // Block mouse events on non-active outputs
-        if !self.output_ctx.is_active_output && self.output_ctx.has_confirmed_selection {
-            if matches!(&event, Event::Mouse(_)) {
+        if !self.output_ctx.is_active_output && self.output_ctx.has_confirmed_selection
+            && matches!(&event, Event::Mouse(_)) {
                 shell.capture_event();
                 return;
             }
-        }
 
         // Handle clicks on QR code URL open buttons
         if let Event::Mouse(mouse_event) = &event
@@ -1827,7 +1823,7 @@ where
 
         for (i, (child_layout, child)) in layout_children
             .into_iter()
-            .zip(children.into_iter())
+            .zip(children)
             .enumerate()
             .rev()
         {
@@ -1945,12 +1941,11 @@ where
                 }
 
                 // Check settings drawer
-                if self.ui.settings_drawer_open {
-                    if layout_children.len() > 4 && layout_children[4].bounds().contains(pos) {
+                if self.ui.settings_drawer_open
+                    && layout_children.len() > 4 && layout_children[4].bounds().contains(pos) {
                         shell.capture_event();
                         return;
                     }
-                }
             }
         }
 
@@ -2136,15 +2131,10 @@ where
                         if let Some((i, tx, ty)) = hit {
                             if is_double {
                                 // Double-click re-opens the label for typing.
-                                shell.publish(
-                                    self.emit(ScreenshotEvent::text_edit_existing(i)),
-                                );
+                                shell.publish(self.emit(ScreenshotEvent::text_edit_existing(i)));
                             } else {
-                                state.text_drag =
-                                    Some((i, cursor_gx - tx, cursor_gy - ty));
-                                shell.publish(
-                                    self.emit(ScreenshotEvent::text_select(Some(i))),
-                                );
+                                state.text_drag = Some((i, cursor_gx - tx, cursor_gy - ty));
+                                shell.publish(self.emit(ScreenshotEvent::text_select(Some(i))));
                             }
                             shell.capture_event();
                             return;
@@ -2156,10 +2146,9 @@ where
                             if let Some((sel_x, sel_y, sel_w, sel_h)) = self.selection_rect {
                                 let (cx, cy) =
                                     clamp_to_selection(pos.x, pos.y, sel_x, sel_y, sel_w, sel_h);
-                                shell.publish(self.emit(ScreenshotEvent::text_begin(
-                                    cx + off_x,
-                                    cy + off_y,
-                                )));
+                                shell.publish(
+                                    self.emit(ScreenshotEvent::text_begin(cx + off_x, cy + off_y)),
+                                );
                             }
                             shell.capture_event();
                             return;
@@ -2176,12 +2165,11 @@ where
                             return;
                         }
                     }
-                    MouseEvent::ButtonReleased(Button::Left) => {
-                        if state.text_drag.take().is_some() {
+                    MouseEvent::ButtonReleased(Button::Left)
+                        if state.text_drag.take().is_some() => {
                             shell.capture_event();
                             return;
                         }
-                    }
                     _ => {}
                 }
             }
@@ -2253,7 +2241,6 @@ where
                                 )));
                             }
                             shell.capture_event();
-                            return;
                         }
                     }
                     MouseEvent::CursorMoved { .. } => match &drag_state.drag {
@@ -2262,10 +2249,11 @@ where
                             grab_dx,
                             grab_dy,
                         }) => {
-                            let (index, nx, ny) = (*index, cursor_gx - grab_dx, cursor_gy - grab_dy);
-                            shell.publish(self.emit(ScreenshotEvent::magnifier_move(index, nx, ny)));
+                            let (index, nx, ny) =
+                                (*index, cursor_gx - grab_dx, cursor_gy - grab_dy);
+                            shell
+                                .publish(self.emit(ScreenshotEvent::magnifier_move(index, nx, ny)));
                             shell.capture_event();
-                            return;
                         }
                         Some(MagnifierDrag::Resize { index }) => {
                             let index = *index;
@@ -2276,7 +2264,6 @@ where
                                     self.emit(ScreenshotEvent::magnifier_resize(index, r)),
                                 );
                                 shell.capture_event();
-                                return;
                             }
                         }
                         None => {}
@@ -2296,7 +2283,6 @@ where
                                 )));
                             }
                             shell.capture_event();
-                            return;
                         }
                     }
                     MouseEvent::WheelScrolled { delta } => {
@@ -2307,18 +2293,19 @@ where
                             if dist_to(cx, cy) <= m.radius() {
                                 let step = match delta {
                                     cosmic::iced::core::mouse::ScrollDelta::Lines { y, .. } => *y,
-                                    cosmic::iced::core::mouse::ScrollDelta::Pixels { y, .. } => {
-                                        *y / 40.0
-                                    }
+                                    cosmic::iced::core::mouse::ScrollDelta::Pixels {
+                                        y, ..
+                                    } => *y / 40.0,
                                 };
                                 if step != 0.0 {
                                     let new_zoom =
                                         m.magnification + step.signum() * MAGNIFIER_SCROLL_STEP;
                                     shell.publish(
-                                        self.emit(ScreenshotEvent::magnifier_set_zoom(sel, new_zoom)),
+                                        self.emit(ScreenshotEvent::magnifier_set_zoom(
+                                            sel, new_zoom,
+                                        )),
                                     );
                                     shell.capture_event();
-                                    return;
                                 }
                             }
                         }
@@ -2339,8 +2326,8 @@ where
     ) -> cosmic::iced::mouse::Interaction {
         // If actively dragging a rectangle selection, show the appropriate cursor
         // This takes priority and handles cases where cursor position is unavailable during DnD
-        if let Choice::Rectangle(_, drag_state) = &self.choice {
-            if *drag_state != DragState::None {
+        if let Choice::Rectangle(_, drag_state) = &self.choice
+            && *drag_state != DragState::None {
                 return match drag_state {
                     DragState::Move => cosmic::iced::mouse::Interaction::Grabbing,
                     DragState::N | DragState::S => {
@@ -2355,7 +2342,6 @@ where
                     DragState::None => unreachable!(),
                 };
             }
-        }
 
         let mut children: Vec<&Element<'_, Msg>> = vec![
             &self.bg_element,
@@ -2439,8 +2425,8 @@ where
         }
 
         // If in drawing mode (annotation active), show appropriate cursor based on position
-        if self.is_any_drawing_mode() {
-            if let Some(cursor_pos) = cursor.position() {
+        if self.is_any_drawing_mode()
+            && let Some(cursor_pos) = cursor.position() {
                 // Check if cursor is inside the selection region
                 if let Some((x, y, w, h)) = self.selection_rect {
                     let selection_bounds = cosmic::iced::core::Rectangle {
@@ -2458,7 +2444,6 @@ where
                 // No selection, show crosshair everywhere
                 return cosmic::iced::mouse::Interaction::Crosshair;
             }
-        }
 
         // Then check fg_element (RectangleSelection) for move/resize cursors
         // This is index 1
@@ -2554,7 +2539,7 @@ where
         }
         for (i, (layout, child)) in layout
             .into_iter()
-            .zip(children.into_iter())
+            .zip(children)
             .enumerate()
             .rev()
         {

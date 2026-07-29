@@ -246,7 +246,12 @@ impl AnnotationState {
     /// item in place requires translating back to the unified index.
     fn unified_index_of_nth(&self, n: usize, pred: fn(&Annotation) -> bool) -> Option<usize> {
         let mut count = 0;
-        for (i, a) in self.annotations.iter().take(self.annotation_index).enumerate() {
+        for (i, a) in self
+            .annotations
+            .iter()
+            .take(self.annotation_index)
+            .enumerate()
+        {
             if pred(a) {
                 if count == n {
                     return Some(i);
@@ -282,7 +287,12 @@ impl AnnotationState {
     fn selected_magnifier_unified_index(&self) -> Option<usize> {
         let target = self.selected_magnifier?;
         let mut count = 0;
-        for (i, a) in self.annotations.iter().take(self.annotation_index).enumerate() {
+        for (i, a) in self
+            .annotations
+            .iter()
+            .take(self.annotation_index)
+            .enumerate()
+        {
             if matches!(a, Annotation::Magnifier(_)) {
                 if count == target {
                     return Some(i);
@@ -905,7 +915,10 @@ mod tests {
     #[test]
     fn has_unsaved_work_covers_committed_and_in_progress() {
         let mut st = AnnotationState::default();
-        assert!(!st.has_unsaved_work(), "a clean session has nothing to lose");
+        assert!(
+            !st.has_unsaved_work(),
+            "a clean session has nothing to lose"
+        );
 
         // A committed annotation counts.
         st.add(Annotation::Text(text_ann("done")));

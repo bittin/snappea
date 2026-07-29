@@ -48,7 +48,7 @@ fn align_crop_axis(offset: u32, length: u32, capture_length: u32) -> (u32, u32) 
     // If the far edge cannot be extended, shift/shrink inside the frame instead
     // of advertising a crop the pipeline cannot produce.
     if capture_length > 1 && end % 2 == 1 {
-        if end + 1 <= capture_length {
+        if end < capture_length {
             end += 1;
         } else if end > start + 1 {
             end -= 1;
@@ -813,19 +813,18 @@ impl Pipeline {
                         err.debug().unwrap_or_default()
                     ));
                 }
-                MessageView::StateChanged(state_change) => {
+                MessageView::StateChanged(state_change)
                     if state_change
                         .src()
                         .map(|s| s.name().as_str() == "pipeline0")
                         .unwrap_or(false)
-                    {
+                    => {
                         log::debug!(
                             "Pipeline state changed: {:?} -> {:?}",
                             state_change.old(),
                             state_change.current()
                         );
                     }
-                }
                 _ => {}
             }
         }

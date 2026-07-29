@@ -893,7 +893,9 @@ impl ScreenshotEvent {
             Self::ToolPopup(ToolPopupEvent::MagnifierPopupToggle) => Msg::toggle_magnifier_popup(),
             Self::ToolPopup(ToolPopupEvent::MagnifierPopupOpen) => Msg::open_magnifier_popup(),
             Self::ToolPopup(ToolPopupEvent::MagnifierPopupClose) => Msg::close_magnifier_popup(),
-            Self::ToolPopup(ToolPopupEvent::MagnificationSet(value)) => Msg::set_magnification(value),
+            Self::ToolPopup(ToolPopupEvent::MagnificationSet(value)) => {
+                Msg::set_magnification(value)
+            }
             Self::ToolPopup(ToolPopupEvent::MagnificationSave) => Msg::save_magnification(),
             Self::ToolPopup(ToolPopupEvent::PencilPopupToggle) => Msg::toggle_pencil_popup(),
             Self::ToolPopup(ToolPopupEvent::PencilPopupClose) => Msg::close_pencil_popup(),

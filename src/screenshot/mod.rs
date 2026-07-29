@@ -1,4 +1,3 @@
-use cosmic::cosmic_config::CosmicConfigEntry;
 use cosmic::iced::animation;
 use cosmic::iced::clipboard::mime::AsMimeTypes;
 use cosmic::iced::core::Length;
@@ -590,8 +589,8 @@ fn handle_draw_msg(app: &mut App, msg: DrawMsg) -> cosmic::Task<crate::core::app
 /// Delegates to the widget::tool_handlers module
 fn handle_tool_msg(app: &mut App, msg: ToolMsg) -> cosmic::Task<crate::core::app::Msg> {
     // Handle PencilPopup actions for indicator overlay
-    if let ToolMsg::PencilPopup(action) = &msg {
-        if let Some(indicator) = &mut app.recording_indicator {
+    if let ToolMsg::PencilPopup(action) = &msg
+        && let Some(indicator) = &mut app.recording_indicator {
             match action {
                 crate::session::messages::ToolPopupAction::Toggle => {
                     indicator.pencil_popup_open = !indicator.pencil_popup_open;
@@ -667,7 +666,6 @@ fn handle_tool_msg(app: &mut App, msg: ToolMsg) -> cosmic::Task<crate::core::app
             // Recreate surface with updated input_zone
             return cosmic::Task::done(crate::core::app::Msg::ToggleAnnotationMode);
         }
-    }
 
     // Handle ClearPencilDrawings specially since it needs access to recording_indicator
     if let ToolMsg::ClearPencilDrawings = &msg {
@@ -799,14 +797,13 @@ fn handle_settings_msg(app: &mut App, msg: SettingsMsg) -> cosmic::Task<crate::c
     // Handle BrowseSaveLocationResult - restore overlay and optionally set path
     if let SettingsMsg::BrowseSaveLocationResult(path) = msg {
         // If a path was selected, update settings
-        if let Some(path) = path {
-            if let Some(args) = app.screenshot_args.as_mut() {
+        if let Some(path) = path
+            && let Some(args) = app.screenshot_args.as_mut() {
                 args.ui.custom_save_path = path.clone();
                 let mut config = SnapPeaConfig::load();
                 config.custom_save_path = path;
                 config.save();
             }
-        }
 
         // Recreate layer surfaces
         return recreate_screenshot_surfaces(app);
@@ -840,14 +837,13 @@ fn handle_settings_msg(app: &mut App, msg: SettingsMsg) -> cosmic::Task<crate::c
 
     // Handle BrowseVideoSaveLocationResult - restore overlay and optionally set path
     if let SettingsMsg::BrowseVideoSaveLocationResult(path) = msg {
-        if let Some(path) = path {
-            if let Some(args) = app.screenshot_args.as_mut() {
+        if let Some(path) = path
+            && let Some(args) = app.screenshot_args.as_mut() {
                 args.ui.video_custom_save_path = path.clone();
                 let mut config = SnapPeaConfig::load();
                 config.video_custom_save_path = path;
                 config.save();
             }
-        }
 
         return recreate_screenshot_surfaces(app);
     }
@@ -983,8 +979,8 @@ fn handle_settings_msg(app: &mut App, msg: SettingsMsg) -> cosmic::Task<crate::c
 
 /// Handle Detect messages (OCR and QR)
 fn handle_detect_msg(app: &mut App, msg: DetectMsg) -> cosmic::Task<crate::core::app::Msg> {
-    if let Some(args) = app.screenshot_args.as_mut() {
-        if matches!(
+    if let Some(args) = app.screenshot_args.as_mut()
+        && matches!(
             msg,
             DetectMsg::Qr(QrMsg::Requested)
                 | DetectMsg::Ocr(OcrMsg::Requested)
@@ -994,7 +990,6 @@ fn handle_detect_msg(app: &mut App, msg: DetectMsg) -> cosmic::Task<crate::core:
             args.disable_all_modes();
             args.close_all_popups();
         }
-    }
     match msg {
         DetectMsg::Qr(qr_msg) => handle_qr_msg(app, qr_msg),
         DetectMsg::Ocr(ocr_msg) => handle_ocr_msg(app, ocr_msg),
@@ -1217,9 +1212,8 @@ fn handle_capture_msg(app: &mut App, msg: CaptureMsg) -> cosmic::Task<crate::cor
             // the bare home directory) when no XDG Videos dir is configured, so
             // recordings don't get dropped into the home root on systems without
             // xdg-user-dirs set up.
-            let videos_default = || {
-                dirs::video_dir().or_else(|| dirs::home_dir().map(|h| h.join("Videos")))
-            };
+            let videos_default =
+                || dirs::video_dir().or_else(|| dirs::home_dir().map(|h| h.join("Videos")));
             let output_dir = match config.video_save_location {
                 crate::config::VideoSaveLocationChoice::Custom
                     if !config.video_custom_save_path.is_empty() =>
@@ -1232,8 +1226,8 @@ fn handle_capture_msg(app: &mut App, msg: CaptureMsg) -> cosmic::Task<crate::cor
             .unwrap_or_else(|| std::path::PathBuf::from("."));
 
             // Ensure output directory exists
-            if !output_dir.exists() {
-                if let Err(e) = std::fs::create_dir_all(&output_dir) {
+            if !output_dir.exists()
+                && let Err(e) = std::fs::create_dir_all(&output_dir) {
                     log::error!(
                         "Failed to create output directory '{}': {}",
                         output_dir.display(),
@@ -1241,11 +1235,13 @@ fn handle_capture_msg(app: &mut App, msg: CaptureMsg) -> cosmic::Task<crate::cor
                     );
                     crate::core::notify::notify_error(
                         "Recording failed",
-                        format!("Could not create output directory '{}': {e}", output_dir.display()),
+                        format!(
+                            "Could not create output directory '{}': {e}",
+                            output_dir.display()
+                        ),
                     );
                     return cosmic::Task::none();
                 }
-            }
 
             // Determine encoder (from config or best_encoder)
             let encoder = config
@@ -1260,15 +1256,15 @@ fn handle_capture_msg(app: &mut App, msg: CaptureMsg) -> cosmic::Task<crate::cor
             // Coerce the container to one the chosen codec can actually mux into.
             // e.g. VP9/AV1 can't be muxed into MP4 here, so fall back to the
             // codec's default container rather than silently producing no file.
-            if let Some(codec) = crate::screencast::encoder::detect_encoders()
-                .ok()
-                .and_then(|list| {
-                    list.iter()
-                        .find(|e| e.gst_element == encoder)
-                        .map(|e| e.codec)
-                })
-            {
-                if !codec.supports_container(container) {
+            if let Some(codec) =
+                crate::screencast::encoder::detect_encoders()
+                    .ok()
+                    .and_then(|list| {
+                        list.iter()
+                            .find(|e| e.gst_element == encoder)
+                            .map(|e| e.codec)
+                    })
+                && !codec.supports_container(container) {
                     let fallback = codec.default_container();
                     log::warn!(
                         "Codec {} cannot be muxed into {:?}; using {:?} instead",
@@ -1278,7 +1274,6 @@ fn handle_capture_msg(app: &mut App, msg: CaptureMsg) -> cosmic::Task<crate::cor
                     );
                     container = fallback;
                 }
-            }
 
             let output_file =
                 output_dir.join(format!("recording-{}.{}", timestamp, container.extension()));
@@ -1362,10 +1357,7 @@ fn handle_capture_msg(app: &mut App, msg: CaptureMsg) -> cosmic::Task<crate::cor
                 // user. Surface it as a desktop notification.
                 if let Err(ref e) = result {
                     log::error!("Recording failed: {:#}", e);
-                    crate::core::notify::notify_error(
-                        "Recording failed",
-                        format!("{:#}", e),
-                    );
+                    crate::core::notify::notify_error("Recording failed", format!("{:#}", e));
                 }
                 result
             });
@@ -1517,7 +1509,7 @@ fn handle_capture_msg(app: &mut App, msg: CaptureMsg) -> cosmic::Task<crate::cor
             let action = if app
                 .recording_indicator
                 .as_ref()
-                .map_or(false, |i| i.pencil_popup_open)
+                .is_some_and(|i| i.pencil_popup_open)
             {
                 crate::session::messages::ToolPopupAction::Close
             } else {
@@ -1591,8 +1583,8 @@ fn handle_capture_msg(app: &mut App, msg: CaptureMsg) -> cosmic::Task<crate::cor
         }
         CaptureMsg::ToggleRecordingAnnotation => {
             // If popup is open, close it (and enable pencil)
-            if let Some(indicator) = app.recording_indicator.as_ref() {
-                if indicator.pencil_popup_open {
+            if let Some(indicator) = app.recording_indicator.as_ref()
+                && indicator.pencil_popup_open {
                     log::info!("Pencil clicked while popup open - closing popup");
                     return cosmic::Task::done(crate::core::app::Msg::Screenshot(
                         crate::session::messages::Msg::Tool(
@@ -1602,7 +1594,6 @@ fn handle_capture_msg(app: &mut App, msg: CaptureMsg) -> cosmic::Task<crate::cor
                         ),
                     ));
                 }
-            }
 
             // Normal toggle behavior
             if let Some(indicator) = app.recording_indicator.as_mut() {
@@ -1958,10 +1949,7 @@ fn handle_capture_inner(app: &mut App) -> cosmic::Task<crate::core::app::Msg> {
                 uri: url.to_string(),
             }),
             Err(()) => {
-                log::error!(
-                    "Could not build a file URI for '{}'",
-                    image_path1.display()
-                );
+                log::error!("Could not build a file URI for '{}'", image_path1.display());
                 PortalResponse::Other
             }
         }
@@ -1999,7 +1987,11 @@ fn handle_cancel_inner(app: &mut App) -> cosmic::Task<crate::core::app::Msg> {
         return cosmic::Task::batch(cmds);
     };
     let Args { portal, .. } = args;
-    send_portal_response(portal.tx, portal.expects_response, PortalResponse::Cancelled);
+    send_portal_response(
+        portal.tx,
+        portal.expects_response,
+        PortalResponse::Cancelled,
+    );
 
     cosmic::Task::batch(cmds)
 }

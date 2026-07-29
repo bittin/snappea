@@ -12,7 +12,7 @@ use cosmic::{
         mesh::{Indexed, Renderer as MeshRenderer},
     },
     iced::core::{
-        Background, Border, Clipboard, Layout, Length, Rectangle, Shell, Size, Widget, event,
+        Background, Border, Clipboard, Layout, Length, Rectangle, Shell, Size, Widget,
         layout, overlay,
         renderer::Renderer as RendererTrait,
         widget::{Tree, tree},
@@ -358,7 +358,6 @@ impl<'a, Msg: Clone + 'static> Widget<Msg, cosmic::Theme, cosmic::Renderer>
                     if let Some(msg) = msg {
                         shell.publish(msg);
                         shell.capture_event();
-                        return;
                     }
                 }
             }
@@ -393,7 +392,6 @@ impl<'a, Msg: Clone + 'static> Widget<Msg, cosmic::Theme, cosmic::Renderer>
                     if let Some(msg) = msg {
                         shell.publish(msg);
                         shell.capture_event();
-                        return;
                     }
                 }
             }

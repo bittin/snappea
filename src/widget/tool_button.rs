@@ -460,9 +460,7 @@ pub fn build_shape_popup<'a, Msg: Clone + 'static>(
                         icon::from_name("object-select-symbolic").size(16),
                     ))
                 } else {
-                    Element::from(
-                        cosmic::iced::widget::space().width(Length::Fixed(16.0)),
-                    )
+                    Element::from(cosmic::iced::widget::space().width(Length::Fixed(16.0)))
                 },
             ]
             .spacing(space_xs)
@@ -507,7 +505,7 @@ pub fn build_shape_popup<'a, Msg: Clone + 'static>(
                 current_thickness,
                 on_thickness_change,
             )
-            .step(1.0)
+            .step(1.0_f32)
             .on_release(on_thickness_save)
             .width(Length::Fill),
             cosmic::widget::divider::horizontal::light(),
@@ -852,10 +850,11 @@ pub fn build_magnifier_popup<'a, Msg: Clone + 'static>(
     space_xs: u16,
 ) -> Element<'a, Msg> {
     // Magnification slider (1.5x - 10x) - updates during drag, saves on release
-    let magnification_label = text::body(fl!("magnification", value = format!("{magnification:.1}")));
+    let magnification_label =
+        text::body(fl!("magnification", value = format!("{magnification:.1}")));
     let magnification_slider =
-        cosmic::widget::slider(1.5..=10.0, magnification, move |v| on_set_magnification(v))
-            .step(0.5)
+        cosmic::widget::slider(1.5..=10.0, magnification, on_set_magnification)
+            .step(0.5_f32)
             .on_release(on_save_magnification)
             .width(Length::Fill);
 
@@ -1006,8 +1005,8 @@ pub fn build_pencil_popup<'a, Msg: Clone + 'static>(
     // Thickness slider (1-10 pixels) - updates during drag, saves on release
     let thickness_label = text::body(fl!("thickness", size = (thickness as u32)));
     let thickness_slider =
-        cosmic::widget::slider(1.0..=10.0, thickness, move |v| on_thickness_change(v))
-            .step(1.0)
+        cosmic::widget::slider(1.0..=10.0, thickness, on_thickness_change)
+            .step(1.0_f32)
             .on_release(on_thickness_save)
             .width(Length::Fill);
 
@@ -1018,8 +1017,8 @@ pub fn build_pencil_popup<'a, Msg: Clone + 'static>(
     // Fade duration slider (1-10 seconds) - updates during drag, saves on release
     let duration_label = text::body(fl!("fade-duration", duration = (fade_duration as u32)));
     let duration_slider =
-        cosmic::widget::slider(1.0..=10.0, fade_duration, move |v| on_duration_change(v))
-            .step(1.0)
+        cosmic::widget::slider(1.0..=10.0, fade_duration, on_duration_change)
+            .step(1.0_f32)
             .on_release(on_duration_save)
             .width(Length::Fill);
 

@@ -49,6 +49,7 @@ pub struct DmabufFormat {
 }
 
 /// State for linux-dmabuf protocol
+#[derive(Default)]
 struct DmabufState {
     /// The linux-dmabuf global (if available)
     dmabuf: Option<ZwpLinuxDmabufV1>,
@@ -58,15 +59,6 @@ struct DmabufState {
     formats_ready: bool,
 }
 
-impl Default for DmabufState {
-    fn default() -> Self {
-        Self {
-            dmabuf: None,
-            formats: Vec::new(),
-            formats_ready: false,
-        }
-    }
-}
 
 struct WaylandHelperInner {
     conn: wayland_client::Connection,

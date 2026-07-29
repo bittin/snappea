@@ -155,42 +155,145 @@ pub fn detect_encoders() -> Result<Vec<EncoderInfo>> {
     let candidate_groups: &[&[Candidate]] = &[
         // VA-API H.264 (Intel/AMD) - priority 10
         &[
-            Candidate { name: "VA-API H.264", gst_element: "vaapih264enc", codec: Codec::H264, hardware: true, supports_dmabuf_zero_copy: true, priority: 10 },
-            Candidate { name: "VA-API H.264", gst_element: "vah264enc", codec: Codec::H264, hardware: true, supports_dmabuf_zero_copy: false, priority: 10 },
-            Candidate { name: "VA-API H.264 (low-power)", gst_element: "vah264lpenc", codec: Codec::H264, hardware: true, supports_dmabuf_zero_copy: false, priority: 10 },
+            Candidate {
+                name: "VA-API H.264",
+                gst_element: "vaapih264enc",
+                codec: Codec::H264,
+                hardware: true,
+                supports_dmabuf_zero_copy: true,
+                priority: 10,
+            },
+            Candidate {
+                name: "VA-API H.264",
+                gst_element: "vah264enc",
+                codec: Codec::H264,
+                hardware: true,
+                supports_dmabuf_zero_copy: false,
+                priority: 10,
+            },
+            Candidate {
+                name: "VA-API H.264 (low-power)",
+                gst_element: "vah264lpenc",
+                codec: Codec::H264,
+                hardware: true,
+                supports_dmabuf_zero_copy: false,
+                priority: 10,
+            },
         ],
         // VA-API H.265 - priority 11
         &[
-            Candidate { name: "VA-API H.265", gst_element: "vaapih265enc", codec: Codec::H265, hardware: true, supports_dmabuf_zero_copy: true, priority: 11 },
-            Candidate { name: "VA-API H.265", gst_element: "vah265enc", codec: Codec::H265, hardware: true, supports_dmabuf_zero_copy: false, priority: 11 },
-            Candidate { name: "VA-API H.265 (low-power)", gst_element: "vah265lpenc", codec: Codec::H265, hardware: true, supports_dmabuf_zero_copy: false, priority: 11 },
+            Candidate {
+                name: "VA-API H.265",
+                gst_element: "vaapih265enc",
+                codec: Codec::H265,
+                hardware: true,
+                supports_dmabuf_zero_copy: true,
+                priority: 11,
+            },
+            Candidate {
+                name: "VA-API H.265",
+                gst_element: "vah265enc",
+                codec: Codec::H265,
+                hardware: true,
+                supports_dmabuf_zero_copy: false,
+                priority: 11,
+            },
+            Candidate {
+                name: "VA-API H.265 (low-power)",
+                gst_element: "vah265lpenc",
+                codec: Codec::H265,
+                hardware: true,
+                supports_dmabuf_zero_copy: false,
+                priority: 11,
+            },
         ],
         // VA-API VP9 - priority 12
         &[
-            Candidate { name: "VA-API VP9", gst_element: "vaapivp9enc", codec: Codec::VP9, hardware: true, supports_dmabuf_zero_copy: true, priority: 12 },
-            Candidate { name: "VA-API VP9", gst_element: "vavp9enc", codec: Codec::VP9, hardware: true, supports_dmabuf_zero_copy: false, priority: 12 },
+            Candidate {
+                name: "VA-API VP9",
+                gst_element: "vaapivp9enc",
+                codec: Codec::VP9,
+                hardware: true,
+                supports_dmabuf_zero_copy: true,
+                priority: 12,
+            },
+            Candidate {
+                name: "VA-API VP9",
+                gst_element: "vavp9enc",
+                codec: Codec::VP9,
+                hardware: true,
+                supports_dmabuf_zero_copy: false,
+                priority: 12,
+            },
         ],
         // NVENC H.264 (NVIDIA) - priority 20
         &[
-            Candidate { name: "NVENC H.264", gst_element: "nvh264enc", codec: Codec::H264, hardware: true, supports_dmabuf_zero_copy: false, priority: 20 },
-            Candidate { name: "NVENC H.264", gst_element: "nvcudah264enc", codec: Codec::H264, hardware: true, supports_dmabuf_zero_copy: false, priority: 20 },
+            Candidate {
+                name: "NVENC H.264",
+                gst_element: "nvh264enc",
+                codec: Codec::H264,
+                hardware: true,
+                supports_dmabuf_zero_copy: false,
+                priority: 20,
+            },
+            Candidate {
+                name: "NVENC H.264",
+                gst_element: "nvcudah264enc",
+                codec: Codec::H264,
+                hardware: true,
+                supports_dmabuf_zero_copy: false,
+                priority: 20,
+            },
         ],
         // NVENC H.265 - priority 21
         &[
-            Candidate { name: "NVENC H.265", gst_element: "nvh265enc", codec: Codec::H265, hardware: true, supports_dmabuf_zero_copy: false, priority: 21 },
-            Candidate { name: "NVENC H.265", gst_element: "nvcudah265enc", codec: Codec::H265, hardware: true, supports_dmabuf_zero_copy: false, priority: 21 },
+            Candidate {
+                name: "NVENC H.265",
+                gst_element: "nvh265enc",
+                codec: Codec::H265,
+                hardware: true,
+                supports_dmabuf_zero_copy: false,
+                priority: 21,
+            },
+            Candidate {
+                name: "NVENC H.265",
+                gst_element: "nvcudah265enc",
+                codec: Codec::H265,
+                hardware: true,
+                supports_dmabuf_zero_copy: false,
+                priority: 21,
+            },
         ],
         // Software H.264 - priority 100. x264 (gst-plugins-ugly) preferred,
         // openh264 (gst-plugins-bad) as a fallback so MP4 still works without
         // gst-plugins-ugly installed.
         &[
-            Candidate { name: "x264 H.264", gst_element: "x264enc", codec: Codec::H264, hardware: false, supports_dmabuf_zero_copy: false, priority: 100 },
-            Candidate { name: "OpenH264", gst_element: "openh264enc", codec: Codec::H264, hardware: false, supports_dmabuf_zero_copy: false, priority: 100 },
+            Candidate {
+                name: "x264 H.264",
+                gst_element: "x264enc",
+                codec: Codec::H264,
+                hardware: false,
+                supports_dmabuf_zero_copy: false,
+                priority: 100,
+            },
+            Candidate {
+                name: "OpenH264",
+                gst_element: "openh264enc",
+                codec: Codec::H264,
+                hardware: false,
+                supports_dmabuf_zero_copy: false,
+                priority: 100,
+            },
         ],
         // Software VP9 - priority 101
-        &[
-            Candidate { name: "VP9", gst_element: "vp9enc", codec: Codec::VP9, hardware: false, supports_dmabuf_zero_copy: false, priority: 101 },
-        ],
+        &[Candidate {
+            name: "VP9",
+            gst_element: "vp9enc",
+            codec: Codec::VP9,
+            hardware: false,
+            supports_dmabuf_zero_copy: false,
+            priority: 101,
+        }],
     ];
 
     // Probing spins up real GStreamer pipelines, so cache the result for the

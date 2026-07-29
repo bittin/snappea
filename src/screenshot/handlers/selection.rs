@@ -35,20 +35,16 @@ pub fn handle_select_screen_mode(app: &mut App, output_index: usize) -> HandlerR
 pub fn handle_navigate_left(app: &mut App) -> HandlerResult {
     if let Some(args) = app.screenshot_args.as_mut() {
         let output_count = app.outputs.len();
-        if output_count > 0 {
-            match &args.session.choice {
-                Choice::Output(None) => {
-                    // In screen picker mode: move to previous screen (just update index)
-                    args.session.focused_output_index = if args.session.focused_output_index == 0 {
-                        output_count - 1
-                    } else {
-                        args.session.focused_output_index - 1
-                    };
-                    // Choice stays as None (picker mode)
-                }
-                _ => {}
+        if output_count > 0
+            && let Choice::Output(None) = &args.session.choice {
+                // In screen picker mode: move to previous screen (just update index)
+                args.session.focused_output_index = if args.session.focused_output_index == 0 {
+                    output_count - 1
+                } else {
+                    args.session.focused_output_index - 1
+                };
+                // Choice stays as None (picker mode)
             }
-        }
     }
     cosmic::Task::none()
 }
@@ -57,33 +53,25 @@ pub fn handle_navigate_left(app: &mut App) -> HandlerResult {
 pub fn handle_navigate_right(app: &mut App) -> HandlerResult {
     if let Some(args) = app.screenshot_args.as_mut() {
         let output_count = app.outputs.len();
-        if output_count > 0 {
-            match &args.session.choice {
-                Choice::Output(None) => {
-                    // In screen picker mode: move to next screen (just update index)
-                    args.session.focused_output_index =
-                        (args.session.focused_output_index + 1) % output_count;
-                    // Choice stays as None (picker mode)
-                }
-                _ => {}
+        if output_count > 0
+            && let Choice::Output(None) = &args.session.choice {
+                // In screen picker mode: move to next screen (just update index)
+                args.session.focused_output_index =
+                    (args.session.focused_output_index + 1) % output_count;
+                // Choice stays as None (picker mode)
             }
-        }
     }
     cosmic::Task::none()
 }
 
 /// Handle ConfirmSelection message
 pub fn handle_confirm_selection(app: &mut App) -> HandlerResult {
-    if let Some(args) = app.screenshot_args.as_mut() {
-        match &args.session.choice {
-            Choice::Output(None) => {
-                // Confirm the highlighted screen (enter confirmed mode)
-                if let Some(output) = app.outputs.get(args.session.focused_output_index) {
-                    args.session.choice = Choice::Output(Some(output.name.clone()));
-                }
+    if let Some(args) = app.screenshot_args.as_mut()
+        && let Choice::Output(None) = &args.session.choice {
+            // Confirm the highlighted screen (enter confirmed mode)
+            if let Some(output) = app.outputs.get(args.session.focused_output_index) {
+                args.session.choice = Choice::Output(Some(output.name.clone()));
             }
-            _ => {}
         }
-    }
     cosmic::Task::none()
 }

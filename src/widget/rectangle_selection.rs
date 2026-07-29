@@ -3,12 +3,11 @@ use std::borrow::Cow;
 use cosmic::{
     iced::{
         clipboard::{
-            dnd::{self, DndAction, DndDestinationRectangle, DndEvent, OfferEvent, SourceEvent},
+            dnd::{self, DndAction, DndDestinationRectangle},
             mime::{AllowedMimeTypes, AsMimeTypes},
         },
         core::{
-            self, Border, Color, Length, Point, Rectangle, Renderer, Shadow, Size,
-            clipboard::DndSource, layout::Node, renderer::Quad,
+            self, Border, Color, Length, Point, Rectangle, Renderer, Shadow, Size, layout::Node, renderer::Quad,
         },
         mouse,
     },
@@ -411,95 +410,89 @@ impl<'a, Msg: 'static + Clone> Widget<Msg, cosmic::Theme, cosmic::Renderer>
         if self.is_recording {
             return;
         }
-        match event {
-            core::Event::Mouse(e) => {
-                if !cursor.is_over(layout.bounds()) {
-                    return;
+        if let core::Event::Mouse(e) = event {
+            if !cursor.is_over(layout.bounds()) {
+                return;
+            }
+
+            // Skip rectangle drawing while an annotation tool owns the mouse
+            // or a popup/drawer is open.
+            if self.suppress_selection {
+                return;
+            }
+
+            match e {
+                core::mouse::Event::ButtonPressed(core::mouse::Button::Left) => {
+                    let s = self.drag_state(cursor);
+
+                    if s == DragState::Move {
+                        // For Move: compute offset for translation
+                        let pos = cursor.position().unwrap_or_default();
+                        let cursor_x = self.output_rect.left + pos.x as i32;
+                        let cursor_y = self.output_rect.top + pos.y as i32;
+                        let offset_x = cursor_x - self.rectangle_selection.left;
+                        let offset_y = cursor_y - self.rectangle_selection.top;
+                        self.drag_state = DragState::Move;
+                        shell.publish((self.on_move_offset)(Some((offset_x, offset_y))));
+                        shell.publish((self.on_rectangle)(
+                            DragState::Move,
+                            self.rectangle_selection,
+                        ));
+                    } else if s == DragState::None {
+                        // New selection: start drawing from current position
+                        let mut pos = cursor.position().unwrap_or_default();
+                        pos.x += self.output_rect.left as f32;
+                        pos.y += self.output_rect.top as f32;
+                        self.drag_state = DragState::SE;
+                        shell.publish((self.on_move_offset)(None));
+                        shell.publish((self.on_rectangle)(
+                            DragState::SE,
+                            Rect {
+                                left: pos.x as i32,
+                                top: pos.y as i32,
+                                right: pos.x as i32 + 1,
+                                bottom: pos.y as i32 + 1,
+                            },
+                        ));
+                    } else {
+                        // Resize from corner or edge
+                        self.drag_state = s;
+                        shell.publish((self.on_move_offset)(None));
+                        shell.publish((self.on_rectangle)(s, self.rectangle_selection));
+                    }
+                    shell.capture_event();
                 }
-
-                // Skip rectangle drawing while an annotation tool owns the mouse
-                // or a popup/drawer is open.
-                if self.suppress_selection {
-                    return;
-                }
-
-                match e {
-                    core::mouse::Event::ButtonPressed(core::mouse::Button::Left) => {
-                        let s = self.drag_state(cursor);
-
-                        if s == DragState::Move {
-                            // For Move: compute offset for translation
-                            let pos = cursor.position().unwrap_or_default();
-                            let cursor_x = self.output_rect.left + pos.x as i32;
-                            let cursor_y = self.output_rect.top + pos.y as i32;
-                            let offset_x = cursor_x - self.rectangle_selection.left;
-                            let offset_y = cursor_y - self.rectangle_selection.top;
-                            self.drag_state = DragState::Move;
-                            shell.publish((self.on_move_offset)(Some((offset_x, offset_y))));
-                            shell.publish((self.on_rectangle)(
-                                DragState::Move,
-                                self.rectangle_selection,
-                            ));
-                        } else if s == DragState::None {
-                            // New selection: start drawing from current position
-                            let mut pos = cursor.position().unwrap_or_default();
-                            pos.x += self.output_rect.left as f32;
-                            pos.y += self.output_rect.top as f32;
-                            self.drag_state = DragState::SE;
-                            shell.publish((self.on_move_offset)(None));
-                            shell.publish((self.on_rectangle)(
-                                DragState::SE,
-                                Rect {
-                                    left: pos.x as i32,
-                                    top: pos.y as i32,
-                                    right: pos.x as i32 + 1,
-                                    bottom: pos.y as i32 + 1,
-                                },
-                            ));
-                        } else {
-                            // Resize from corner or edge
-                            self.drag_state = s;
-                            shell.publish((self.on_move_offset)(None));
-                            shell.publish((self.on_rectangle)(s, self.rectangle_selection));
+                core::mouse::Event::CursorMoved { .. } => {
+                    // Handle all drag operations without DnD for proper cursor control
+                    if self.drag_state != DragState::None {
+                        if let Some(pos) = cursor.position() {
+                            let x = pos.x.round() as i32;
+                            let y = pos.y.round() as i32;
+                            self.handle_drag_pos(x, y, shell);
                         }
                         shell.capture_event();
                     }
-                    core::mouse::Event::CursorMoved { .. } => {
-                        // Handle all drag operations without DnD for proper cursor control
-                        if self.drag_state != DragState::None {
-                            if let Some(pos) = cursor.position() {
-                                let x = pos.x.round() as i32;
-                                let y = pos.y.round() as i32;
-                                self.handle_drag_pos(x, y, shell);
-                            }
-                            shell.capture_event();
-                            return;
-                        }
-                    }
-                    core::mouse::Event::ButtonReleased(core::mouse::Button::Left) => {
-                        // End any drag operation
-                        if self.drag_state != DragState::None {
-                            self.drag_state = DragState::None;
-                            shell.publish((self.on_move_offset)(None));
-                            // Only keep rectangle if it has meaningful dimensions (> 5x5)
-                            let rect = self.rectangle_selection;
-                            let width = (rect.right - rect.left).abs();
-                            let height = (rect.bottom - rect.top).abs();
-                            if width > 5 && height > 5 {
-                                shell.publish((self.on_rectangle)(DragState::None, rect));
-                            } else {
-                                // Clear the selection - just a click, not a drag
-                                shell
-                                    .publish((self.on_rectangle)(DragState::None, Rect::default()));
-                            }
-                            shell.capture_event();
-                            return;
-                        }
-                    }
-                    _ => {}
                 }
+                core::mouse::Event::ButtonReleased(core::mouse::Button::Left)
+                    // End any drag operation
+                    if self.drag_state != DragState::None => {
+                        self.drag_state = DragState::None;
+                        shell.publish((self.on_move_offset)(None));
+                        // Only keep rectangle if it has meaningful dimensions (> 5x5)
+                        let rect = self.rectangle_selection;
+                        let width = (rect.right - rect.left).abs();
+                        let height = (rect.bottom - rect.top).abs();
+                        if width > 5 && height > 5 {
+                            shell.publish((self.on_rectangle)(DragState::None, rect));
+                        } else {
+                            // Clear the selection - just a click, not a drag
+                            shell
+                                .publish((self.on_rectangle)(DragState::None, Rect::default()));
+                        }
+                        shell.capture_event();
+                    }
+                _ => {}
             }
-            _ => {}
         }
     }
 

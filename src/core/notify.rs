@@ -55,13 +55,13 @@ fn send(summary: &str, body: &str) -> Result<(), Box<dyn std::error::Error>> {
         proxy
             .notify(
                 "SnapPea",
-                0,             // replaces_id: 0 = new notification
+                0, // replaces_id: 0 = new notification
                 "dialog-error",
                 summary,
                 body,
-                &[],           // no actions
+                &[], // no actions
                 hints,
-                5000,          // expire after 5s
+                5000, // expire after 5s
             )
             .await?;
         Ok::<(), zbus::Error>(())

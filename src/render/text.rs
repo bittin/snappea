@@ -21,7 +21,12 @@ pub fn measure_text(content: &str, font_size: f32) -> (f32, f32) {
     let Ok(mut font_sys) = font_system().write() else {
         // Fall back to a rough estimate rather than reporting a zero-size box.
         let lines = content.lines().count().max(1) as f32;
-        let widest = content.lines().map(str::chars).map(Iterator::count).max().unwrap_or(0) as f32;
+        let widest = content
+            .lines()
+            .map(str::chars)
+            .map(Iterator::count)
+            .max()
+            .unwrap_or(0) as f32;
         return (widest * font_size * 0.6, lines * line_height);
     };
 

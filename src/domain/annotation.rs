@@ -229,7 +229,10 @@ pub struct MagnifierAnnotation {
 impl MagnifierAnnotation {
     /// Center point in global logical coordinates
     pub fn center(&self) -> (f32, f32) {
-        ((self.start_x + self.end_x) * 0.5, (self.start_y + self.end_y) * 0.5)
+        (
+            (self.start_x + self.end_x) * 0.5,
+            (self.start_y + self.end_y) * 0.5,
+        )
     }
 
     /// Radius in logical units (matches `render::geometry::circle_from_points`)

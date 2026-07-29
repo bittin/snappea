@@ -202,7 +202,6 @@ fn chunk_time_range(chunk: usize, cuts: &[f64], duration: f64) -> (f64, f64) {
     (start, end)
 }
 
-
 fn pick_tick_interval(visible_duration: f64) -> (f64, usize) {
     const NICE: &[(f64, usize)] = &[
         (0.01, 2),
@@ -454,11 +453,10 @@ impl<Message: Clone + 'static> Widget<Message, cosmic::Theme, cosmic::Renderer>
                         DragTarget::EdgeStart | DragTarget::EdgeEnd => {
                             let near_start = drag_time <= EDGE_SNAP_THRESHOLD * self.duration;
                             let near_end = drag_time >= self.duration * (1.0 - EDGE_SNAP_THRESHOLD);
-                            if !near_start && !near_end {
-                                if let Some(ref cb) = self.on_cut_added {
+                            if !near_start && !near_end
+                                && let Some(ref cb) = self.on_cut_added {
                                     shell.publish(cb(drag_time));
                                 }
-                            }
                         }
                     }
                 }
@@ -466,8 +464,8 @@ impl<Message: Clone + 'static> Widget<Message, cosmic::Theme, cosmic::Renderer>
 
             Event::Mouse(mouse::Event::CursorMoved { .. })
             | Event::Touch(touch::Event::FingerMoved { .. }) => {
-                if let Some(target) = state.drag {
-                    if let Some(pos) = cursor.land().position() {
+                if let Some(target) = state.drag
+                    && let Some(pos) = cursor.land().position() {
                         let local_x = (pos.x - bounds.x).clamp(0.0, width);
                         let time = screen_x_to_time(
                             local_x,
@@ -488,7 +486,6 @@ impl<Message: Clone + 'static> Widget<Message, cosmic::Theme, cosmic::Renderer>
                         }
                         shell.capture_event();
                     }
-                }
             }
 
             Event::Mouse(mouse::Event::WheelScrolled { delta }) => {
@@ -686,8 +683,8 @@ impl<Message: Clone + 'static> Widget<Message, cosmic::Theme, cosmic::Renderer>
         }
 
         // Selected chunk highlight
-        if let Some(sel) = self.selected_chunk {
-            if sel < num_chunks {
+        if let Some(sel) = self.selected_chunk
+            && sel < num_chunks {
                 let (t_start, t_end) = chunk_time_range(sel, self.cuts, self.duration);
                 let x_start = time_to_screen_x(t_start, self.duration, zoom, scroll, width);
                 let x_end = time_to_screen_x(t_end, self.duration, zoom, scroll, width);
@@ -723,7 +720,6 @@ impl<Message: Clone + 'static> Widget<Message, cosmic::Theme, cosmic::Renderer>
                     }
                 }
             }
-        }
 
         // Cut lines + handles
         let cut_color = Color::from_rgba(1.0, 0.85, 0.0, 0.9);
@@ -735,11 +731,10 @@ impl<Message: Clone + 'static> Widget<Message, cosmic::Theme, cosmic::Renderer>
             .iter()
             .enumerate()
             .map(|(i, &c)| {
-                if let Some(DragTarget::Cut(di)) = state.drag {
-                    if di == i {
+                if let Some(DragTarget::Cut(di)) = state.drag
+                    && di == i {
                         return (state.drag_time, true);
                     }
-                }
                 (c, false)
             })
             .collect();

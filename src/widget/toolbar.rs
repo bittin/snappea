@@ -665,7 +665,8 @@ impl<'a, Msg: Clone + 'static> cosmic::widget::Widget<Msg, cosmic::Theme, cosmic
         let radius = cosmic_theme.corner_radii.radius_s;
 
         // Draw the background with appropriate opacity
-        let mut bg_color: cosmic::iced::Color = cosmic_theme.background(false).component.base.into();
+        let mut bg_color: cosmic::iced::Color =
+            cosmic_theme.background(false).component.base.into();
         bg_color.a *= opacity;
 
         renderer.fill_quad(
@@ -721,8 +722,8 @@ impl<'a, Msg: Clone + 'static> cosmic::widget::Widget<Msg, cosmic::Theme, cosmic
         viewport: &cosmic::iced::core::Rectangle,
     ) {
         // Check for hover state changes on any mouse event
-        if let cosmic::iced::core::Event::Mouse(_) = &event {
-            if let Some(ref on_hover_change) = self.on_hover_change {
+        if let cosmic::iced::core::Event::Mouse(_) = &event
+            && let Some(ref on_hover_change) = self.on_hover_change {
                 let bounds = layout.bounds();
                 let is_hovered = cursor
                     .position()
@@ -735,7 +736,6 @@ impl<'a, Msg: Clone + 'static> cosmic::widget::Widget<Msg, cosmic::Theme, cosmic
                     shell.publish(on_hover_change(is_hovered));
                 }
             }
-        }
 
         self.content.as_widget_mut().update(
             &mut tree.children[0],
@@ -894,7 +894,8 @@ impl<'a, Msg: Clone + 'static> cosmic::widget::Widget<Msg, cosmic::Theme, cosmic
             self.unhovered_opacity
         };
 
-        let mut bg_color: cosmic::iced::Color = cosmic_theme.background(false).component.base.into();
+        let mut bg_color: cosmic::iced::Color =
+            cosmic_theme.background(false).component.base.into();
         bg_color.a *= opacity;
 
         let mut draw_style = *style;
@@ -996,8 +997,8 @@ impl<'a, Msg: Clone + 'static> cosmic::widget::Widget<Msg, cosmic::Theme, cosmic
         let body_layout = children.next();
 
         // Check for hover state changes on any mouse event
-        if matches!(event, cosmic::iced::core::Event::Mouse(_)) {
-            if let (Some(header_layout), Some(body_layout)) = (header_layout, body_layout) {
+        if matches!(event, cosmic::iced::core::Event::Mouse(_))
+            && let (Some(header_layout), Some(body_layout)) = (header_layout, body_layout) {
                 let header_bounds = header_layout.bounds();
                 let body_bounds = body_layout.bounds();
                 let radius = HAT_HIT_RADIUS_FALLBACK;
@@ -1022,7 +1023,6 @@ impl<'a, Msg: Clone + 'static> cosmic::widget::Widget<Msg, cosmic::Theme, cosmic
                 //     return cosmic::iced::core::event::Status::Ignored;
                 // }
             }
-        }
 
         let mut children = layout.children();
         let header_layout = children.next();
@@ -1133,8 +1133,8 @@ impl<'a, Msg: Clone + 'static> cosmic::widget::Widget<Msg, cosmic::Theme, cosmic
         // Collect all overlays from both header and body
         let mut overlays = Vec::new();
 
-        if let Some(header_layout) = header_layout {
-            if let Some(overlay) = self.header.as_widget_mut().overlay(
+        if let Some(header_layout) = header_layout
+            && let Some(overlay) = self.header.as_widget_mut().overlay(
                 &mut header_tree[0],
                 header_layout,
                 renderer,
@@ -1143,10 +1143,9 @@ impl<'a, Msg: Clone + 'static> cosmic::widget::Widget<Msg, cosmic::Theme, cosmic
             ) {
                 overlays.push(overlay);
             }
-        }
 
-        if let Some(body_layout) = body_layout {
-            if let Some(overlay) = self.body.as_widget_mut().overlay(
+        if let Some(body_layout) = body_layout
+            && let Some(overlay) = self.body.as_widget_mut().overlay(
                 &mut body_tree[0],
                 body_layout,
                 renderer,
@@ -1155,7 +1154,6 @@ impl<'a, Msg: Clone + 'static> cosmic::widget::Widget<Msg, cosmic::Theme, cosmic
             ) {
                 overlays.push(overlay);
             }
-        }
 
         // Return combined overlays as a group
         (!overlays.is_empty()).then(move || overlay::Group::with_children(overlays).overlay())
@@ -1178,7 +1176,7 @@ impl<'a, Msg: Clone + 'static> From<HoverOpacity<'a, Msg>> for Element<'a, Msg> 
 #[allow(clippy::too_many_arguments)]
 pub fn build_toolbar<'a, Msg: Clone + 'static>(
     choice: Choice,
-    output_name: String,
+    _output_name: String,
     toolbar_position: ToolbarPosition,
     has_selection: bool,
     has_ocr_text: bool,

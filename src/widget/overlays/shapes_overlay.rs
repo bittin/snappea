@@ -205,11 +205,10 @@ impl<'a, Message: Clone + 'static> canvas::Program<Message, cosmic::Theme, cosmi
                         return Some(canvas::Action::publish(cb(gx, gy)).and_capture());
                     }
                 }
-                if self.pencil_mode {
-                    if let Some(ref cb) = self.on_pencil_start {
+                if self.pencil_mode
+                    && let Some(ref cb) = self.on_pencil_start {
                         return Some(canvas::Action::publish(cb(gx, gy)).and_capture());
                     }
-                }
             }
             canvas::Event::Mouse(MouseEvent::ButtonReleased(Button::Left)) => {
                 let Some(pos) = cursor.position_in(bounds) else {
