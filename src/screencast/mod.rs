@@ -11,8 +11,7 @@ mod recorder;
 mod state;
 
 pub use encoder::best_encoder;
-pub use pipeline::{CropRegion, Pipeline};
 pub use recorder::{start_recording, start_recording_thread};
 pub use state::{
-    RecordingHandle, RecordingState, cancel_recording, is_recording, set_recording, stop_recording,
+    RecordingHandle, RecordingState, is_recording, set_recording, stop_recording,
 };

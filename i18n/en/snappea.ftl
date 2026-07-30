@@ -60,8 +60,12 @@ color-black = Black
 
 # Shape tools
 arrow = Arrow
+line = Line
 oval-circle = Oval or Circle
 rectangle-square = Rectangle or Square
+pencil = Freehand
+text = Text
+text-size = Text size
 shape-cycle-hint = Shift+A to cycle shapes, A to toggle
 color = Color
 shadow = Shadow
@@ -81,8 +85,11 @@ clear-drawings = Clear Drawings
 
 # Shape tool tooltips
 draw-arrow = Draw Arrow (A, right-click for settings)
+draw-line = Draw Line (A, Ctrl to snap angle, right-click for settings)
 draw-circle = Draw Circle (A, Ctrl for perfect, right-click for settings)
 draw-rectangle = Draw Rectangle (A, Ctrl for square, right-click for settings)
+draw-pencil = Draw Freehand (A, right-click for settings)
+draw-text = Add Text (A, click to place, Enter to finish)
 
 # Redact tool tooltips
 redact-tool = Redact (D, right-click for settings)
@@ -158,6 +165,7 @@ browse-screenshots-title = Select save location for screenshots
 browse-videos-title = Select save location for videos
 
 # Status overlays
+press-escape-again = Press Escape again to discard this screenshot
 scanning-qr = Scanning for QR codes...
 downloading-ocr-models = Downloading OCR models...
 running-ocr = Running OCR...

@@ -154,9 +154,7 @@ where
 
     // Screenshot delay dropdown (for the delayed-capture toolbar button)
     static DELAY_NAMES: &[&str] = &["1s", "2s", "3s", "5s", "10s", "15s"];
-    let selected_delay_idx = DELAY_OPTIONS
-        .iter()
-        .position(|s| *s == capture_delay_secs);
+    let selected_delay_idx = DELAY_OPTIONS.iter().position(|s| *s == capture_delay_secs);
     let capture_delay_dropdown = dropdown(DELAY_NAMES, selected_delay_idx, move |idx| {
         let secs = DELAY_OPTIONS.get(idx).copied().unwrap_or(3);
         on_capture_delay_select(secs)
@@ -248,16 +246,37 @@ where
     })
     .width(Length::Fill);
 
-    // Container format selection using dropdown
+    // Container format selection using dropdown.
     let container_label = text::body(fl!("format"));
 
-    // Use static array for container names (these are technical names, not translated)
-    static CONTAINER_NAMES: &[&str] = &["MP4", "MKV"];
+    // Only offer containers the selected codec can actually mux into (e.g. VP9
+    // can't go into MP4). Codec is inferred from the encoder element name.
+    let selected_codec = selected_encoder
+        .as_deref()
+        .and_then(crate::screencast::encoder::Codec::from_element_name);
+    let container_options: Vec<Container> = CONTAINER_OPTIONS
+        .iter()
+        .copied()
+        .filter(|c| selected_codec.is_none_or(|codec| codec.supports_container(*c)))
+        .collect();
+    let container_names: &'static [String] = Box::leak(
+        container_options
+            .iter()
+            .map(|c| match c {
+                Container::Mp4 => "MP4",
+                Container::Mkv => "MKV",
+                Container::Webm => "WebM",
+            })
+            .map(str::to_string)
+            .collect::<Vec<_>>()
+            .into_boxed_slice(),
+    );
 
-    let selected_container_idx = CONTAINER_OPTIONS.iter().position(|c| *c == video_container);
+    let selected_container_idx = container_options.iter().position(|c| *c == video_container);
+    let container_options_for_cb = container_options.clone();
 
-    let container_dropdown = dropdown(CONTAINER_NAMES, selected_container_idx, move |idx| {
-        let container = CONTAINER_OPTIONS
+    let container_dropdown = dropdown(container_names, selected_container_idx, move |idx| {
+        let container = container_options_for_cb
             .get(idx)
             .copied()
             .unwrap_or(Container::Mp4);
@@ -450,7 +469,7 @@ where
             let cosmic_theme = theme.cosmic();
             cosmic::iced::widget::container::Style {
                 background: None, // HoverOpacity handles the background
-                text_color: Some(cosmic_theme.background.component.on.into()),
+                text_color: Some(cosmic_theme.background(false).component.on.into()),
                 border: Border::default(),
                 ..Default::default()
             }

@@ -4,14 +4,14 @@ use crate::fl;
 use crate::screenshot;
 use crate::session::messages;
 use crate::session::state::SettingsTab;
-use crate::tray::{self, TrayAction, TrayHandle};
+use crate::tray::{TrayAction, TrayHandle};
 use cosmic::Task;
 use cosmic::cctk::sctk::shell::wlr_layer;
 use cosmic::iced::animation;
 use cosmic::iced::core::event::wayland::OutputEvent;
 use cosmic::iced::core::layout::Limits;
 use cosmic::iced::platform_specific::runtime::wayland::layer_surface::{
-    IcedMargin, IcedOutput, SctkLayerSurfaceSettings,
+    IcedOutput, SctkLayerSurfaceSettings,
 };
 use cosmic::iced::platform_specific::shell::commands::layer_surface::get_layer_surface;
 use cosmic::widget::segmented_button;
@@ -222,6 +222,8 @@ impl cosmic::Application for App {
         let (tray_tx, tray_rx) = crossbeam_channel::unbounded::<TrayAction>();
         let dummy_id = window::Id::unique();
 
+        core.set_auto_blur(Default::default());
+
         (
             Self {
                 core,
@@ -316,7 +318,7 @@ impl cosmic::Application for App {
                 screenshot::Event::RecordingStopped => {
                     // Recording was stopped via PrintScreen key - clean up UI
                     // This reuses the existing RecordingStopped handler
-                    return self.update(Msg::RecordingStopped);
+                    self.update(Msg::RecordingStopped)
                 }
             },
             Msg::Screenshot(m) => screenshot::update_msg(self, m).map(cosmic::Action::App),
@@ -394,17 +396,16 @@ impl cosmic::Application for App {
                             }
                         }
                         cosmic::iced::mouse::Event::CursorMoved { .. } => {
-                            if can_draw {
-                                if let Some(stroke) = &mut indicator.current_stroke {
+                            if can_draw
+                                && let Some(stroke) = &mut indicator.current_stroke {
                                     stroke.push((position.x, position.y));
                                 }
-                            }
                         }
                         cosmic::iced::mouse::Event::ButtonReleased(
                             cosmic::iced::mouse::Button::Left,
                         ) => {
-                            if let Some(points) = indicator.current_stroke.take() {
-                                if points.len() > 1 {
+                            if let Some(points) = indicator.current_stroke.take()
+                                && points.len() > 1 {
                                     // Capture current color and thickness for this stroke
                                     let color = indicator.pencil_color;
                                     let thickness = indicator.pencil_thickness;
@@ -416,7 +417,6 @@ impl cosmic::Application for App {
                                         thickness,
                                     });
                                 }
-                            }
                         }
                         _ => {}
                     }
@@ -535,8 +535,8 @@ impl cosmic::Application for App {
                 cosmic::iced::Task::none()
             }
             Msg::ToolbarDragMove(x, y) => {
-                if let Some(indicator) = &mut self.recording_indicator {
-                    if indicator.toolbar_dragging {
+                if let Some(indicator) = &mut self.recording_indicator
+                    && indicator.toolbar_dragging {
                         // On first move, calculate the offset from cursor to toolbar top-left
                         if indicator.drag_offset == (0.0, 0.0) {
                             indicator.drag_offset =
@@ -546,7 +546,6 @@ impl cosmic::Application for App {
                         indicator.toolbar_pos =
                             (x - indicator.drag_offset.0, y - indicator.drag_offset.1);
                     }
-                }
                 cosmic::iced::Task::none()
             }
             Msg::ToolbarDragEnd => {
@@ -836,8 +835,8 @@ impl cosmic::Application for App {
 
                         // If screenshot args arrived before outputs were ready, create
                         // the overlay window now that we have our first output.
-                        if self.screenshot_windows_pending {
-                            if let Some(output_state) = self.outputs.last_mut() {
+                        if self.screenshot_windows_pending
+                            && let Some(output_state) = self.outputs.last_mut() {
                                 output_state.id = window::Id::unique();
                                 let surface_cmd = get_layer_surface(SctkLayerSurfaceSettings {
                                     id: output_state.id,
@@ -860,7 +859,6 @@ impl cosmic::Application for App {
                                 self.screenshot_windows_pending = false;
                                 return surface_cmd;
                             }
-                        }
                     }
                     OutputEvent::Removed => self.outputs.retain(|o| o.output != wl_output),
                     OutputEvent::InfoUpdate(info)
@@ -1245,6 +1243,8 @@ pub(crate) fn direct_screenshot_subscription(
                             choose_destination: None,
                         },
                         tx,
+                        // User-initiated capture; the response is discarded (see `_rx` above).
+                        expects_response: false,
                     },
                     capture: CaptureData { output_images },
                     session: SessionState {
@@ -1266,6 +1266,9 @@ pub(crate) fn direct_screenshot_subscription(
                         shape_popup_open: false,
                         shape_color: config.shape_color,
                         shape_shadow: config.shape_shadow,
+                        shape_thickness: config.shape_thickness,
+                        text_font_size: config.text_font_size,
+                        exit_armed: false,
                         primary_redact_tool: config.primary_redact_tool,
                         redact_popup_open: false,
                         pixelation_block_size: config.pixelation_block_size,
@@ -1425,8 +1428,8 @@ fn render_recording_indicator(
             match event {
                 canvas::Event::Mouse(MouseEvent::ButtonPressed(Button::Left)) => {
                     // Handle click-outside-to-close for popup
-                    if self.pencil_popup_open {
-                        if let Some(cursor_pos) = cursor.position() {
+                    if self.pencil_popup_open
+                        && let Some(cursor_pos) = cursor.position() {
                             let in_popup = self
                                 .pencil_popup_bounds
                                 .map(|b| b.contains(cursor_pos))
@@ -1450,7 +1453,6 @@ fn render_recording_indicator(
                                 );
                             }
                         }
-                    }
 
                     // Start drawing if in annotation mode (and popup not handling the click)
                     if self.annotation_mode && !self.pencil_popup_open {
@@ -1589,8 +1591,8 @@ fn render_recording_indicator(
             }
 
             // Draw current stroke being drawn (full opacity, uses current settings)
-            if let Some(points) = &self.current_stroke {
-                if points.len() >= 2 {
+            if let Some(points) = &self.current_stroke
+                && points.len() >= 2 {
                     let path = Path::new(|builder| {
                         builder.move_to(cosmic::iced::core::Point::new(points[0].0, points[0].1));
                         for point in &points[1..] {
@@ -1615,7 +1617,6 @@ fn render_recording_indicator(
                             .with_line_join(canvas::LineJoin::Round),
                     );
                 }
-            }
 
             vec![frame.into_geometry()]
         }
@@ -1793,7 +1794,7 @@ fn render_recording_indicator(
             let cosmic_theme = theme.cosmic();
             cosmic::iced::widget::container::Style {
                 background: Some(Background::Color(
-                    cosmic_theme.background.component.base.into(),
+                    cosmic_theme.background(false).component.base.into(),
                 )),
                 border: cosmic::iced::core::Border {
                     radius: cosmic_theme.corner_radii.radius_s.into(),
@@ -2065,6 +2066,8 @@ async fn trigger_screenshot(
                 choose_destination: None,
             },
             tx: portal_tx,
+            // Control-triggered capture; the response is discarded (see `_portal_rx`).
+            expects_response: false,
         },
         capture: CaptureData { output_images },
         session: SessionState {
@@ -2086,6 +2089,9 @@ async fn trigger_screenshot(
             shape_popup_open: false,
             shape_color: config.shape_color,
             shape_shadow: config.shape_shadow,
+            shape_thickness: config.shape_thickness,
+            text_font_size: config.text_font_size,
+            exit_armed: false,
             primary_redact_tool: config.primary_redact_tool,
             redact_popup_open: false,
             pixelation_block_size: config.pixelation_block_size,

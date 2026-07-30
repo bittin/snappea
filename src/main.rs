@@ -93,8 +93,8 @@ fn main() -> cosmic::iced::Result {
                 "--region" => {
                     if i + 1 < args.len() {
                         let parts: Vec<&str> = args[i + 1].split(',').collect();
-                        if parts.len() == 4 {
-                            if let (Ok(x), Ok(y), Ok(w), Ok(h)) = (
+                        if parts.len() == 4
+                            && let (Ok(x), Ok(y), Ok(w), Ok(h)) = (
                                 parts[0].parse::<i32>(),
                                 parts[1].parse::<i32>(),
                                 parts[2].parse::<u32>(),
@@ -102,7 +102,6 @@ fn main() -> cosmic::iced::Result {
                             ) {
                                 region = Some((x, y, w, h));
                             }
-                        }
                         i += 2;
                     } else {
                         i += 1;
@@ -111,13 +110,12 @@ fn main() -> cosmic::iced::Result {
                 "--logical-size" => {
                     if i + 1 < args.len() {
                         let parts: Vec<&str> = args[i + 1].split(',').collect();
-                        if parts.len() == 2 {
-                            if let (Ok(w), Ok(h)) =
+                        if parts.len() == 2
+                            && let (Ok(w), Ok(h)) =
                                 (parts[0].parse::<u32>(), parts[1].parse::<u32>())
                             {
                                 logical_size = Some((w, h));
                             }
-                        }
                         i += 2;
                     } else {
                         i += 1;

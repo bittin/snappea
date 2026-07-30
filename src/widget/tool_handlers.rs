@@ -29,10 +29,22 @@ pub fn handle_tool_msg(args: &mut Args, msg: ToolMsg) -> bool {
         }
         ToolMsg::SetShapeColor(color) => {
             args.ui.shape_color = color;
+            // Recolour the selected text label too, so the picker edits existing
+            // text rather than only affecting the next annotation.
+            args.annotations.edit_selected_text(|t| t.color = color);
+            true // needs config save
+        }
+        ToolMsg::SetShapeThickness(v) => {
+            args.ui.shape_thickness = v;
+            false // saved on release, not during drag
+        }
+        ToolMsg::SaveShapeThickness => {
             true // needs config save
         }
         ToolMsg::ToggleShapeShadow => {
             args.ui.shape_shadow = !args.ui.shape_shadow;
+            let shadow = args.ui.shape_shadow;
+            args.annotations.edit_selected_text(|t| t.shadow = shadow);
             true // needs config save
         }
         ToolMsg::SetRedactTool(tool) => {
@@ -113,12 +125,14 @@ pub fn save_tool_config(args: &Args) {
     config.primary_shape_tool = args.ui.primary_shape_tool;
     config.shape_color = args.ui.shape_color;
     config.shape_shadow = args.ui.shape_shadow;
+    config.shape_thickness = args.ui.shape_thickness;
     config.primary_redact_tool = args.ui.primary_redact_tool;
     config.pixelation_block_size = args.ui.pixelation_block_size;
     config.magnifier_magnification = args.ui.magnifier_magnification;
     config.pencil_color = args.ui.pencil_color;
     config.pencil_fade_duration = args.ui.pencil_fade_duration;
     config.pencil_thickness = args.ui.pencil_thickness;
+    config.text_font_size = args.ui.text_font_size;
     config.save();
 }
 
@@ -152,6 +166,30 @@ fn handle_shape_mode_toggle(args: &mut Args) {
                 args.annotations.rect_outline_drawing = None;
             }
         }
+        ShapeTool::Line => {
+            args.annotations.line_mode = !args.annotations.line_mode;
+            if args.annotations.line_mode {
+                disable_other_modes_except(args, Mode::Line);
+            } else {
+                args.annotations.line_drawing = None;
+            }
+        }
+        ShapeTool::Pencil => {
+            args.annotations.pencil_mode = !args.annotations.pencil_mode;
+            if args.annotations.pencil_mode {
+                disable_other_modes_except(args, Mode::Pencil);
+            } else {
+                args.annotations.pencil_drawing = None;
+            }
+        }
+        ShapeTool::Text => {
+            args.annotations.text_mode = !args.annotations.text_mode;
+            if args.annotations.text_mode {
+                disable_other_modes_except(args, Mode::Text);
+            } else {
+                crate::annotations::handlers::commit_editing_text(args);
+            }
+        }
     }
     // Close popups
     args.close_all_popups();
@@ -173,6 +211,18 @@ fn set_primary_shape_tool(args: &mut Args, tool: ShapeTool) {
         ShapeTool::Rectangle => {
             args.annotations.rect_outline_mode = true;
             disable_other_modes_except(args, Mode::Rectangle);
+        }
+        ShapeTool::Line => {
+            args.annotations.line_mode = true;
+            disable_other_modes_except(args, Mode::Line);
+        }
+        ShapeTool::Pencil => {
+            args.annotations.pencil_mode = true;
+            disable_other_modes_except(args, Mode::Pencil);
+        }
+        ShapeTool::Text => {
+            args.annotations.text_mode = true;
+            disable_other_modes_except(args, Mode::Text);
         }
     }
     args.close_all_popups();
@@ -372,8 +422,11 @@ fn handle_pencil_popup(args: &mut Args, action: ToolPopupAction) {
 #[derive(Clone, Copy, PartialEq)]
 enum Mode {
     Arrow,
+    Line,
     Circle,
     Rectangle,
+    Pencil,
+    Text,
     Magnifier,
     Redact,
     Pixelate,
@@ -391,6 +444,18 @@ fn disable_other_modes_except(args: &mut Args, keep: Mode) {
     if keep != Mode::Rectangle {
         args.annotations.rect_outline_mode = false;
         args.annotations.rect_outline_drawing = None;
+    }
+    if keep != Mode::Line {
+        args.annotations.line_mode = false;
+        args.annotations.line_drawing = None;
+    }
+    if keep != Mode::Pencil {
+        args.annotations.pencil_mode = false;
+        args.annotations.pencil_drawing = None;
+    }
+    if keep != Mode::Text {
+        args.annotations.text_mode = false;
+        crate::annotations::handlers::commit_editing_text(args);
     }
     if keep != Mode::Magnifier {
         args.annotations.magnifier_mode = false;

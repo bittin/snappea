@@ -7,8 +7,8 @@
 //! circle via `border_radius`), which is both fast and seamless — far better
 //! than filling the circle with one quad per source pixel.
 
-use cosmic::iced::Radians;
 use cosmic::iced::Color;
+use cosmic::iced::Radians;
 use cosmic::iced::advanced::image::{FilterMethod, Handle, Image, Renderer as ImageRenderer};
 use cosmic::iced::core::{Background, Border, Rectangle, Renderer as _, Shadow, renderer::Quad};
 

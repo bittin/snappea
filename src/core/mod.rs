@@ -7,4 +7,5 @@
 
 pub mod app;
 pub mod control;
+pub mod notify;
 pub mod portal;

@@ -2,8 +2,11 @@
 //!
 //! Queries GStreamer for available encoders and prioritizes hardware-accelerated ones
 
+use crate::config::Container;
 use anyhow::{Context, Result};
 use gstreamer as gst;
+use gstreamer::prelude::*;
+use std::sync::OnceLock;
 
 /// Codec type
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -21,6 +24,59 @@ impl Codec {
             Codec::H265 => "H.265",
             Codec::VP9 => "VP9",
             Codec::AV1 => "AV1",
+        }
+    }
+
+    /// GStreamer parser element required to mux this codec, if any.
+    ///
+    /// H.264/H.265 need a parser for MP4; VP9 goes into WebM/MKV without one.
+    /// AV1 needs `av1parse` for MP4 (not currently a recording target here).
+    fn parser_element(&self) -> Option<&'static str> {
+        match self {
+            Codec::H264 => Some("h264parse"),
+            Codec::H265 => Some("h265parse"),
+            Codec::AV1 => Some("av1parse"),
+            Codec::VP9 => None,
+        }
+    }
+
+    /// Whether this codec can be muxed into the given container by the pipeline.
+    ///
+    /// Matroska (MKV) is a catch-all. MP4 is only offered for H.264/H.265 — the
+    /// codecs snappea wires a parser for and that mux reliably; VP9/AV1 in MP4 is
+    /// unreliable and would otherwise produce an empty file (see issue #17).
+    pub fn supports_container(&self, container: Container) -> bool {
+        match (self, container) {
+            (_, Container::Mkv) => true,
+            (Codec::H264 | Codec::H265, Container::Mp4) => true,
+            (Codec::VP9 | Codec::AV1, Container::Mp4) => false,
+            (_, Container::Webm) => matches!(self, Codec::VP9 | Codec::AV1),
+        }
+    }
+
+    /// Container to fall back to when the configured one is incompatible.
+    pub fn default_container(&self) -> Container {
+        match self {
+            Codec::H264 | Codec::H265 => Container::Mp4,
+            Codec::VP9 | Codec::AV1 => Container::Mkv,
+        }
+    }
+
+    /// Best-effort codec inference from a GStreamer encoder element name.
+    ///
+    /// Used by the settings UI to gate the container dropdown without threading
+    /// full `EncoderInfo` through the widget signature.
+    pub fn from_element_name(name: &str) -> Option<Codec> {
+        if name.contains("h265") || name.contains("hevc") {
+            Some(Codec::H265)
+        } else if name.contains("h264") || name.contains("x264") || name.contains("openh264") {
+            Some(Codec::H264)
+        } else if name.contains("av1") {
+            Some(Codec::AV1)
+        } else if name.contains("vp9") {
+            Some(Codec::VP9)
+        } else {
+            None
         }
     }
 }
@@ -99,67 +155,236 @@ pub fn detect_encoders() -> Result<Vec<EncoderInfo>> {
     let candidate_groups: &[&[Candidate]] = &[
         // VA-API H.264 (Intel/AMD) - priority 10
         &[
-            Candidate { name: "VA-API H.264", gst_element: "vaapih264enc", codec: Codec::H264, hardware: true, supports_dmabuf_zero_copy: true, priority: 10 },
-            Candidate { name: "VA-API H.264", gst_element: "vah264enc", codec: Codec::H264, hardware: true, supports_dmabuf_zero_copy: false, priority: 10 },
-            Candidate { name: "VA-API H.264 (low-power)", gst_element: "vah264lpenc", codec: Codec::H264, hardware: true, supports_dmabuf_zero_copy: false, priority: 10 },
+            Candidate {
+                name: "VA-API H.264",
+                gst_element: "vaapih264enc",
+                codec: Codec::H264,
+                hardware: true,
+                supports_dmabuf_zero_copy: true,
+                priority: 10,
+            },
+            Candidate {
+                name: "VA-API H.264",
+                gst_element: "vah264enc",
+                codec: Codec::H264,
+                hardware: true,
+                supports_dmabuf_zero_copy: false,
+                priority: 10,
+            },
+            Candidate {
+                name: "VA-API H.264 (low-power)",
+                gst_element: "vah264lpenc",
+                codec: Codec::H264,
+                hardware: true,
+                supports_dmabuf_zero_copy: false,
+                priority: 10,
+            },
         ],
         // VA-API H.265 - priority 11
         &[
-            Candidate { name: "VA-API H.265", gst_element: "vaapih265enc", codec: Codec::H265, hardware: true, supports_dmabuf_zero_copy: true, priority: 11 },
-            Candidate { name: "VA-API H.265", gst_element: "vah265enc", codec: Codec::H265, hardware: true, supports_dmabuf_zero_copy: false, priority: 11 },
-            Candidate { name: "VA-API H.265 (low-power)", gst_element: "vah265lpenc", codec: Codec::H265, hardware: true, supports_dmabuf_zero_copy: false, priority: 11 },
+            Candidate {
+                name: "VA-API H.265",
+                gst_element: "vaapih265enc",
+                codec: Codec::H265,
+                hardware: true,
+                supports_dmabuf_zero_copy: true,
+                priority: 11,
+            },
+            Candidate {
+                name: "VA-API H.265",
+                gst_element: "vah265enc",
+                codec: Codec::H265,
+                hardware: true,
+                supports_dmabuf_zero_copy: false,
+                priority: 11,
+            },
+            Candidate {
+                name: "VA-API H.265 (low-power)",
+                gst_element: "vah265lpenc",
+                codec: Codec::H265,
+                hardware: true,
+                supports_dmabuf_zero_copy: false,
+                priority: 11,
+            },
         ],
         // VA-API VP9 - priority 12
         &[
-            Candidate { name: "VA-API VP9", gst_element: "vaapivp9enc", codec: Codec::VP9, hardware: true, supports_dmabuf_zero_copy: true, priority: 12 },
-            Candidate { name: "VA-API VP9", gst_element: "vavp9enc", codec: Codec::VP9, hardware: true, supports_dmabuf_zero_copy: false, priority: 12 },
+            Candidate {
+                name: "VA-API VP9",
+                gst_element: "vaapivp9enc",
+                codec: Codec::VP9,
+                hardware: true,
+                supports_dmabuf_zero_copy: true,
+                priority: 12,
+            },
+            Candidate {
+                name: "VA-API VP9",
+                gst_element: "vavp9enc",
+                codec: Codec::VP9,
+                hardware: true,
+                supports_dmabuf_zero_copy: false,
+                priority: 12,
+            },
         ],
         // NVENC H.264 (NVIDIA) - priority 20
         &[
-            Candidate { name: "NVENC H.264", gst_element: "nvh264enc", codec: Codec::H264, hardware: true, supports_dmabuf_zero_copy: false, priority: 20 },
-            Candidate { name: "NVENC H.264", gst_element: "nvcudah264enc", codec: Codec::H264, hardware: true, supports_dmabuf_zero_copy: false, priority: 20 },
+            Candidate {
+                name: "NVENC H.264",
+                gst_element: "nvh264enc",
+                codec: Codec::H264,
+                hardware: true,
+                supports_dmabuf_zero_copy: false,
+                priority: 20,
+            },
+            Candidate {
+                name: "NVENC H.264",
+                gst_element: "nvcudah264enc",
+                codec: Codec::H264,
+                hardware: true,
+                supports_dmabuf_zero_copy: false,
+                priority: 20,
+            },
         ],
         // NVENC H.265 - priority 21
         &[
-            Candidate { name: "NVENC H.265", gst_element: "nvh265enc", codec: Codec::H265, hardware: true, supports_dmabuf_zero_copy: false, priority: 21 },
-            Candidate { name: "NVENC H.265", gst_element: "nvcudah265enc", codec: Codec::H265, hardware: true, supports_dmabuf_zero_copy: false, priority: 21 },
+            Candidate {
+                name: "NVENC H.265",
+                gst_element: "nvh265enc",
+                codec: Codec::H265,
+                hardware: true,
+                supports_dmabuf_zero_copy: false,
+                priority: 21,
+            },
+            Candidate {
+                name: "NVENC H.265",
+                gst_element: "nvcudah265enc",
+                codec: Codec::H265,
+                hardware: true,
+                supports_dmabuf_zero_copy: false,
+                priority: 21,
+            },
         ],
         // Software H.264 - priority 100. x264 (gst-plugins-ugly) preferred,
         // openh264 (gst-plugins-bad) as a fallback so MP4 still works without
         // gst-plugins-ugly installed.
         &[
-            Candidate { name: "x264 H.264", gst_element: "x264enc", codec: Codec::H264, hardware: false, supports_dmabuf_zero_copy: false, priority: 100 },
-            Candidate { name: "OpenH264", gst_element: "openh264enc", codec: Codec::H264, hardware: false, supports_dmabuf_zero_copy: false, priority: 100 },
+            Candidate {
+                name: "x264 H.264",
+                gst_element: "x264enc",
+                codec: Codec::H264,
+                hardware: false,
+                supports_dmabuf_zero_copy: false,
+                priority: 100,
+            },
+            Candidate {
+                name: "OpenH264",
+                gst_element: "openh264enc",
+                codec: Codec::H264,
+                hardware: false,
+                supports_dmabuf_zero_copy: false,
+                priority: 100,
+            },
         ],
         // Software VP9 - priority 101
-        &[
-            Candidate { name: "VP9", gst_element: "vp9enc", codec: Codec::VP9, hardware: false, supports_dmabuf_zero_copy: false, priority: 101 },
-        ],
+        &[Candidate {
+            name: "VP9",
+            gst_element: "vp9enc",
+            codec: Codec::VP9,
+            hardware: false,
+            supports_dmabuf_zero_copy: false,
+            priority: 101,
+        }],
     ];
 
-    let mut encoders = Vec::new();
-    for group in candidate_groups {
-        if let Some(candidate) = group.iter().find(|c| encoder_available(c.gst_element)) {
-            encoders.push(EncoderInfo {
-                name: candidate.name.to_string(),
-                gst_element: candidate.gst_element.to_string(),
-                codec: candidate.codec,
-                hardware: candidate.hardware,
-                supports_dmabuf_zero_copy: candidate.supports_dmabuf_zero_copy,
-                priority: candidate.priority,
-            });
+    // Probing spins up real GStreamer pipelines, so cache the result for the
+    // lifetime of the process — encoder availability doesn't change at runtime,
+    // and detection is called from both the settings UI and the record path.
+    static CACHE: OnceLock<Vec<EncoderInfo>> = OnceLock::new();
+    let encoders = CACHE.get_or_init(|| {
+        let mut encoders = Vec::new();
+        for group in candidate_groups {
+            // Keep the first candidate that both exists AND actually encodes.
+            // Probing (not just existence) is what filters out encoders that are
+            // present but fail at runtime — e.g. a VA-API element the GPU/driver
+            // can't drive, the root cause behind issue #17.
+            if let Some(candidate) = group
+                .iter()
+                .find(|c| encoder_available(c.gst_element) && encoder_works(c.gst_element, c.codec))
+            {
+                encoders.push(EncoderInfo {
+                    name: candidate.name.to_string(),
+                    gst_element: candidate.gst_element.to_string(),
+                    codec: candidate.codec,
+                    hardware: candidate.hardware,
+                    supports_dmabuf_zero_copy: candidate.supports_dmabuf_zero_copy,
+                    priority: candidate.priority,
+                });
+            }
         }
-    }
 
-    // Sort by priority (lower first)
-    encoders.sort_by_key(|e| e.priority);
+        // Sort by priority (lower first)
+        encoders.sort_by_key(|e| e.priority);
+        encoders
+    });
 
-    Ok(encoders)
+    Ok(encoders.clone())
 }
 
 /// Check if a GStreamer encoder element is available
 fn encoder_available(element_name: &str) -> bool {
     gst::ElementFactory::find(element_name).is_some()
+}
+
+/// Timeout for encoder probe pipelines (EOS or Error).
+const PROBE_TIMEOUT_SECS: u64 = 3;
+
+/// Verify an encoder actually works by running a tiny throwaway pipeline
+/// (`videotestsrc → videoconvert → encoder → parser → fakesink`) to EOS.
+///
+/// Existence (`ElementFactory::find`) is not enough: hardware encoders routinely
+/// register but then fail to negotiate or initialize on the actual GPU/driver.
+/// Only encoders that reach EOS within [`PROBE_TIMEOUT_SECS`] are offered.
+fn encoder_works(element_name: &str, codec: Codec) -> bool {
+    let parser = codec
+        .parser_element()
+        .map(|p| format!(" ! {p}"))
+        .unwrap_or_default();
+    let pipeline_desc = format!(
+        "videotestsrc num-buffers=3 \
+         ! video/x-raw,format=NV12,width=320,height=240,framerate=10/1 \
+         ! videoconvert ! {element_name}{parser} ! fakesink"
+    );
+
+    let pipeline = match gst::parse::launch(&pipeline_desc) {
+        Ok(p) => p,
+        Err(e) => {
+            log::debug!("Encoder probe build failed for {element_name}: {e}");
+            return false;
+        }
+    };
+    let Some(bus) = pipeline.bus() else {
+        return false;
+    };
+    if pipeline.set_state(gst::State::Playing).is_err() {
+        let _ = pipeline.set_state(gst::State::Null);
+        return false;
+    }
+
+    let ok = loop {
+        match bus.timed_pop(gst::ClockTime::from_seconds(PROBE_TIMEOUT_SECS)) {
+            Some(msg) => match msg.view() {
+                gst::MessageView::Eos(_) => break true,
+                gst::MessageView::Error(_) => break false,
+                _ => continue,
+            },
+            None => break false, // timed out
+        }
+    };
+    let _ = pipeline.set_state(gst::State::Null);
+    if !ok {
+        log::debug!("Encoder probe failed/timed out for {element_name}");
+    }
+    ok
 }
 
 /// Get the best available encoder (first hardware encoder, or first software if none)
@@ -247,6 +472,46 @@ mod tests {
                 "duplicate encoder element: {}",
                 e.gst_element
             );
+        }
+    }
+
+    #[test]
+    fn test_codec_container_support() {
+        // MP4 only for H.264/H.265; MKV for everything.
+        assert!(Codec::H264.supports_container(Container::Mp4));
+        assert!(Codec::H265.supports_container(Container::Mp4));
+        assert!(!Codec::VP9.supports_container(Container::Mp4));
+        assert!(!Codec::AV1.supports_container(Container::Mp4));
+
+        for codec in [Codec::H264, Codec::H265, Codec::VP9, Codec::AV1] {
+            assert!(codec.supports_container(Container::Mkv));
+        }
+
+        assert_eq!(Codec::H264.default_container(), Container::Mp4);
+        assert_eq!(Codec::VP9.default_container(), Container::Mkv);
+    }
+
+    #[test]
+    fn test_codec_from_element_name() {
+        assert_eq!(Codec::from_element_name("vaapih264enc"), Some(Codec::H264));
+        assert_eq!(Codec::from_element_name("vah264enc"), Some(Codec::H264));
+        assert_eq!(Codec::from_element_name("x264enc"), Some(Codec::H264));
+        assert_eq!(Codec::from_element_name("openh264enc"), Some(Codec::H264));
+        assert_eq!(Codec::from_element_name("vah265enc"), Some(Codec::H265));
+        assert_eq!(Codec::from_element_name("nvh265enc"), Some(Codec::H265));
+        assert_eq!(Codec::from_element_name("vaav1enc"), Some(Codec::AV1));
+        assert_eq!(Codec::from_element_name("vp9enc"), Some(Codec::VP9));
+        assert_eq!(Codec::from_element_name("wildcard"), None);
+    }
+
+    #[test]
+    fn test_detected_encoder_codec_container_consistency() {
+        // Every detected encoder must have a working default container.
+        let Ok(encoders) = detect_encoders() else {
+            return;
+        };
+        for e in &encoders {
+            assert!(e.codec.supports_container(e.codec.default_container()));
         }
     }
 

@@ -4,12 +4,149 @@ use crate::screenshot::Args;
 use crate::session::messages::Msg;
 use cosmic::iced::keyboard::{Key, Modifiers, key::Named};
 
+/// Route a key press to the text annotation being typed.
+///
+/// While a text annotation is open, keystrokes are *text*, not shortcuts —
+/// otherwise typing "and" would toggle the shape tool, start a redaction and
+/// re-enter region mode. This runs before every other binding and swallows
+/// anything it plausibly owns.
+fn handle_text_editing_key(key: &Key, modifiers: Modifiers) -> Option<Msg> {
+    match key {
+        // Enter commits; Shift+Enter adds a line break.
+        Key::Named(Named::Enter) if modifiers.shift() => Some(Msg::text_newline()),
+        Key::Named(Named::Enter) => Some(Msg::text_commit()),
+        // Escape finishes the label (keeping it) rather than cancelling the whole
+        // screenshot. Nothing discards a typed label implicitly.
+        Key::Named(Named::Escape) => Some(Msg::text_commit()),
+        Key::Named(Named::Backspace) => Some(Msg::text_backspace()),
+        Key::Named(Named::Tab) => Some(Msg::text_insert("    ".to_string())),
+        // Printable characters. Ctrl/Alt combos are left alone so they can't be
+        // typed as literal text, but they also must not fall through to the
+        // shortcut table mid-edit — swallow them instead.
+        Key::Character(c) => {
+            if modifiers.control() || modifiers.alt() {
+                Some(Msg::text_commit())
+            } else {
+                Some(Msg::text_insert(c.to_string()))
+            }
+        }
+        // Everything else (arrows, F-keys, modifiers alone) is ignored. Returning
+        // None is safe here because the caller early-returns, so these keys never
+        // reach the shortcut table below.
+        _ => None,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::session::messages::{DrawMsg, TextAction};
+
+    fn ch(c: &str) -> Key {
+        Key::Character(c.into())
+    }
+
+    /// Extract the text action a key produced, if any.
+    fn text_action(key: Key, modifiers: Modifiers) -> Option<TextAction> {
+        match handle_text_editing_key(&key, modifiers) {
+            Some(Msg::Draw(DrawMsg::Text(action))) => Some(action),
+            _ => None,
+        }
+    }
+
+    #[test]
+    fn letters_that_are_shortcuts_are_typed_as_text_instead() {
+        // Every one of these is a mode shortcut when not editing text: typing
+        // "adroqs" must not toggle tools, start a redaction or re-enter region
+        // mode. This is the whole reason text editing intercepts the keyboard.
+        for c in ["a", "d", "r", "o", "q", "s", "R", "D"] {
+            match text_action(ch(c), Modifiers::default()) {
+                Some(TextAction::Insert(s)) => assert_eq!(s, c),
+                other => panic!("{c:?} should insert text, got {other:?}"),
+            }
+        }
+    }
+
+    #[test]
+    fn space_is_typed_as_text() {
+        // Space arrives as a character, not a named key.
+        match text_action(ch(" "), Modifiers::default()) {
+            Some(TextAction::Insert(s)) => assert_eq!(s, " "),
+            other => panic!("space should insert text, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn enter_commits_and_shift_enter_adds_a_line() {
+        assert!(matches!(
+            text_action(Key::Named(Named::Enter), Modifiers::default()),
+            Some(TextAction::Commit)
+        ));
+        assert!(matches!(
+            text_action(Key::Named(Named::Enter), Modifiers::SHIFT),
+            Some(TextAction::Newline)
+        ));
+    }
+
+    #[test]
+    fn escape_saves_the_label_rather_than_cancelling_the_screenshot() {
+        // Without interception this would cancel the whole capture; and it must
+        // keep the text, not discard it.
+        assert!(matches!(
+            text_action(Key::Named(Named::Escape), Modifiers::default()),
+            Some(TextAction::Commit)
+        ));
+    }
+
+    #[test]
+    fn backspace_deletes_and_tab_indents() {
+        assert!(matches!(
+            text_action(Key::Named(Named::Backspace), Modifiers::default()),
+            Some(TextAction::Backspace)
+        ));
+        match text_action(Key::Named(Named::Tab), Modifiers::default()) {
+            Some(TextAction::Insert(s)) => assert_eq!(s, "    "),
+            other => panic!("tab should indent, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn ctrl_combos_commit_instead_of_typing_a_letter() {
+        // Ctrl+Z shouldn't insert "z" — it finishes the label so the next press
+        // reaches the real undo binding.
+        assert!(matches!(
+            text_action(ch("z"), Modifiers::CTRL),
+            Some(TextAction::Commit)
+        ));
+    }
+
+    #[test]
+    fn navigation_keys_are_swallowed_while_editing() {
+        // Must not fall through to screen navigation / toolbar movement.
+        for key in [
+            Key::Named(Named::ArrowLeft),
+            Key::Named(Named::ArrowRight),
+            Key::Named(Named::Home),
+        ] {
+            assert!(
+                handle_text_editing_key(&key, Modifiers::default()).is_none(),
+                "{key:?} should be ignored while editing"
+            );
+        }
+    }
+}
+
 pub fn handle_key_event(
     args: &Args,
     key: Key,
     modifiers: Modifiers,
     current_output_index: usize,
 ) -> Option<Msg> {
+    // Text editing owns the keyboard while it's active.
+    if args.annotations.text_editing.is_some() {
+        return handle_text_editing_key(&key, modifiers);
+    }
+
     // Determine if we have a complete selection for action shortcuts
     let has_selection = match &args.session.choice {
         Choice::Rectangle(r, _) => r.dimensions().is_some(),
@@ -65,7 +202,7 @@ pub fn handle_key_event(
         }
         // Save/copy shortcuts (always available - empty selection captures all screens)
         Key::Named(Named::Enter) if modifiers.control() => Some(Msg::save_to_pictures()),
-        Key::Named(Named::Escape) => Some(Msg::cancel()),
+        Key::Named(Named::Escape) => Some(Msg::cancel_requested()),
         // Space/Enter to confirm selection in picker mode (screen)
         Key::Character(c) if c.as_str() == " " && in_screen_picker => Some(Msg::confirm()),
         Key::Named(Named::Enter) if in_screen_picker => Some(Msg::confirm()),

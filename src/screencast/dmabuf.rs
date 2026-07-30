@@ -249,9 +249,9 @@ pub fn select_best_format(
     }
 
     // Fall back to first available format
-    available_formats.first().and_then(|(format, modifiers)| {
+    available_formats.first().map(|(format, modifiers)| {
         let modifier = modifiers.first().copied().unwrap_or(DrmModifier::Invalid);
-        Some((*format, modifier))
+        (*format, modifier)
     })
 }
 

@@ -118,7 +118,7 @@ fn substitute_h265_for_unaligned_width(
     encoders: &[EncoderInfo],
     width: u32,
 ) -> EncoderInfo {
-    if requested.codec != Codec::H265 || width % 64 == 0 {
+    if requested.codec != Codec::H265 || width.is_multiple_of(64) {
         return requested;
     }
 
@@ -762,8 +762,8 @@ pub fn start_recording(
                         }
 
                         // If toplevel capture is failing, try falling back to output capture
-                        if !fell_back_to_output && consecutive_failures >= 10 {
-                            if let CaptureSource::Toplevel(_) = &capture_source {
+                        if !fell_back_to_output && consecutive_failures >= 10
+                            && let CaptureSource::Toplevel(_) = &capture_source {
                                 log::warn!(
                                     "Capture thread: toplevel capture not working, falling back to output capture"
                                 );
@@ -787,7 +787,6 @@ pub fn start_recording(
                                     continue;
                                 }
                             }
-                        }
 
                         // Give up after too many consecutive failures
                         if consecutive_failures >= max_consecutive_failures {
@@ -850,7 +849,7 @@ pub fn start_recording(
                     consecutive_errors = 0;
                     frame_count += 1;
 
-                    if frame_count % 60 == 0 {
+                    if frame_count.is_multiple_of(60) {
                         let elapsed = start_time.elapsed();
                         let fps = frame_count as f64 / elapsed.as_secs_f64();
                         let capture_fps = new_frames as f64 / elapsed.as_secs_f64();
@@ -900,7 +899,7 @@ pub fn start_recording(
                     consecutive_errors = 0;
                     frame_count += 1;
 
-                    if frame_count % 60 == 0 {
+                    if frame_count.is_multiple_of(60) {
                         let elapsed = start_time.elapsed();
                         let fps = frame_count as f64 / elapsed.as_secs_f64();
                         log::info!(
@@ -1534,7 +1533,7 @@ pub fn start_recording_thread(
                             last_checksum = Some(checksum);
 
                             frame_count += 1;
-                            if frame_count % 60 == 0 {
+                            if frame_count.is_multiple_of(60) {
                                 log::debug!(
                                     "Capture thread: {} frames captured, {} currently identical",
                                     frame_count,
@@ -1609,7 +1608,7 @@ pub fn start_recording_thread(
                     consecutive_errors = 0;
                     frame_count += 1;
 
-                    if frame_count % 60 == 0 {
+                    if frame_count.is_multiple_of(60) {
                         let elapsed = start_time.elapsed();
                         let fps = frame_count as f64 / elapsed.as_secs_f64();
                         let capture_fps = new_frames as f64 / elapsed.as_secs_f64();

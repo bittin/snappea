@@ -17,6 +17,7 @@ use cosmic::widget::{button, container, icon, text, toggler, tooltip};
 
 use super::lucide::{self, AppIcon};
 use crate::config::{RedactTool, ShapeColor, ShapeTool};
+use crate::domain::{SHAPE_THICKNESS_MAX, SHAPE_THICKNESS_MIN, TEXT_SIZE_PRESETS};
 use crate::fl;
 
 /// A wrapper widget that detects right-click and long-press events
@@ -401,23 +402,11 @@ pub fn build_shape_button<'a, Msg: Clone + 'static>(
     _space_xxs: u16,
     content_opacity: f32,
 ) -> Element<'a, Msg> {
-    let option_index = match current_tool {
-        ShapeTool::Arrow => 0,
-        ShapeTool::Circle => 1,
-        ShapeTool::Rectangle => 2,
-    };
-
-    let icon = match current_tool {
-        ShapeTool::Arrow => AppIcon::Arrow,
-        ShapeTool::Circle => AppIcon::Circle,
-        ShapeTool::Rectangle => AppIcon::Square,
-    };
-
-    build_tool_button_with_icon(
-        lucide::icon_with_opacity(icon, 34.0, content_opacity, is_active || is_popup_open),
+    build_tool_button(
+        current_tool.icon_name(),
         current_tool.tooltip(),
-        3, // 3 shape options
-        option_index,
+        ShapeTool::COUNT,
+        current_tool.index(),
         is_active,
         is_popup_open,
         is_enabled,
@@ -428,6 +417,12 @@ pub fn build_shape_button<'a, Msg: Clone + 'static>(
     )
 }
 
+/// Width of the shape popup.
+///
+/// Wide enough for the tool rows (icon + label + selected check) as well as the
+/// 4-per-row colour swatches.
+const SHAPE_POPUP_WIDTH: f32 = 260.0;
+
 /// Build the shape settings popup element
 #[allow(clippy::too_many_arguments)]
 pub fn build_shape_popup<'a, Msg: Clone + 'static>(
@@ -435,80 +430,59 @@ pub fn build_shape_popup<'a, Msg: Clone + 'static>(
     current_color: ShapeColor,
     shadow_enabled: bool,
     has_annotations: bool,
-    on_select_arrow: Msg,
-    on_select_circle: Msg,
-    on_select_rectangle: Msg,
+    on_select_tool: &(impl Fn(ShapeTool) -> Msg + 'a),
+    current_thickness: f32,
+    on_thickness_change: impl Fn(f32) -> Msg + 'a,
+    on_thickness_save: Msg,
+    current_font_size: f32,
+    on_font_size_change: &(impl Fn(f32) -> Msg + 'a),
     on_color_change: &(impl Fn(ShapeColor) -> Msg + 'a),
     on_shadow_toggle: Msg,
     on_clear: Msg,
     space_s: u16,
     space_xs: u16,
 ) -> Element<'a, Msg> {
-    let icon_size = 32.0;
-
-    // Shape selection buttons in a row
-    let btn_arrow = tooltip(
-        button::custom(lucide::icon_with_opacity(
-            AppIcon::Arrow,
-            icon_size,
-            1.0,
-            current_tool == ShapeTool::Arrow,
-        ))
-        .class(if current_tool == ShapeTool::Arrow {
-            cosmic::theme::Button::Suggested
-        } else {
-            cosmic::theme::Button::Icon
-        })
-        .on_press(on_select_arrow)
-        .padding(space_xs),
-        text::body(fl!("arrow")),
-        tooltip::Position::Bottom,
-    );
-
-    let btn_circle = tooltip(
-        button::custom(lucide::icon_with_opacity(
-            AppIcon::Circle,
-            icon_size,
-            1.0,
-            current_tool == ShapeTool::Circle,
-        ))
-        .class(if current_tool == ShapeTool::Circle {
-            cosmic::theme::Button::Suggested
-        } else {
-            cosmic::theme::Button::Icon
-        })
-        .on_press(on_select_circle)
-        .padding(space_xs),
-        text::body(fl!("oval-circle")),
-        tooltip::Position::Bottom,
-    );
-
-    let btn_rectangle = tooltip(
-        button::custom(lucide::icon_with_opacity(
-            AppIcon::Square,
-            icon_size,
-            1.0,
-            current_tool == ShapeTool::Rectangle,
-        ))
-        .class(if current_tool == ShapeTool::Rectangle {
-            cosmic::theme::Button::Suggested
-        } else {
-            cosmic::theme::Button::Icon
-        })
-        .on_press(on_select_rectangle)
-        .padding(space_xs),
-        text::body(fl!("rectangle-square")),
-        tooltip::Position::Bottom,
-    );
-
-    // Center the shape buttons in the popup
-    let shape_buttons = container(
-        row![btn_arrow, btn_circle, btn_rectangle]
+    // Tool list: one row per tool (icon + label + selected check).
+    //
+    // A vertical list rather than a row of icon-only buttons: five icons in a
+    // row overflowed the fixed popup width and the last two were clipped. This
+    // also mirrors cosmic-viewer's shape picker and self-documents each tool.
+    let tool_rows: Vec<Element<'_, Msg>> = ShapeTool::ALL
+        .iter()
+        .map(|tool| {
+            let tool = *tool;
+            let is_selected = tool == current_tool;
+            let item = row![
+                icon::Icon::from(icon::from_name(tool.icon_name()).size(16)),
+                text::body(tool.label()).width(Length::Fill),
+                if is_selected {
+                    Element::from(icon::Icon::from(
+                        icon::from_name("object-select-symbolic").size(16),
+                    ))
+                } else {
+                    Element::from(cosmic::iced::widget::space().width(Length::Fixed(16.0)))
+                },
+            ]
             .spacing(space_xs)
-            .align_y(cosmic::iced::core::Alignment::Center),
-    )
-    .width(Length::Fill)
-    .align_x(cosmic::iced::core::alignment::Horizontal::Center);
+            .align_y(cosmic::iced::core::Alignment::Center)
+            .width(Length::Fill);
+
+            button::custom(item)
+                .class(if is_selected {
+                    cosmic::theme::Button::Suggested
+                } else {
+                    cosmic::theme::Button::Icon
+                })
+                .width(Length::Fill)
+                .padding(space_xs)
+                .on_press(on_select_tool(tool))
+                .into()
+        })
+        .collect();
+
+    let shape_buttons = cosmic::iced::widget::Column::with_children(tool_rows)
+        .spacing(2)
+        .width(Length::Fill);
 
     // Subtitle with keyboard shortcuts
     let shape_subtitle = container(text::caption(fl!("shape-cycle-hint")).class(
@@ -516,6 +490,70 @@ pub fn build_shape_popup<'a, Msg: Clone + 'static>(
     ))
     .width(Length::Fill)
     .align_x(cosmic::iced::core::alignment::Horizontal::Center);
+
+    // Stroke thickness — applies to every tool except text, which sizes by font.
+    let thickness_section: Element<'_, Msg> = if current_tool == ShapeTool::Text {
+        cosmic::iced::widget::space()
+            .width(Length::Fixed(0.0))
+            .height(Length::Fixed(0.0))
+            .into()
+    } else {
+        column![
+            text::caption(fl!("thickness", size = (current_thickness as u32))),
+            cosmic::widget::slider(
+                SHAPE_THICKNESS_MIN..=SHAPE_THICKNESS_MAX,
+                current_thickness,
+                on_thickness_change,
+            )
+            .step(1.0_f32)
+            .on_release(on_thickness_save)
+            .width(Length::Fill),
+            cosmic::widget::divider::horizontal::light(),
+        ]
+        .spacing(space_xs)
+        .width(Length::Fill)
+        .into()
+    };
+
+    // Font size presets — only meaningful for the text tool, so only shown then.
+    let font_size_section: Element<'_, Msg> = if current_tool == ShapeTool::Text {
+        let buttons: Vec<Element<'_, Msg>> = TEXT_SIZE_PRESETS
+            .iter()
+            .map(|size| {
+                let size = *size;
+                let is_selected = (size - current_font_size).abs() < 0.5;
+                button::custom(text::caption(format!("{}", size as u32)))
+                    .class(if is_selected {
+                        cosmic::theme::Button::Suggested
+                    } else {
+                        cosmic::theme::Button::Icon
+                    })
+                    .padding(space_xs)
+                    .on_press(on_font_size_change(size))
+                    .into()
+            })
+            .collect();
+
+        column![
+            text::caption(fl!("text-size")),
+            container(
+                row(buttons)
+                    .spacing(space_xs)
+                    .align_y(cosmic::iced::core::Alignment::Center)
+            )
+            .width(Length::Fill)
+            .align_x(cosmic::iced::core::alignment::Horizontal::Center),
+            cosmic::widget::divider::horizontal::light(),
+        ]
+        .spacing(space_xs)
+        .width(Length::Fill)
+        .into()
+    } else {
+        cosmic::iced::widget::space()
+            .width(Length::Fixed(0.0))
+            .height(Length::Fixed(0.0))
+            .into()
+    };
 
     // Color picker - 2 rows of 4 color swatches each to avoid clipping
     let make_color_swatch = |color: &ShapeColor, name: String| {
@@ -626,11 +664,14 @@ pub fn build_shape_popup<'a, Msg: Clone + 'static>(
     let clear_row = container(clear_button).width(Length::Fill);
 
     // Assemble popup content
-    // Width needs to fit: 4 color swatches per row * (24px + 2*2 padding + spacing) + popup padding
+    // Width needs to fit: 4 color swatches per row * (24px + 2*2 padding + spacing)
+    // + popup padding, and the tool rows' icon + label + check mark.
     let popup_content = column![
         shape_buttons,
         shape_subtitle,
         cosmic::widget::divider::horizontal::light(),
+        thickness_section,
+        font_size_section,
         color_section,
         cosmic::widget::divider::horizontal::light(),
         shadow_row,
@@ -639,16 +680,16 @@ pub fn build_shape_popup<'a, Msg: Clone + 'static>(
     ]
     .spacing(space_s)
     .padding(space_s)
-    .width(Length::Fixed(230.0));
+    .width(Length::Fixed(SHAPE_POPUP_WIDTH));
 
     container(popup_content)
         .class(cosmic::theme::Container::Custom(Box::new(|theme| {
             let cosmic_theme = theme.cosmic();
             cosmic::iced::widget::container::Style {
                 background: Some(Background::Color(
-                    cosmic_theme.background.component.base.into(),
+                    cosmic_theme.background(false).component.base.into(),
                 )),
-                text_color: Some(cosmic_theme.background.component.on.into()),
+                text_color: Some(cosmic_theme.background(false).component.on.into()),
                 border: Border {
                     radius: cosmic_theme.corner_radii.radius_s.into(),
                     width: 1.0,
@@ -783,9 +824,9 @@ pub fn build_redact_popup<'a, Msg: Clone + 'static>(
             let cosmic_theme = theme.cosmic();
             cosmic::iced::widget::container::Style {
                 background: Some(Background::Color(
-                    cosmic_theme.background.component.base.into(),
+                    cosmic_theme.background(false).component.base.into(),
                 )),
-                text_color: Some(cosmic_theme.background.component.on.into()),
+                text_color: Some(cosmic_theme.background(false).component.on.into()),
                 border: Border {
                     radius: cosmic_theme.corner_radii.radius_s.into(),
                     width: 1.0,
@@ -809,10 +850,11 @@ pub fn build_magnifier_popup<'a, Msg: Clone + 'static>(
     space_xs: u16,
 ) -> Element<'a, Msg> {
     // Magnification slider (1.5x - 10x) - updates during drag, saves on release
-    let magnification_label = text::body(fl!("magnification", value = format!("{magnification:.1}")));
+    let magnification_label =
+        text::body(fl!("magnification", value = format!("{magnification:.1}")));
     let magnification_slider =
-        cosmic::widget::slider(1.5..=10.0, magnification, move |v| on_set_magnification(v))
-            .step(0.5)
+        cosmic::widget::slider(1.5..=10.0, magnification, on_set_magnification)
+            .step(0.5_f32)
             .on_release(on_save_magnification)
             .width(Length::Fill);
 
@@ -856,9 +898,9 @@ pub fn build_magnifier_popup<'a, Msg: Clone + 'static>(
             let cosmic_theme = theme.cosmic();
             cosmic::iced::widget::container::Style {
                 background: Some(Background::Color(
-                    cosmic_theme.background.component.base.into(),
+                    cosmic_theme.background(false).component.base.into(),
                 )),
-                text_color: Some(cosmic_theme.background.component.on.into()),
+                text_color: Some(cosmic_theme.background(false).component.on.into()),
                 border: Border {
                     radius: cosmic_theme.corner_radii.radius_s.into(),
                     width: 1.0,
@@ -963,8 +1005,8 @@ pub fn build_pencil_popup<'a, Msg: Clone + 'static>(
     // Thickness slider (1-10 pixels) - updates during drag, saves on release
     let thickness_label = text::body(fl!("thickness", size = (thickness as u32)));
     let thickness_slider =
-        cosmic::widget::slider(1.0..=10.0, thickness, move |v| on_thickness_change(v))
-            .step(1.0)
+        cosmic::widget::slider(1.0..=10.0, thickness, on_thickness_change)
+            .step(1.0_f32)
             .on_release(on_thickness_save)
             .width(Length::Fill);
 
@@ -975,8 +1017,8 @@ pub fn build_pencil_popup<'a, Msg: Clone + 'static>(
     // Fade duration slider (1-10 seconds) - updates during drag, saves on release
     let duration_label = text::body(fl!("fade-duration", duration = (fade_duration as u32)));
     let duration_slider =
-        cosmic::widget::slider(1.0..=10.0, fade_duration, move |v| on_duration_change(v))
-            .step(1.0)
+        cosmic::widget::slider(1.0..=10.0, fade_duration, on_duration_change)
+            .step(1.0_f32)
             .on_release(on_duration_save)
             .width(Length::Fill);
 
@@ -1025,9 +1067,9 @@ pub fn build_pencil_popup<'a, Msg: Clone + 'static>(
             let cosmic_theme = theme.cosmic();
             cosmic::iced::widget::container::Style {
                 background: Some(Background::Color(
-                    cosmic_theme.background.component.base.into(),
+                    cosmic_theme.background(false).component.base.into(),
                 )),
-                text_color: Some(cosmic_theme.background.component.on.into()),
+                text_color: Some(cosmic_theme.background(false).component.on.into()),
                 border: Border {
                     radius: cosmic_theme.corner_radii.radius_s.into(),
                     width: 1.0,

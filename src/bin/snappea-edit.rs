@@ -373,7 +373,7 @@ fn build_gif_frames(frames: &[RgbaImage], delay_ms: u32) -> GifFrames {
     const MAX_SYNC_BYTES: usize = 2 * 1024 * 1024;
     const BPP: usize = 4;
 
-    let needs_downscale = frames.first().map_or(false, |f| {
+    let needs_downscale = frames.first().is_some_and(|f| {
         (f.width() as usize * f.height() as usize * BPP) > MAX_SYNC_BYTES
     });
 
@@ -617,7 +617,12 @@ fn save_as_gif_ffmpeg(
         if let Some(t) = t_arg {
             cmd.args(["-t", &format!("{:.3}", t)]);
         }
-        let o = cancel.run(cmd.args(["-i"]).arg(actual_source).args(["-vf", &vf]).arg(out))?;
+        let o = cancel.run(
+            cmd.args(["-i"])
+                .arg(actual_source)
+                .args(["-vf", &vf])
+                .arg(out),
+        )?;
         if !o.status.success() {
             return Err(anyhow::anyhow!(
                 "ffmpeg GIF export failed: {}",
@@ -678,15 +683,7 @@ fn ffmpeg_export_segment(
             cmd.args(["-filter:v", &setpts]);
         }
         cmd.args([
-            "-c:v",
-            "libx264",
-            "-preset",
-            "veryfast",
-            "-crf",
-            "18",
-            "-pix_fmt",
-            "yuv420p",
-            "-an",
+            "-c:v", "libx264", "-preset", "veryfast", "-crf", "18", "-pix_fmt", "yuv420p", "-an",
         ]);
     }
 
@@ -1235,11 +1232,11 @@ impl Application for MediaEditor {
             .output()
             .ok()
             .filter(|o| o.status.success())
-            .and_then(|o| {
+            .map(|o| {
                 let out = String::from_utf8(o.stdout).unwrap_or_default();
                 let err = String::from_utf8(o.stderr).unwrap_or_default();
                 let s = if out.trim().is_empty() { err } else { out };
-                Some(s.trim().to_string())
+                s.trim().to_string()
             })
             .filter(|s| !s.is_empty());
         let gifski_available = gifski_version.is_some();
@@ -1455,12 +1452,11 @@ impl Application for MediaEditor {
             // ── Cut editing ──────────────────────────────────────────
             Message::CutAtPlayhead => {
                 let pos = self.position;
-                if pos > 0.0 && pos < self.duration {
-                    if !self.cuts.iter().any(|&c| (c - pos).abs() < 0.01) {
+                if pos > 0.0 && pos < self.duration
+                    && !self.cuts.iter().any(|&c| (c - pos).abs() < 0.01) {
                         self.cuts.push(pos);
                         self.cuts.sort_by(|a, b| a.partial_cmp(b).unwrap());
                     }
-                }
             }
             Message::SelectChunk(chunk) => {
                 self.selected_chunk = chunk;
@@ -1491,12 +1487,11 @@ impl Application for MediaEditor {
                 }
             }
             Message::AddCut(time) => {
-                if time > 0.0 && time < self.duration {
-                    if !self.cuts.iter().any(|&c| (c - time).abs() < 0.01) {
+                if time > 0.0 && time < self.duration
+                    && !self.cuts.iter().any(|&c| (c - time).abs() < 0.01) {
                         self.cuts.push(time);
                         self.cuts.sort_by(|a, b| a.partial_cmp(b).unwrap());
                     }
-                }
             }
             Message::RemoveCut(index) => {
                 if index < self.cuts.len() {
@@ -1540,17 +1535,16 @@ impl Application for MediaEditor {
                             video.set_paused(true);
                         }
                     }
-                    MediaState::Gif { .. } => {
-                        if self.playing {
+                    MediaState::Gif { .. }
+                        if self.playing => {
                             self.position = fallback;
                         }
-                    }
                     _ => {}
                 }
             }
             Message::NewFrame => {
-                if !self.dragging {
-                    if let MediaState::VideoLoaded { video } = &mut self.media {
+                if !self.dragging
+                    && let MediaState::VideoLoaded { video } = &mut self.media {
                         let pos = video.position().as_secs_f64();
                         let in_deleted =
                             Self::time_in_deleted(pos, &self.cuts, &self.deleted_chunks);
@@ -1595,11 +1589,10 @@ impl Application for MediaEditor {
                             self.position = pos;
                         }
                     }
-                }
             }
             Message::GifFrameChanged(index) => {
-                if let MediaState::Gif { frames, .. } = &self.media {
-                    if !frames.is_empty() && self.duration > 0.0 {
+                if let MediaState::Gif { frames, .. } = &self.media
+                    && !frames.is_empty() && self.duration > 0.0 {
                         let pos = index as f64 / frames.len() as f64 * self.duration;
                         if self.playing && self.is_in_deleted_chunk(pos) {
                             if let Some(next) = self.next_non_deleted_time(pos) {
@@ -1615,7 +1608,6 @@ impl Application for MediaEditor {
                             self.position = pos;
                         }
                     }
-                }
             }
             Message::DurationChanged(dur) => {
                 let d = dur.as_secs_f64();
@@ -1627,11 +1619,10 @@ impl Application for MediaEditor {
                 }
             }
             Message::EndOfStream => {
-                if self.playing {
-                    if let MediaState::VideoLoaded { video } = &mut self.media {
+                if self.playing
+                    && let MediaState::VideoLoaded { video } = &mut self.media {
                         let _ = video.seek(Duration::from_secs_f64(self.trim_start), false);
                     }
-                }
             }
 
             // ── Loading ───────────────────────────────────────────────
@@ -1798,8 +1789,10 @@ impl Application for MediaEditor {
             }
             Message::SaveAsChosen(None) => {}
             Message::CopyToClipboard => {
-                let tmp_path =
-                    PathBuf::from(format!("/tmp/snappea-clipboard.{}", self.export_extension()));
+                let tmp_path = PathBuf::from(format!(
+                    "/tmp/snappea-clipboard.{}",
+                    self.export_extension()
+                ));
                 return self.begin_export(tmp_path, ExportIntent::Copy);
             }
             Message::ExportTick => {
@@ -1948,8 +1941,7 @@ impl Application for MediaEditor {
                 .body(format!("{}%", pct))
                 .control(progress)
                 .primary_action(
-                    widget::button::standard(fl!("edit-cancel"))
-                        .on_press(Message::CancelExport),
+                    widget::button::standard(fl!("edit-cancel")).on_press(Message::CancelExport),
                 )
                 .into(),
         )
@@ -2042,7 +2034,7 @@ impl Application for MediaEditor {
                 VideoPlayer::new(video)
                     .on_new_frame(Message::NewFrame)
                     .on_end_of_stream(Message::EndOfStream)
-                    .on_duration_changed(|d| Message::DurationChanged(d))
+                    .on_duration_changed(Message::DurationChanged)
                     .width(Length::Fill)
                     .height(Length::Fill)
                     .content_fit(ContentFit::Contain),
@@ -2400,7 +2392,7 @@ impl Application for MediaEditor {
 
         // ── About panel (collapsible) ─────────────────────────────
         widget::column::with_children(vec![
-            preview.into(),
+            preview,
             scrub.into(),
             cut_toolbar.into(),
             info.into(),
