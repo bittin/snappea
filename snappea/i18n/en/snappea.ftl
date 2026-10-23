@@ -111,4 +111,3 @@ recording-saved = Recording Saved
 saved-to = Saved to { $path }
 
 # Default screenshot filename prefix
-screenshot-filename-prefix = Screenshot

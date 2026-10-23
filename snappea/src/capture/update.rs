@@ -648,7 +648,7 @@ fn start_recording(app: &mut App) -> cosmic::Task<AppMsg> {
         container = fallback;
     }
     let timestamp = chrono::Local::now().format("%Y-%m-%d_%H-%M-%S");
-    let output_file = output_dir.join(format!("recording-{timestamp}.{}", container.extension()));
+    let output_file = output_dir.join(format!("{timestamp}.{}", container.extension()));
 
     let Some(wl_output) = app.wayland_helper.outputs().into_iter().find(|o| {
         app.wayland_helper

@@ -153,7 +153,7 @@ impl Editor {
             .unwrap_or_default()
             .to_string_lossy()
             .into_owned();
-        let default_name = format!("{stem}-trimmed.{}", format.extension());
+        let default_name = format!("{stem}.{}", format.extension());
         let start_dir = self.path.parent().map(std::path::Path::to_path_buf);
         Task::perform(
             async move {

@@ -7,7 +7,6 @@ use crate::app::{App, OutputState};
 use crate::config::{Config, SaveLocationChoice};
 use crate::dbus::PortalResponse;
 use crate::dbus::ScreenshotResult;
-use crate::fl;
 use crate::geometry::{Choice, DragState, Rect};
 use cosmic::iced::clipboard::mime::AsMimeTypes;
 use cosmic::iced::platform_specific::shell::commands::layer_surface::destroy_layer_surface;
@@ -60,12 +59,7 @@ pub fn get_img_path(location: SaveLocationChoice, custom_dir: &str) -> Option<Pa
 
 /// Timestamped file name for a new screenshot.
 pub fn img_file_name() -> String {
-    chrono::Local::now()
-        .format(&format!(
-            "{}_%Y-%m-%d_%H-%M-%S.png",
-            fl!("screenshot-filename-prefix")
-        ))
-        .to_string()
+    chrono::Local::now().format("%Y-%m-%d_%H-%M-%S.png").to_string()
 }
 
 /// Stitch whole-output frames, each with its logical rect, into one image at
