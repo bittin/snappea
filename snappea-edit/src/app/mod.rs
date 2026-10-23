@@ -249,7 +249,8 @@ impl Application for Editor {
         video.set_muted(false);
         let duration = video.duration().as_secs_f64();
 
-        let title = format!("{} - SnapPea Edit", flags.path.display());
+        let name = flags.path.file_name().unwrap_or(flags.path.as_os_str());
+        let title = format!("{} - SnapPea Edit", name.to_string_lossy());
         core.window.show_headerbar = true;
         core.set_header_title(title.clone());
         let title_task = core.set_title(None, title);
