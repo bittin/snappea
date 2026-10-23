@@ -49,7 +49,6 @@ pub struct Editor {
     seek_scheduled: bool,
     seek_generation: u64,
 
-    speed_menu_open: bool,
     /// for the timeline readability
     frame_colors: Vec<[u8; 3]>,
     /// the audio overlay's bars, empty when the file has no audio
@@ -85,7 +84,6 @@ pub enum Message {
     ColorsExtracted(Vec<[u8; 3]>),
     PeaksExtracted(Vec<f32>),
     // Speed
-    ToggleSpeedMenu,
     SetSpeed(usize),
     // Playback
     TogglePlay,
@@ -304,7 +302,6 @@ impl Application for Editor {
             pending_seek: None,
             seek_scheduled: false,
             seek_generation: 0,
-            speed_menu_open: false,
             frame_colors: Vec::new(),
             peaks: Vec::new(),
             export: None,
@@ -392,10 +389,8 @@ impl Application for Editor {
                 self.audio = !self.audio;
                 self.video.set_muted(!self.audio);
             }
-            Message::ToggleSpeedMenu => self.speed_menu_open = !self.speed_menu_open,
             Message::SetSpeed(index) => {
                 self.speed = SPEED_OPTIONS[index.min(SPEED_OPTIONS.len() - 1)];
-                self.speed_menu_open = false;
             }
 
             Message::TogglePlay => {

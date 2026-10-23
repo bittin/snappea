@@ -32,7 +32,6 @@ appicon-src := name / 'data' / 'logo.svg'
 appicon-dst := base-dir / 'share' / 'icons' / 'hicolor' / 'scalable' / 'apps' / 'io.github.hojjatabdollahi.snappea.svg'
 
 icons-src := name / 'data' / 'icons' / 'scalable' / 'actions'
-trim-icons-src := trim / 'res' / 'icons' / 'scalable' / 'actions'
 icons-dst := base-dir / 'share' / 'icons' / 'hicolor' / 'scalable' / 'actions'
 
 portal-src := name / 'data' / 'snappea.portal'
@@ -115,7 +114,6 @@ install: _built
     install -Dm0644 {{metainfo-src}} {{metainfo-dst}}
     install -Dm0644 {{appicon-src}} {{appicon-dst}}
     install -Dm0644 -t {{icons-dst}} {{icons-src}}/*.svg
-    install -Dm0644 -t {{icons-dst}} {{trim-icons-src}}/*.svg
     install -Dm0644 {{portal-src}} {{portal-dst}}
     install -Dm0644 {{service-src}} {{service-dst}}
     @just rootdir={{rootdir}} prefix={{prefix}} _refresh-caches
@@ -167,7 +165,7 @@ uninstall:
     rm -f {{trim-desktop-dst}}
     rm -f {{metainfo-dst}}
     rm -f {{appicon-dst}}
-    @for f in {{icons-src}}/*.svg {{trim-icons-src}}/*.svg; do \
+    @for f in {{icons-src}}/*.svg; do \
         rm -f "{{icons-dst}}/$(basename "$f")"; \
     done
     rm -f {{portal-dst}}

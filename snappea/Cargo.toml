@@ -106,11 +106,6 @@ assets = [
     "644",
   ],
   [
-    "../snappea-edit/res/icons/scalable/actions/*.svg",
-    "usr/share/icons/hicolor/scalable/actions/",
-    "644",
-  ],
-  [
     "data/io.github.hojjatabdollahi.snappea.metainfo.xml",
     "usr/share/metainfo/",
     "644",
