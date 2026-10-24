@@ -1,3 +1,8 @@
 /target
-/fonts/lucide.ttf
-/src/lucide_icon.rs
+**/.cargo/
+/debian/*debhelper*
+/debian/snappea.substvars
+/debian/snappea/
+/debian/files
+/vendor.tar
+/vendor/

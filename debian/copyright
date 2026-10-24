@@ -1,0 +1,7 @@
+Format: https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
+Upstream-Name: snappea
+Upstream-Contact: Hojjat <hojjat.abdollahi@gmail.com>
+Source: https://github.com/hojjatabdollahi/snappea
+Files: *
+Copyright: Hojjat
+License: GPL-3.0

@@ -33,11 +33,11 @@ jobs:
                 print version
                 exit
               }
-            ' Cargo.toml
+            ' snappea/Cargo.toml
           )"
 
           if [ -z "$cargo_version" ]; then
-            echo "::error::Could not read package version from Cargo.toml"
+            echo "::error::Could not read package version from snappea/Cargo.toml"
             exit 1
           fi
 
@@ -90,7 +90,7 @@ jobs:
         run: cargo build --release --locked
 
       - name: Build .deb package
-        run: cargo deb --no-build
+        run: cargo deb -p snappea --no-build
         # --no-build because we already built above; cargo-deb just packages
 
       - name: Locate .deb file

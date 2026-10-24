@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<component type="desktop-application">
+    <id>io.github.hojjatabdollahi.snappea</id>
+    <metadata_license>CC0-1.0</metadata_license>
+    <project_license>GPL-3.0-only</project_license>
+    <project_group>COSMIC</project_group>
+    <developer id="com.system76">
+        <name>System76</name>
+    </developer>
+    <url type="homepage">https://github.com/hojjatabdollahi/snappea</url>
+    <url type="bugtracker">https://github.com/hojjatabdollahi/snappea/issues</url>
+    <name>SnapPea</name>
+    <summary>Screenshots and screen recording for the COSMIC desktop</summary>
+    <description>
+        <p>
+            SnapPea captures a region or a screen, annotates the result,
+            and records the screen. It implements the Screenshot portal.
+        </p>
+        <ul>
+            <li>Region, screen and all-screens capture</li>
+            <li>Pen, highlighter, shapes, text, redaction, pixelation and a loupe</li>
+            <li>Screen recording with hardware encoding and live drawing</li>
+            <li>A trimmer for recordings, with GIF and video export</li>
+            <li>Text recognition and QR code detection on the selection</li>
+            <li>Delayed capture</li>
+            <li>Audio recording</li>
+        </ul>
+    </description>
+    <keywords>
+        <keyword>Screenshot</keyword>
+        <keyword>Screen</keyword>
+        <keyword>Capture</keyword>
+        <keyword>Record</keyword>
+        <keyword>Annotate</keyword>
+    </keywords>
+    <launchable type="desktop-id">io.github.hojjatabdollahi.snappea.desktop</launchable>
+    <releases>
+        <release version="1.2.0" date="2026-10-23">
+            <description>
+                <p>Audio recording: system audio, the microphone, or both, with a mute button and live level meter in the recording toolbar. The editor shows the audio track, keeps it when exporting, and can remove it. Default save folders are Screenshots and Screencasts. Fixes the microphone pop at the start of a recording and a stuck portal after a lost Wayland connection.</p>
+            </description>
+        </release>
+        <release version="1.1.0" date="2026-10-19">
+            <description>
+                <p>Toggle for the recording region border, Enter as the capture key, no default capture delay, and fixes for the border at screen edges and delayed capture.</p>
+            </description>
+        </release>
+        <release version="1.0.0" date="2026-10-13">
+            <description>
+                <p>Major overhaul and redesigned interface.</p>
+            </description>
+        </release>
+        <release version="0.9.1" date="2026-09-03">
+            <description>
+                <p>Initial release.</p>
+            </description>
+        </release>
+    </releases>
+    <content_rating type="oars-1.1" />
+    <provides>
+        <id>com.system76.CosmicApplication</id>
+        <dbus type="session">io.github.hojjatabdollahi.snappea</dbus>
+        <binary>snappea</binary>
+        <binary>snappea-edit</binary>
+    </provides>
+</component>
