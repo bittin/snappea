@@ -72,6 +72,8 @@ pub struct RecordingHandle {
     thread_handle: Option<JoinHandle<Result<()>>>,
     /// Where the recording is being written
     pub output_file: PathBuf,
+    /// Whether to open snappea-edit after the recording finishes
+    pub open_snappea_edit: bool,
 }
 
 impl RecordingHandle {
@@ -80,11 +82,13 @@ impl RecordingHandle {
         stop_flag: Arc<AtomicBool>,
         thread_handle: JoinHandle<Result<()>>,
         output_file: PathBuf,
+        open_snappea_edit: bool,
     ) -> Self {
         Self {
             stop_flag,
             thread_handle: Some(thread_handle),
             output_file,
+            open_snappea_edit,
         }
     }
 
@@ -132,11 +136,14 @@ pub fn stop_recording() -> Result<()> {
 
         // Spawn a thread to wait for cleanup (don't block the caller)
         let output_file = handle.output_file.clone();
+        let open_snappea_edit = handle.open_snappea_edit;
         std::thread::spawn(move || match handle.join() {
             Ok(()) => {
                 log::info!("Recording saved to: {}", output_file.display());
                 // Launch snappea-edit with --discard so user can trim/convert
-                launch_editor(&output_file);
+                if open_snappea_edit {
+                    launch_editor(&output_file);
+                }
             }
             Err(e) => {
                 log::error!("Recording thread error: {e}");

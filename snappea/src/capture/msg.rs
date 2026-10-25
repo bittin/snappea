@@ -176,6 +176,7 @@ pub enum SettingsMsg {
     SetVideoFramerate(u32),
     ToggleShowCursor,
     ToggleRegionBorder,
+    ToggleOpenSnappeaEdit,
     ToggleSystemAudio,
     ToggleMicrophone,
     ToggleScreenshotCursor,
@@ -436,6 +437,9 @@ impl Msg {
     }
     pub const fn toggle_region_border() -> Self {
         Self::Settings(SettingsMsg::ToggleRegionBorder)
+    }
+    pub const fn toggle_open_snappea_edit() -> Self {
+        Self::Settings(SettingsMsg::ToggleOpenSnappeaEdit)
     }
     pub const fn toggle_system_audio() -> Self {
         Self::Settings(SettingsMsg::ToggleSystemAudio)

@@ -600,6 +600,7 @@ pub struct UiState {
     pub video_container: Container,
     pub video_framerate: u32,
     pub video_show_cursor: bool,
+    pub video_open_snappea_edit: bool,
     /// Whether a blinking red border marks the recording region.
     pub video_region_border: bool,
     pub video_system_audio: bool,
@@ -677,6 +678,7 @@ impl UiState {
             video_framerate: config.video_framerate,
             video_show_cursor: config.video_show_cursor,
             video_region_border: config.video_region_border,
+            video_open_snappea_edit: config.video_open_snappea_edit,
             video_system_audio: config.video_system_audio,
             video_microphone: config.video_microphone,
             show_cursor: config.show_cursor,

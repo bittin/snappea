@@ -371,6 +371,8 @@ pub struct Config {
     pub video_framerate: u32,
     /// Whether to show cursor in recordings
     pub video_show_cursor: bool,
+    /// Whether to open the snappea edit tool after a video recording
+    pub video_open_snappea_edit: bool,
     /// Whether a blinking red border marks the recording region.
     #[serde(default = "default_video_region_border")]
     pub video_region_border: bool,
@@ -544,6 +546,7 @@ impl Default for Config {
             video_framerate: 60,
             video_show_cursor: true,
             video_region_border: default_video_region_border(),
+            video_open_snappea_edit: true,
             video_system_audio: false,
             video_microphone: false,
             // Off by default: most screenshots are of the screen, not of the

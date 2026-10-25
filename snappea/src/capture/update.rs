@@ -309,6 +309,11 @@ pub fn handle_settings_msg(app: &mut App, msg: SettingsMsg) -> cosmic::Task<crat
             crate::config::Config::store("video_region_border", capture.ui.video_region_border);
             cosmic::Task::none()
         }
+        SettingsMsg::ToggleOpenSnappeaEdit => {
+            capture.ui.video_open_snappea_edit = !capture.ui.video_open_snappea_edit;
+            crate::config::Config::store("video_open_snappea_edit", capture.ui.video_open_snappea_edit);
+            cosmic::Task::none()
+        }
         SettingsMsg::ToggleSystemAudio => {
             capture.ui.video_system_audio = !capture.ui.video_system_audio;
             crate::config::Config::store("video_system_audio", capture.ui.video_system_audio);
@@ -667,6 +672,7 @@ fn start_recording(app: &mut App) -> cosmic::Task<AppMsg> {
 
     let wayland_helper = app.wayland_helper.clone();
     let stop_flag = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+    let open_snappea_edit = capture.ui.video_open_snappea_edit;
     let thread_handle = {
         let stop_flag = stop_flag.clone();
         let output_file = output_file.clone();
@@ -702,6 +708,7 @@ fn start_recording(app: &mut App) -> cosmic::Task<AppMsg> {
         stop_flag,
         thread_handle,
         output_file.clone(),
+        open_snappea_edit,
     ));
     log::info!("Recording started: {}", output_file.display());
 

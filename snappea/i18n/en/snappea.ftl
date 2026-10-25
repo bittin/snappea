@@ -68,6 +68,7 @@ delay-seconds = { $secs } seconds
 selection-edge-magnification = Selection edge magnification
 show-cursor = Show cursor
 show-region-border = Show region border
+open-snappea-edit = Edit after recording
 system-audio= System audio
 microphone= Microphone
 recognize-qr-codes = Recognize QR codes

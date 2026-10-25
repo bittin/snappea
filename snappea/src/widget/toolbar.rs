@@ -841,6 +841,7 @@ pub struct SettingsMenu<'a, Msg> {
     pub video_save_location: VideoSaveLocationChoice,
     pub video_show_cursor: bool,
     pub video_region_border: bool,
+    pub video_open_snappea_edit: bool,
     pub video_system_audio: bool,
     pub video_microphone: bool,
     /// Whether a screenshot includes the pointer.
@@ -856,6 +857,7 @@ pub struct SettingsMenu<'a, Msg> {
     pub on_save_clipboard: Msg,
     pub on_show_cursor: Msg,
     pub on_region_border: Msg,
+    pub on_open_snappea_edit: Msg,
     pub on_system_audio: Msg,
     pub on_microphone: Msg,
     pub on_screenshot_cursor: Msg,
@@ -885,6 +887,11 @@ fn build_settings_menu<Msg: Clone + 'static>(
             fl!("show-region-border"),
             settings.video_region_border,
             settings.on_region_border.clone(),
+        ));
+        list = list.push(menu_row(
+            fl!("open-snappea-edit"),
+            settings.video_open_snappea_edit,
+            settings.on_open_snappea_edit.clone(),
         ));
         list = list.push(menu_row(
             fl!("system-audio"),
