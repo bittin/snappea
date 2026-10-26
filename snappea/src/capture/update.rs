@@ -311,7 +311,10 @@ pub fn handle_settings_msg(app: &mut App, msg: SettingsMsg) -> cosmic::Task<crat
         }
         SettingsMsg::ToggleOpenSnappeaEdit => {
             capture.ui.video_open_snappea_edit = !capture.ui.video_open_snappea_edit;
-            crate::config::Config::store("video_open_snappea_edit", capture.ui.video_open_snappea_edit);
+            crate::config::Config::store(
+                "video_open_snappea_edit",
+                capture.ui.video_open_snappea_edit,
+            );
             cosmic::Task::none()
         }
         SettingsMsg::ToggleSystemAudio => {
@@ -366,7 +369,6 @@ pub fn handle_settings_msg(app: &mut App, msg: SettingsMsg) -> cosmic::Task<crat
                 annotating: capture.ui.annotate_mode,
                 video: capture.ui.is_video_mode,
                 has_selection: capture.selection.choice.has_selection(),
-                annotation_selected: capture.annotations.selected.is_some(),
                 // Only a dragged region, and only where tesseract is
                 // installed to read it.
                 can_ocr: capture.ui.tesseract_available
@@ -1320,7 +1322,7 @@ pub fn apply_tool(capture: &mut Capture, msg: ToolMsg) -> bool {
         }
         ToolMsg::SetShapeThickness(v) => {
             // A picked annotation takes the new size itself. The defaults stay.
-            if capture.ui.move_mode && capture.annotations.resize_selected(v) {
+            if capture.annotations.resize_selected(v) {
                 return false;
             }
             // For pixelation the number is a block size, with its own presets and value.
@@ -1454,6 +1456,7 @@ fn set_primary_shape_tool(capture: &mut Capture, tool: ShapeTool) {
     }
     // Arming a tool leaves move mode.
     capture.ui.move_mode = false;
+    capture.annotations.clear_selection();
 
     // Activate the new tool
     if let Some(kind) = tool.shape_kind() {

@@ -418,7 +418,6 @@ fn restore_last_capture(app: &App, capture: &mut Capture) {
             annotating: false,
             video,
             has_selection: capture.selection.choice.has_selection(),
-            annotation_selected: false,
             can_ocr: capture.ui.tesseract_available
                 && matches!(&capture.selection.choice, Choice::Rectangle(r, _) if r.dimensions().is_some()),
         }),

@@ -3,6 +3,19 @@
 All notable changes to SnapPea are listed here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## Unreleased
+
+### Added
+
+- Add a toggle to edit videos after recording
+- Can select pixelate after drawing one
+
+### Changed
+
+- Show file name in the video editor header instead of the full path.
+- Default name for the output files is now just the date, with no prefix or suffixes.
+- Use libcosmic's dropdown widget for the video speed dropdown
+
 ## [1.2.0] - 2026-10-23
 
 ### Added

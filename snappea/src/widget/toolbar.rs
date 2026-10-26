@@ -236,8 +236,8 @@ pub struct AnnotateSection<'a, Msg> {
     /// Whether there is anything on the capture that could be picked up
     pub can_move: bool,
     pub on_move: Msg,
-    /// How far the delete button is out, 0 when nothing is picked out.
-    pub delete_progress: f32,
+    /// Whether an annotation is picked out for the delete button to delete
+    pub can_delete: bool,
     pub on_delete_selected: Msg,
     pub on_toggle: Msg,
     pub on_shape_popup: Msg,
@@ -509,26 +509,22 @@ fn build_annotate_row<'a, Msg: Clone + 'static>(
         tooltip::Position::Bottom,
     );
 
-    // Eased in and out so a button never appears under the pointer between clicks.
-    let btn_delete: Element<'_, Msg> = Collapse::new(
-        gap_before(
-            tooltip(
-                button::custom(
-                    toolbar_icon("user-trash-symbolic", ICON_PX)
-                        .width(Length::Fixed(BTN_SIZE))
-                        .height(Length::Fixed(BTN_SIZE)),
-                )
-                .class(cosmic::theme::Button::Icon)
-                .padding(BTN_PADDING)
-                .on_press(annotate.on_delete_selected.clone()),
-                text::body(fl!("delete-annotation")),
-                tooltip::Position::Bottom,
-            ),
-            BTN_GAP,
+    let btn_delete = tooltip(
+        button::custom(
+            toolbar_icon("user-trash-symbolic", ICON_PX)
+                .width(Length::Fixed(BTN_SIZE))
+                .height(Length::Fixed(BTN_SIZE)),
+        )
+        .class(cosmic::theme::Button::Icon)
+        .padding(BTN_PADDING)
+        .on_press_maybe(
+            annotate
+                .can_delete
+                .then_some(annotate.on_delete_selected.clone()),
         ),
-        annotate.delete_progress,
-    )
-    .into();
+        text::body(fl!("delete-annotation")),
+        tooltip::Position::Bottom,
+    );
 
     // Shapes dropdown: the geometric tools share one slot, showing whichever
     // was picked last.

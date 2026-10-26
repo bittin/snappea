@@ -389,8 +389,6 @@ pub struct ToolbarAnim {
     pub annotate_row: Animation<f32>,
     /// Capture delay
     pub delay: Animation<f32>,
-    /// Delete button, present only while an annotation is picked out
-    pub delete: Animation<f32>,
     /// Recognize-text button
     pub ocr: Animation<f32>,
 }
@@ -414,7 +412,6 @@ impl ToolbarAnim {
             tools: Self::section(shown.tools),
             annotate_row: Self::section(shown.annotate_row),
             delay: Self::section(shown.delay),
-            delete: Self::section(shown.delete),
             ocr: Self::section(shown.ocr),
         }
     }
@@ -427,7 +424,6 @@ impl ToolbarAnim {
             (&mut self.tools, shown.tools),
             (&mut self.annotate_row, shown.annotate_row),
             (&mut self.delay, shown.delay),
-            (&mut self.delete, shown.delete),
             (&mut self.ocr, shown.ocr),
         ] {
             let target = if target { 1.0 } else { 0.0 };
@@ -447,7 +443,6 @@ impl ToolbarAnim {
             tools: at(&self.tools),
             annotate_row: at(&self.annotate_row),
             delay: at(&self.delay),
-            delete: at(&self.delete),
             ocr: at(&self.ocr),
         }
     }
@@ -460,7 +455,6 @@ impl ToolbarAnim {
             || self.tools.is_animating(now)
             || self.annotate_row.is_animating(now)
             || self.delay.is_animating(now)
-            || self.delete.is_animating(now)
             || self.ocr.is_animating(now)
     }
 }
@@ -473,8 +467,6 @@ pub struct ToolbarProgress {
     pub tools: f32,
     pub annotate_row: f32,
     pub delay: f32,
-    /// The delete button, which is there only while something is picked out.
-    pub delete: f32,
     /// The recognize-text button.
     pub ocr: f32,
 }
@@ -487,7 +479,6 @@ pub struct ToolbarSections {
     pub tools: bool,
     pub annotate_row: bool,
     pub delay: bool,
-    pub delete: bool,
     pub ocr: bool,
 }
 
@@ -497,9 +488,6 @@ pub struct ToolbarMode {
     pub annotating: bool,
     pub video: bool,
     pub has_selection: bool,
-    /// Whether the cursor tool has an annotation picked out, and so whether
-    /// there is anything for the delete button to delete.
-    pub annotation_selected: bool,
     /// Whether there is a region to read text out of, and something to read it
     /// with.
     pub can_ocr: bool,
@@ -513,7 +501,6 @@ impl ToolbarSections {
             annotating,
             video,
             has_selection,
-            annotation_selected,
             can_ocr,
         } = mode;
 
@@ -527,9 +514,6 @@ impl ToolbarSections {
             annotate_row: annotating,
             // Screenshots only, and not while annotating. Stays visible while armed so it can be disarmed.
             delay: !video && !annotating,
-            // Delete is part of the cursor tool, so it shows only with the
-            // annotation row and only while something is picked.
-            delete: annotating && annotation_selected,
             // OCR needs a dragged region and tesseract.
             ocr: can_ocr && !video && !annotating,
         }
@@ -637,7 +621,6 @@ impl UiState {
                 annotating: false,
                 video: false,
                 has_selection: false,
-                annotation_selected: false,
                 can_ocr: false,
             })),
             toolbar_pos: HashMap::new(),
@@ -720,7 +703,6 @@ mod toolbar_anim_tests {
             annotating: false,
             video: false,
             has_selection,
-            annotation_selected: false,
             can_ocr: false,
         }
     }
@@ -952,35 +934,6 @@ mod selection_tests {
         state.selected = Some(0);
         state.clear_all();
         assert_eq!(state.selected, None);
-    }
-
-    /// The delete button is a toolbar section, shown only with the annotation row.
-    #[test]
-    fn delete_needs_selection() {
-        let armed = ToolbarMode {
-            annotating: true,
-            video: false,
-            has_selection: true,
-            annotation_selected: true,
-            can_ocr: false,
-        };
-        assert!(ToolbarSections::of(armed).delete);
-        assert!(
-            !ToolbarSections::of(ToolbarMode {
-                annotation_selected: false,
-                can_ocr: false,
-                ..armed
-            })
-            .delete
-        );
-        assert!(
-            !ToolbarSections::of(ToolbarMode {
-                annotating: false,
-                ..armed
-            })
-            .delete,
-            "nothing to delete from when the tools are put away"
-        );
     }
 }
 

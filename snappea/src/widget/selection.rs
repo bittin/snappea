@@ -39,7 +39,7 @@ use cosmic::iced::core::overlay;
 use cosmic::iced::core::widget::Tree;
 use cosmic::iced::widget::canvas;
 use cosmic::widget::image;
-use viewer_tools::annotate::{MagnifierOperation, TextOperation};
+use viewer_tools::annotate::{MagnifierOperation, PixelateOperation, TextOperation};
 
 /// Distance (logical px) from a magnifier's ring within which a drag resizes it
 const MAGNIFIER_RING_GRAB: f32 = 12.0;
@@ -259,7 +259,7 @@ impl<'a> ScreenshotSelectionWidget<'a> {
             on_capture_mode_video: Msg::toggle_capture_mode(true),
             annotate: {
                 // With an annotation picked up, the controls show and edit it.
-                let picked = ui.move_mode.then(|| annotations.picked()).flatten();
+                let picked = annotations.picked();
                 let picked_size = |tool: crate::config::ShapeTool, default: f32| {
                     picked
                         .filter(|p| {
@@ -352,7 +352,7 @@ impl<'a> ScreenshotSelectionWidget<'a> {
                     can_move: text.is_some()
                         || annotations.operations().iter().any(|op| op.movable()),
                     on_move: Msg::toggle_move_mode(),
-                    delete_progress: ui.toolbar_anim.progress(ui.now).delete,
+                    can_delete: annotations.selected.is_some(),
                     on_delete_selected: Msg::delete_selected(),
                     on_toggle: Msg::annotate_mode_toggle(),
                     on_shape_popup: Msg::toggle_shape_popup(),
@@ -1019,14 +1019,34 @@ impl cosmic::iced::core::Widget<Msg, cosmic::Theme, cosmic::Renderer>
         if let Event::Mouse(mouse_event) = &event
             && let Some(pos) = cursor.position()
         {
+            let global_x = pos.x + self.output_rect.left as f32;
+            let global_y = pos.y + self.output_rect.top as f32;
+            let drag_state = tree.state.downcast_mut::<InteractionState>();
+
+            if let Some((index, last_x, last_y)) = drag_state.move_drag {
+                match mouse_event {
+                    MouseEvent::CursorMoved { .. } => {
+                        let (dx, dy) = (global_x - last_x, global_y - last_y);
+                        drag_state.move_drag = Some((index, global_x, global_y));
+                        if dx != 0.0 || dy != 0.0 {
+                            shell.publish(Msg::move_annotation(index, dx, dy));
+                        }
+                        shell.capture_event();
+                        return;
+                    }
+                    MouseEvent::ButtonReleased(Button::Left) => {
+                        drag_state.move_drag = None;
+                        shell.capture_event();
+                        return;
+                    }
+                    _ => {}
+                }
+            }
+
             // Move tool: pick an annotation up and carry it.
             //
             // Move mode takes precedence over the drawing tools.
             if self.ui.move_mode {
-                let global_x = pos.x + self.output_rect.left as f32;
-                let global_y = pos.y + self.output_rect.top as f32;
-                let drag_state = tree.state.downcast_mut::<InteractionState>();
-
                 // Every press is taken, hit or miss, so a miss cannot drag the selection
                 // and clear the annotations.
                 match mouse_event {
@@ -1079,23 +1099,30 @@ impl cosmic::iced::core::Widget<Msg, cosmic::Theme, cosmic::Renderer>
                         shell.capture_event();
                         return;
                     }
-                    MouseEvent::CursorMoved { .. } => {
-                        if let Some((index, last_x, last_y)) = drag_state.move_drag {
-                            let (dx, dy) = (global_x - last_x, global_y - last_y);
-                            drag_state.move_drag = Some((index, global_x, global_y));
-                            if dx != 0.0 || dy != 0.0 {
-                                shell.publish(Msg::move_annotation(index, dx, dy));
-                            }
-                            shell.capture_event();
-                            return;
-                        }
-                    }
                     MouseEvent::ButtonReleased(Button::Left) => {
-                        drag_state.move_drag = None;
                         shell.capture_event();
                         return;
                     }
                     _ => {}
+                }
+            }
+
+            if self.annotations.pixelate_mode
+                && matches!(mouse_event, MouseEvent::ButtonPressed(Button::Left))
+            {
+                let point = Point::new(global_x, global_y);
+                let hit = self.annotations.operations().iter().rposition(|op| {
+                    op.as_any()
+                        .downcast_ref::<PixelateOperation>()
+                        .is_some_and(|p| p.rect().contains(point))
+                });
+                if hit.is_some() || self.annotations.selected.is_some() {
+                    if hit != self.annotations.selected {
+                        shell.publish(Msg::select_annotation(hit));
+                    }
+                    drag_state.move_drag = hit.map(|index| (index, global_x, global_y));
+                    shell.capture_event();
+                    return;
                 }
             }
 
