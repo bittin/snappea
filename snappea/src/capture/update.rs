@@ -1331,6 +1331,12 @@ pub fn apply_tool(capture: &mut Capture, msg: ToolMsg) -> bool {
             } else if capture.annotations.magnifier_mode {
                 // For the magnifier the same dropdown and message carry a zoom
                 // factor. The selected tool decides what the number means.
+                if capture.annotations.selected_magnifier.is_some() {
+                    capture
+                        .annotations
+                        .edit_selected_magnifier(|m| m.magnification = v);
+                    return false;
+                }
                 capture.ui.magnifier_magnification = v;
             } else if capture.annotations.highlighter_mode {
                 capture.ui.highlighter_thickness = v;

@@ -306,7 +306,10 @@ impl<'a> ScreenshotSelectionWidget<'a> {
                     ),
                     magnification: picked_size(
                         crate::config::ShapeTool::Magnifier,
-                        ui.magnifier_magnification,
+                        annotations
+                            .selected_magnifier
+                            .and_then(|i| annotations.magnifier(i))
+                            .map_or(ui.magnifier_magnification, |m| m.magnification),
                     ),
                     shape_popup_open: ui.shape_popup_open,
                     freehand_popup_open: ui.freehand_popup_open,
@@ -419,7 +422,6 @@ impl<'a> ScreenshotSelectionWidget<'a> {
                         cosmic::widget::dropdown(labels, selected, move |i| {
                             Msg::set_video_encoder(elements.get(i).cloned().flatten())
                         })
-                        .width(cosmic::iced::Length::Fill)
                         .into()
                     },
                     format_picker: {
@@ -442,7 +444,6 @@ impl<'a> ScreenshotSelectionWidget<'a> {
                         cosmic::widget::dropdown(labels, selected, move |i| {
                             Msg::set_video_container(containers[i])
                         })
-                        .width(cosmic::iced::Length::Fill)
                         .into()
                     },
                     framerate_picker: {
@@ -456,7 +457,6 @@ impl<'a> ScreenshotSelectionWidget<'a> {
                         cosmic::widget::dropdown(labels, selected, move |i| {
                             Msg::set_video_framerate(crate::widget::toolbar::FRAMERATE_OPTIONS[i])
                         })
-                        .width(cosmic::iced::Length::Fill)
                         .into()
                     },
                     on_toggle: Msg::toggle_settings_drawer(),

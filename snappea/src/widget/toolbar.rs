@@ -755,10 +755,11 @@ const SETTING_CONTROL_WIDTH: f32 = 140.0;
 fn setting_row<Msg: Clone + 'static>(label: String, control: Element<'_, Msg>) -> Element<'_, Msg> {
     cosmic::widget::container(
         row![
-            cosmic::iced::widget::space().width(Length::Fixed(16.0)),
             text::body(label),
             cosmic::iced::widget::space().width(Length::Fill),
-            cosmic::widget::container(control).width(Length::Fixed(SETTING_CONTROL_WIDTH)),
+            cosmic::widget::container(control)
+                .width(Length::Fixed(SETTING_CONTROL_WIDTH))
+                .align_x(cosmic::iced::core::alignment::Horizontal::Right),
         ]
         .width(Length::Fill)
         .align_y(cosmic::iced::core::Alignment::Center)
