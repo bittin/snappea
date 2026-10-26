@@ -183,6 +183,11 @@ pub fn handle_tool_msg(app: &mut App, msg: ToolMsg) -> cosmic::Task<crate::app::
                 indicator.pencil_thickness = *thickness;
             }
         }
+        ToolMsg::SetAnnotateColor(color) => {
+            if let Some(edit) = &mut app.text {
+                edit.recolor(color.0);
+            }
+        }
         _ => {}
     }
 
@@ -1313,7 +1318,13 @@ pub fn apply_tool(capture: &mut Capture, msg: ToolMsg) -> bool {
             false
         }
         ToolMsg::SetAnnotateColor(color) => {
-            if capture.ui.move_mode && capture.annotations.selected.is_some() {
+            // A picked annotation with a color of its own takes the new one,
+            // whichever tool picked it up. The default stays.
+            if capture
+                .annotations
+                .picked()
+                .is_some_and(|p| p.color.is_some())
+            {
                 capture.annotations.recolor_selected(color);
                 return false;
             }
@@ -1329,14 +1340,6 @@ pub fn apply_tool(capture: &mut Capture, msg: ToolMsg) -> bool {
             if capture.annotations.pixelate_mode {
                 capture.ui.pixelation_block_size = v as u32;
             } else if capture.annotations.magnifier_mode {
-                // For the magnifier the same dropdown and message carry a zoom
-                // factor. The selected tool decides what the number means.
-                if capture.annotations.selected_magnifier.is_some() {
-                    capture
-                        .annotations
-                        .edit_selected_magnifier(|m| m.magnification = v);
-                    return false;
-                }
                 capture.ui.magnifier_magnification = v;
             } else if capture.annotations.highlighter_mode {
                 capture.ui.highlighter_thickness = v;

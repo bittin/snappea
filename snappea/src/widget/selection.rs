@@ -306,10 +306,7 @@ impl<'a> ScreenshotSelectionWidget<'a> {
                     ),
                     magnification: picked_size(
                         crate::config::ShapeTool::Magnifier,
-                        annotations
-                            .selected_magnifier
-                            .and_then(|i| annotations.magnifier(i))
-                            .map_or(ui.magnifier_magnification, |m| m.magnification),
+                        ui.magnifier_magnification,
                     ),
                     shape_popup_open: ui.shape_popup_open,
                     freehand_popup_open: ui.freehand_popup_open,

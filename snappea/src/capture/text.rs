@@ -147,6 +147,25 @@ impl TextEdit {
         Some(op)
     }
 
+    /// Color the selected text, or the whole label when nothing is selected.
+    pub fn recolor(&mut self, color: cosmic::iced::Color) {
+        use cosmic::iced::advanced::graphics::text::cosmic_text;
+        let [r, g, b, a] = color.into_rgba8();
+        let text_color = cosmic_text::Color::rgba(r, g, b, a);
+        self.preview.color = color;
+        let whole = !self.preview.has_selection();
+        if whole {
+            self.preview.select_all();
+        }
+        self.preview
+            .apply_attr_to_selection(|a| a.color(text_color));
+        if whole {
+            // TODO: the caret lands at the end, the editor's cursor is not
+            // accessible from here, upgrade when viewer-tools exposes it.
+            self.preview.editor_action(cosmic_text::Action::Escape);
+        }
+    }
+
     /// Re-open a committed label for editing.
     #[must_use]
     pub fn reopen(index: usize, text: &TextOperation, origin: (f32, f32), bounds: Size) -> Self {

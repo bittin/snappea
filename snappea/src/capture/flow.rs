@@ -59,7 +59,9 @@ pub fn get_img_path(location: SaveLocationChoice, custom_dir: &str) -> Option<Pa
 
 /// Timestamped file name for a new screenshot.
 pub fn img_file_name() -> String {
-    chrono::Local::now().format("%Y-%m-%d_%H-%M-%S.png").to_string()
+    chrono::Local::now()
+        .format("%Y-%m-%d_%H-%M-%S.png")
+        .to_string()
 }
 
 /// Stitch whole-output frames, each with its logical rect, into one image at

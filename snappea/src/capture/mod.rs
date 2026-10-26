@@ -120,13 +120,21 @@ pub struct Picked {
 }
 
 impl AnnotationState {
+    /// Clear the picked annotation's index
     pub const fn clear_selection(&mut self) {
         self.selected = None;
+        self.selected_magnifier = None;
+    }
+
+    /// The picked annotation's index
+    #[must_use]
+    pub fn picked_index(&self) -> Option<usize> {
+        self.selected.or(self.selected_magnifier)
     }
 
     #[must_use]
     pub fn selected_annotation(&self) -> Option<&dyn ToolOperation> {
-        self.stack.get(self.selected?)
+        self.stack.get(self.picked_index()?)
     }
 
     /// The picked annotation's tool and the settings it was drawn with, so the
@@ -182,7 +190,7 @@ impl AnnotationState {
     /// Edit the picked annotation if it is a `T`.
     pub fn edit_selected<T: 'static>(&mut self, f: impl FnOnce(&mut T)) {
         if let Some(op) = self
-            .selected
+            .picked_index()
             .and_then(|i| self.stack.get_mut(i))
             .and_then(|op| op.as_any_mut().downcast_mut::<T>())
         {
@@ -192,7 +200,7 @@ impl AnnotationState {
 
     /// The picked annotation, for editing in place.
     fn selected_annotation_mut(&mut self) -> Option<&mut (dyn ToolOperation + 'static)> {
-        self.stack.get_mut(self.selected?)
+        self.stack.get_mut(self.picked_index()?)
     }
 
     /// Give the picked annotation a new color, whatever its tool.
