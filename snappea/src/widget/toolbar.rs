@@ -606,27 +606,14 @@ fn build_annotate_row<'a, Msg: Clone + 'static>(
     let text_armed = annotate.active_tool == Some(ShapeTool::Text);
     let text_format_dropdown: Element<'a, Msg> = {
         let trigger = tooltip(
-            button::custom(
-                row![
-                    cosmic::widget::container(text::body("Aa"))
-                        .width(Length::Fixed(BTN_SIZE))
-                        .height(Length::Fixed(BTN_SIZE))
-                        .align_x(cosmic::iced::core::alignment::Horizontal::Center)
-                        .align_y(cosmic::iced::core::alignment::Vertical::Center),
-                    toolbar_icon("pan-down-symbolic", 24)
-                        .width(Length::Fixed(CHEVRON))
-                        .height(Length::Fixed(CHEVRON)),
-                ]
-                .spacing(BTN_GAP)
-                .align_y(cosmic::iced::core::Alignment::Center),
-            )
-            .class(if annotate.text_format_popup_open {
-                cosmic::theme::Button::Suggested
-            } else {
-                cosmic::theme::Button::Icon
-            })
-            .padding([BTN_PADDING, DROPDOWN_PADDING])
-            .on_press(annotate.on_text_format_popup.clone()),
+            button::custom(dropdown_face("font-symbolic"))
+                .class(if annotate.text_format_popup_open {
+                    cosmic::theme::Button::Suggested
+                } else {
+                    cosmic::theme::Button::Icon
+                })
+                .padding([BTN_PADDING, DROPDOWN_PADDING])
+                .on_press(annotate.on_text_format_popup.clone()),
             text::body(fl!("text-format")),
             tooltip::Position::Bottom,
         );
