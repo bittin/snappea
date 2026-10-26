@@ -39,7 +39,9 @@ use cosmic::iced::core::overlay;
 use cosmic::iced::core::widget::Tree;
 use cosmic::iced::widget::canvas;
 use cosmic::widget::image;
-use viewer_tools::annotate::{MagnifierOperation, PixelateOperation, TextOperation};
+use viewer_tools::annotate::{
+    MagnifierOperation, PixelateOperation, ShapeOperation, TextOperation,
+};
 
 /// Distance (logical px) from a magnifier's ring within which a drag resizes it
 const MAGNIFIER_RING_GRAB: f32 = 12.0;
@@ -55,6 +57,21 @@ struct InteractionState {
     /// The move tool's last press: when, where (global) and what it hit, for
     /// telling a double-click on a label.
     last_press: Option<(std::time::Instant, f32, f32, Option<usize>)>,
+}
+
+impl InteractionState {
+    /// Record a press at (`x`, `y`) on `hit`, and tell whether it ends a double-click.
+    fn press(&mut self, x: f32, y: f32, hit: Option<usize>) -> bool {
+        let now = std::time::Instant::now();
+        let double = self.last_press.is_some_and(|(at, px, py, h)| {
+            h == hit
+                && now.duration_since(at) <= DOUBLE_CLICK
+                && (x - px).abs() <= DOUBLE_CLICK_SLACK
+                && (y - py).abs() <= DOUBLE_CLICK_SLACK
+        });
+        self.last_press = Some((now, x, y, hit));
+        double
+    }
 }
 
 /// Two presses this close in time and place are one double-click.
@@ -761,7 +778,7 @@ impl cosmic::iced::core::Widget<Msg, cosmic::Theme, cosmic::Renderer>
         if self.annotations.magnifier_mode
             && let Some(m) = self
                 .annotations
-                .selected_magnifier
+                .selected
                 .and_then(|i| self.annotations.magnifier(i))
         {
             let accent: cosmic::iced::Color = theme.cosmic().accent_color().into();
@@ -978,6 +995,54 @@ impl cosmic::iced::core::Widget<Msg, cosmic::Theme, cosmic::Renderer>
                 .position()
                 .is_some_and(|pos| layout_children[MENU].bounds().contains(pos));
 
+        // Shape, text and pixelate tools pick up their own kind
+        let annotations = self.annotations;
+        let picking =
+            annotations.shape_mode.is_some() || annotations.text_mode || annotations.pixelate_mode;
+        if picking
+            && !click_inside_toolbar
+            && !self.ui.move_mode
+            && !self.text_open
+            && let Event::Mouse(MouseEvent::ButtonPressed(Button::Left)) = &event
+            && let Some(pos) = cursor.position()
+        {
+            let (global_x, global_y) = (
+                pos.x + self.output_rect.left as f32,
+                pos.y + self.output_rect.top as f32,
+            );
+            let point = Point::new(global_x, global_y);
+            let hit = annotations.operations().iter().rposition(|op| {
+                let any = op.as_any();
+                let own = any
+                    .downcast_ref::<ShapeOperation>()
+                    .is_some_and(|s| annotations.shape_mode == Some(s.kind))
+                    || (annotations.text_mode && any.is::<TextOperation>())
+                    || (annotations.pixelate_mode && any.is::<PixelateOperation>());
+                own && op.hit_test(point, false)
+            });
+            if hit.is_some() || annotations.selected.is_some() {
+                let drag_state = tree.state.downcast_mut::<InteractionState>();
+                // Double-clicking a text opens it for editing.
+                if drag_state.press(global_x, global_y, hit)
+                    && annotations.text_mode
+                    && hit.is_some()
+                {
+                    drag_state.move_drag = None;
+                    drag_state.last_press = None;
+                    shell.publish(Msg::select_annotation(None));
+                    shell.publish(Msg::text(TextAction::Press(global_x, global_y)));
+                    shell.capture_event();
+                    return;
+                }
+                if hit != annotations.selected {
+                    shell.publish(Msg::select_annotation(hit));
+                }
+                drag_state.move_drag = hit.map(|index| (index, global_x, global_y));
+                shell.capture_event();
+                return;
+            }
+        }
+
         for (i, (child_layout, child)) in layout_children
             .into_iter()
             .zip(self.elements_mut())
@@ -1049,14 +1114,7 @@ impl cosmic::iced::core::Widget<Msg, cosmic::Theme, cosmic::Renderer>
                 match mouse_event {
                     MouseEvent::ButtonPressed(Button::Left) => {
                         let hit = self.annotations.stack.hit(Point::new(global_x, global_y));
-                        let now = std::time::Instant::now();
-                        let double_click = drag_state.last_press.is_some_and(|(at, x, y, h)| {
-                            h == hit
-                                && now.duration_since(at) <= DOUBLE_CLICK
-                                && (global_x - x).abs() <= DOUBLE_CLICK_SLACK
-                                && (global_y - y).abs() <= DOUBLE_CLICK_SLACK
-                        });
-                        drag_state.last_press = Some((now, global_x, global_y, hit));
+                        let double_click = drag_state.press(global_x, global_y, hit);
                         // Double-clicking switches to the annotation's own tool. A label
                         // opens for editing and a loupe gets its resize ring and zoom.
                         if double_click
@@ -1072,7 +1130,7 @@ impl cosmic::iced::core::Widget<Msg, cosmic::Theme, cosmic::Renderer>
                             } else if any.is::<MagnifierOperation>() {
                                 Some(vec![
                                     Msg::set_shape_tool(crate::config::ShapeTool::Magnifier),
-                                    Msg::magnifier_select(Some(index)),
+                                    Msg::select_annotation(Some(index)),
                                 ])
                             } else {
                                 None
@@ -1101,25 +1159,6 @@ impl cosmic::iced::core::Widget<Msg, cosmic::Theme, cosmic::Renderer>
                         return;
                     }
                     _ => {}
-                }
-            }
-
-            if self.annotations.pixelate_mode
-                && matches!(mouse_event, MouseEvent::ButtonPressed(Button::Left))
-            {
-                let point = Point::new(global_x, global_y);
-                let hit = self.annotations.operations().iter().rposition(|op| {
-                    op.as_any()
-                        .downcast_ref::<PixelateOperation>()
-                        .is_some_and(|p| p.rect().contains(point))
-                });
-                if hit.is_some() || self.annotations.selected.is_some() {
-                    if hit != self.annotations.selected {
-                        shell.publish(Msg::select_annotation(hit));
-                    }
-                    drag_state.move_drag = hit.map(|index| (index, global_x, global_y));
-                    shell.capture_event();
-                    return;
                 }
             }
 
@@ -1171,7 +1210,7 @@ impl cosmic::iced::core::Widget<Msg, cosmic::Theme, cosmic::Renderer>
                 match mouse_event {
                     MouseEvent::ButtonPressed(Button::Left) => {
                         // 1. Grabbing the ring of the selected magnifier -> resize
-                        if let Some(sel) = self.annotations.selected_magnifier
+                        if let Some(sel) = self.annotations.selected
                             && let Some(m) = self.annotations.magnifier(sel)
                         {
                             let Point { x: cx, y: cy } = m.center();
@@ -1197,14 +1236,14 @@ impl cosmic::iced::core::Widget<Msg, cosmic::Theme, cosmic::Renderer>
                                 grab_dx: cursor_gx - cx,
                                 grab_dy: cursor_gy - cy,
                             });
-                            shell.publish(Msg::magnifier_select(Some(i)));
+                            shell.publish(Msg::select_annotation(Some(i)));
                             shell.capture_event();
                             return;
                         }
 
                         // 3. Empty space with a loupe selected -> only deselect it
-                        if self.annotations.selected_magnifier.is_some() {
-                            shell.publish(Msg::magnifier_select(None));
+                        if self.annotations.selected.is_some() {
+                            shell.publish(Msg::select_annotation(None));
                             shell.capture_event();
                             return;
                         }
@@ -1251,7 +1290,7 @@ impl cosmic::iced::core::Widget<Msg, cosmic::Theme, cosmic::Renderer>
                         }
                     }
                     MouseEvent::WheelScrolled { delta } => {
-                        if let Some(sel) = self.annotations.selected_magnifier
+                        if let Some(sel) = self.annotations.selected
                             && let Some(m) = self.annotations.magnifier(sel)
                         {
                             let Point { x: cx, y: cy } = m.center();

@@ -1055,29 +1055,30 @@ pub fn apply_draw(capture: &mut Capture, msg: DrawMsg) {
         DrawMsg::Text(_) => {}
         DrawMsg::Pen(action) => handle_pen(capture, action),
         DrawMsg::Magnifier(action) => handle_magnifier(capture, action),
-        DrawMsg::MagnifierSelect(index) => {
-            capture.annotations.selected_magnifier = index;
-        }
         DrawMsg::MagnifierMove(index, x, y) => {
-            capture.annotations.selected_magnifier = Some(index);
-            capture.annotations.edit_selected_magnifier(|m| {
-                let radius = m.radius();
-                m.set_geometry(Point::new(x, y), radius);
-            });
+            capture.annotations.selected = Some(index);
+            capture
+                .annotations
+                .edit_selected::<MagnifierOperation>(|m| {
+                    let radius = m.radius();
+                    m.set_geometry(Point::new(x, y), radius);
+                });
         }
         DrawMsg::MagnifierResize(index, radius) => {
-            capture.annotations.selected_magnifier = Some(index);
-            capture.annotations.edit_selected_magnifier(|m| {
-                let center = m.center();
-                m.set_geometry(center, radius);
-            });
+            capture.annotations.selected = Some(index);
+            capture
+                .annotations
+                .edit_selected::<MagnifierOperation>(|m| {
+                    let center = m.center();
+                    m.set_geometry(center, radius);
+                });
         }
         DrawMsg::MagnifierSetZoom(index, zoom) => {
-            capture.annotations.selected_magnifier = Some(index);
+            capture.annotations.selected = Some(index);
             let zoom = zoom.clamp(MAGNIFIER_MIN_ZOOM, MAGNIFIER_MAX_ZOOM);
             capture
                 .annotations
-                .edit_selected_magnifier(|m| m.magnification = zoom);
+                .edit_selected::<MagnifierOperation>(|m| m.magnification = zoom);
         }
         DrawMsg::Redact(action) => handle_redact(capture, action),
         DrawMsg::Pixelate(action) => handle_pixelate(capture, action),
@@ -1095,7 +1096,6 @@ pub fn apply_draw(capture: &mut Capture, msg: DrawMsg) {
         DrawMsg::DeleteSelected => {
             if let Some(index) = capture.annotations.selected.take() {
                 capture.annotations.stack.remove(index);
-                capture.annotations.selected_magnifier = None;
             }
         }
         DrawMsg::MoveAnnotation(index, dx, dy) => {
@@ -1205,7 +1205,7 @@ fn handle_magnifier(capture: &mut Capture, action: DrawAction) {
                 }
                 capture.annotations.commit(Box::new(loupe));
                 // Selected straight away, so its zoom can be adjusted.
-                capture.annotations.selected_magnifier = Some(capture.annotations.stack.len() - 1);
+                capture.annotations.selected = Some(capture.annotations.stack.len() - 1);
             }
         }
     }
@@ -1580,6 +1580,7 @@ enum Mode {
 }
 
 fn disable_other_modes_except(capture: &mut Capture, keep: Mode) {
+    capture.annotations.clear_selection();
     if keep != Mode::Shape {
         capture.annotations.shape_mode = None;
         capture.annotations.shape_drawing = None;
@@ -1599,7 +1600,6 @@ fn disable_other_modes_except(capture: &mut Capture, keep: Mode) {
     if keep != Mode::Magnifier {
         capture.annotations.magnifier_mode = false;
         capture.annotations.magnifier_drawing = None;
-        capture.annotations.selected_magnifier = None;
     }
     if keep != Mode::Redact {
         capture.annotations.redact_mode = false;

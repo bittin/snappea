@@ -100,8 +100,6 @@ pub struct AnnotationState {
     pub stroke_drawing: Option<Vec<(f32, f32)>>,
     pub magnifier_mode: bool,
     pub magnifier_drawing: Option<(f32, f32)>,
-    /// The magnifier being adjusted, an index into `stack`.
-    pub selected_magnifier: Option<usize>,
 }
 
 /// Whether an operation hides content instead of marking it up.
@@ -123,13 +121,12 @@ impl AnnotationState {
     /// Clear the picked annotation's index
     pub const fn clear_selection(&mut self) {
         self.selected = None;
-        self.selected_magnifier = None;
     }
 
     /// The picked annotation's index
     #[must_use]
-    pub fn picked_index(&self) -> Option<usize> {
-        self.selected.or(self.selected_magnifier)
+    pub const fn picked_index(&self) -> Option<usize> {
+        self.selected
     }
 
     #[must_use]
@@ -234,14 +231,12 @@ impl AnnotationState {
     pub fn clear_all(&mut self) {
         self.stack.clear();
         self.selected = None;
-        self.selected_magnifier = None;
         self.disable_all_modes();
     }
 
     pub fn clear_shapes(&mut self) {
         self.stack.retain(is_redaction);
         self.selected = None;
-        self.selected_magnifier = None;
         self.shape_drawing = None;
         self.shape_mode = None;
         self.stroke_drawing = None;
@@ -254,21 +249,12 @@ impl AnnotationState {
 
     pub fn undo(&mut self) {
         self.stack.undo();
-        self.forget_stale_magnifier();
+        self.selected = None;
     }
 
     pub fn redo(&mut self) {
         self.stack.redo();
-        self.forget_stale_magnifier();
-    }
-
-    fn forget_stale_magnifier(&mut self) {
-        if self
-            .selected_magnifier
-            .is_some_and(|i| self.magnifier(i).is_none())
-        {
-            self.selected_magnifier = None;
-        }
+        self.selected = None;
     }
 
     #[must_use]
@@ -307,19 +293,6 @@ impl AnnotationState {
             .filter_map(|(i, op)| Some((i, op.as_any().downcast_ref()?)))
     }
 
-    pub fn edit_selected_magnifier(&mut self, f: impl FnOnce(&mut MagnifierOperation)) {
-        let Some(index) = self.selected_magnifier else {
-            return;
-        };
-        if let Some(m) = self
-            .stack
-            .get_mut(index)
-            .and_then(|op| op.as_any_mut().downcast_mut())
-        {
-            f(m);
-        }
-    }
-
     /// Whether there is annotation work that would be lost by exiting.
     #[must_use]
     pub fn has_unsaved_work(&self) -> bool {
@@ -356,8 +329,8 @@ impl AnnotationState {
         self.text_mode = false;
         self.magnifier_mode = false;
         self.magnifier_drawing = None;
-        // `selected_magnifier` stays: the zoom dropdown disables the modes and
-        // still needs to know which magnifier it is editing.
+        // `selected` stays: the zoom dropdown disables the modes and still
+        // needs to know which magnifier it is editing.
     }
 }
 
