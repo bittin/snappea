@@ -1,7 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
 
-//! Persistent settings.
-
 use crate::fl;
 use crate::geometry::{Choice, Rect};
 use cosmic::cosmic_config::{self, CosmicConfigEntry, cosmic_config_derive::CosmicConfigEntry};

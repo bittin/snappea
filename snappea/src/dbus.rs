@@ -143,12 +143,14 @@ impl ControlInterface {
     }
 
     /// Check if the application is running (always returns true if reachable)
-    async fn ping(&self) -> bool {
+    #[allow(clippy::unused_self)]
+    const fn ping(&self) -> bool {
         true
     }
 
     /// Check if currently recording
-    async fn is_recording(&self) -> bool {
+    #[allow(clippy::unused_self)]
+    fn is_recording(&self) -> bool {
         crate::recording::is_recording()
     }
 }
@@ -263,14 +265,14 @@ impl Screenshot {
 
     async fn capture_outputs(
         &self,
-        outputs: &[Output],
+        outputs: &[OutputInfo],
     ) -> anyhow::Result<HashMap<String, ScreenshotImage>> {
         let wayland_helper = self.wayland_helper.clone();
 
         // No session yet, so the setting comes from where it is kept.
         let show_cursor = Config::load().show_cursor;
         let mut map = HashMap::with_capacity(outputs.len());
-        for Output { output, name, .. } in outputs {
+        for OutputInfo { output, name, .. } in outputs {
             let frame = wayland_helper
                 .capture_source_shm(CaptureSource::Output(output.clone()), show_cursor)
                 .await
@@ -282,7 +284,7 @@ impl Screenshot {
     }
 
     /// Every screen in one image, saved without showing the UI.
-    async fn capture_silently(&self, outputs: &[Output]) -> PortalResponse<ScreenshotResult> {
+    async fn capture_silently(&self, outputs: &[OutputInfo]) -> PortalResponse<ScreenshotResult> {
         let mut images = match self.capture_outputs(outputs).await {
             Ok(images) => images,
             Err(err) => {
@@ -325,14 +327,14 @@ fn configured_save_path() -> Option<std::path::PathBuf> {
     }
 }
 
-struct Output {
+struct OutputInfo {
     output: WlOutput,
     logical_position: (i32, i32),
     logical_size: (i32, i32),
     name: String,
 }
 
-impl Output {
+impl OutputInfo {
     const fn rect(&self) -> Rect {
         Rect {
             left: self.logical_position.0,
@@ -343,10 +345,9 @@ impl Output {
     }
 }
 
-#[allow(clippy::large_enum_variant)]
 #[derive(Clone, Debug)]
 pub enum Event {
-    Screenshot(Capture),
+    Screenshot(Box<Capture>),
     Init(Sender<Self>),
     /// Recording was stopped via `PrintScreen`: clean up indicator UI
     RecordingStopped,
@@ -356,12 +357,14 @@ pub enum Event {
 impl Screenshot {
     async fn screenshot(
         &self,
-        #[zbus(connection)] _connection: &zbus::Connection,
-        _handle: zvariant::ObjectPath<'_>,
-        _app_id: &str,
-        _parent_window: &str,
+        handle: zvariant::ObjectPath<'_>,
+        app_id: &str,
+        parent_window: &str,
         options: ScreenshotOptions,
     ) -> PortalResponse<ScreenshotResult> {
+        log::debug!(
+            "Screenshot request {handle} from {app_id:?} (parent window {parent_window:?})"
+        );
         // Check if a recording is active: if so, just stop it and return
         // The user needs to press PrintScreen again to get the screenshot UI
         if crate::recording::is_recording() {
@@ -405,8 +408,8 @@ impl Screenshot {
                 logical_size.1,
                 info.scale_factor
             );
-            outputs.push(Output {
-                output,
+            outputs.push(OutputInfo {
+                output: output,
                 logical_position,
                 logical_size,
                 name,
@@ -440,7 +443,7 @@ impl Screenshot {
             expects_response: true,
         };
         let capture = Capture::new(portal, output_images, &Config::load());
-        if let Err(err) = self.tx.send(Event::Screenshot(capture)).await {
+        if let Err(err) = self.tx.send(Event::Screenshot(Box::new(capture))).await {
             // Distinct from the *response* path below: this means the UI event
             // loop isn't listening, so the request can't be shown at all.
             log::error!("Could not hand the screenshot request to the UI: {err}");
@@ -452,14 +455,19 @@ impl Screenshot {
     /// Not implemented. Declared so the frontend gets a portal response rather
     /// than an unknown-method error.
     // reason: zbus requires the method to be async and take `&self`.
-    #[allow(clippy::unused_async, clippy::unused_self)]
-    async fn pick_color(
+    // zbus deserializes the arguments by value, so they cannot be references.
+    #[allow(clippy::unused_self, clippy::needless_pass_by_value)]
+    fn pick_color(
         &self,
-        _handle: zvariant::ObjectPath<'_>,
-        _app_id: &str,
-        _parent_window: &str,
-        _options: HashMap<String, zvariant::OwnedValue>,
+        handle: zvariant::ObjectPath<'_>,
+        app_id: &str,
+        parent_window: &str,
+        options: HashMap<String, zvariant::OwnedValue>,
     ) -> PortalResponse<PickColorResult> {
+        // Not implemented. Say so, since the caller gets no other sign.
+        log::info!(
+            "PickColor request {handle} from {app_id:?} (parent window {parent_window:?}, options {options:?}) is not supported"
+        );
         PortalResponse::Other
     }
 

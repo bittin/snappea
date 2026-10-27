@@ -122,7 +122,6 @@ impl OutputState {
     }
 }
 
-#[allow(clippy::large_enum_variant)]
 #[derive(Debug, Clone)]
 pub enum Msg {
     Screenshot(msg::Msg),
@@ -523,10 +522,9 @@ impl cosmic::Application for App {
                 }
                 cosmic::iced::Task::none()
             }
-            Msg::Keyboard(_) => cosmic::iced::Task::none(),
             Msg::Portal(e) => match e {
                 crate::dbus::Event::Screenshot(capture) => {
-                    crate::capture::flow::start(self, capture).map(cosmic::Action::App)
+                    crate::capture::flow::start(self, *capture).map(cosmic::Action::App)
                 }
                 crate::dbus::Event::Init(tx) => {
                     self.tx = Some(tx);
@@ -541,7 +539,6 @@ impl cosmic::Application for App {
             Msg::Screenshot(m) => {
                 crate::capture::update::update_msg(self, m).map(cosmic::Action::App)
             }
-            Msg::Ignore => cosmic::iced::Task::none(),
             Msg::RecordingStopped => {
                 // Save video if the thread ended on its own (disk low, capture lost)
                 let _ = crate::recording::stop_recording();
@@ -559,10 +556,10 @@ impl cosmic::Application for App {
                 }
                 cosmic::iced::Task::none()
             }
-            Msg::Recording(m) => match &mut self.recording_indicator {
-                Some(indicator) => indicator.update(m),
-                None => cosmic::iced::Task::none(),
-            },
+            Msg::Recording(m) => self
+                .recording_indicator
+                .as_mut()
+                .map_or_else(cosmic::iced::Task::none, |indicator| indicator.update(m)),
             Msg::Control(cmd) => {
                 match cmd {
                     ControlCommand::TakeScreenshot => {
@@ -600,7 +597,7 @@ impl cosmic::Application for App {
                 self.dummy_id = window::Id::unique();
                 dummy_surface(self.dummy_id)
             }
-            Msg::LayerClosed(_) => cosmic::iced::Task::none(),
+            Msg::Keyboard(_) | Msg::Ignore | Msg::LayerClosed(_) => cosmic::iced::Task::none(),
             Msg::RetryPendingWindows => {
                 // OutputEvent::Created never fired (outputs were advertised before the
                 // subscription). Create the windows now.
@@ -668,7 +665,7 @@ impl cosmic::Application for App {
                             name: info.name.unwrap(),
                             logical_size: info
                                 .logical_size
-                                .map(|(w, h)| (w as u32, h as u32))
+                                .map(|(w, h)| (w.cast_unsigned(), h.cast_unsigned()))
                                 .unwrap(),
                             logical_pos: info.logical_position.unwrap(),
                             scale_factor: info.scale_factor,
@@ -700,7 +697,7 @@ impl cosmic::Application for App {
                             state.name = info.name.unwrap();
                             state.logical_size = info
                                 .logical_size
-                                .map(|(w, h)| (w as u32, h as u32))
+                                .map(|(w, h)| (w.cast_unsigned(), h.cast_unsigned()))
                                 .unwrap();
                             state.logical_pos = info.logical_position.unwrap();
                             state.scale_factor = info.scale_factor;
@@ -712,7 +709,7 @@ impl cosmic::Application for App {
                                 name: info.name.unwrap(),
                                 logical_size: info
                                     .logical_size
-                                    .map(|(w, h)| (w as u32, h as u32))
+                                    .map(|(w, h)| (w.cast_unsigned(), h.cast_unsigned()))
                                     .unwrap(),
                                 logical_pos: info.logical_position.unwrap(),
                                 scale_factor: info.scale_factor,
@@ -1003,7 +1000,7 @@ pub fn direct_screenshot_subscription(
                 if let Some(capture) = fresh_capture(&helper).await
                     && let Err(e) = output
                         .send(PortalEvent::Screenshot(crate::dbus::Event::Screenshot(
-                            capture,
+                            Box::new(capture),
                         )))
                         .await
                 {
@@ -1098,7 +1095,9 @@ async fn trigger_screenshot(
     tx: tokio::sync::mpsc::Sender<crate::dbus::Event>,
 ) {
     if let Some(capture) = fresh_capture(&helper).await
-        && let Err(e) = tx.send(crate::dbus::Event::Screenshot(capture)).await
+        && let Err(e) = tx
+            .send(crate::dbus::Event::Screenshot(Box::new(capture)))
+            .await
     {
         log::error!("Failed to send screenshot event: {e}");
     }
