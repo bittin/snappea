@@ -65,8 +65,11 @@ pub fn img_file_name() -> String {
 }
 
 /// Stitch whole-output frames, each with its logical rect, into one image at
-/// the first frame's scale.
-pub fn stitch_outputs(frames: Vec<(RgbaImage, Rect)>) -> Option<RgbaImage> {
+/// the first frame's scale, with annotations burned in.
+pub fn stitch_outputs(
+    frames: Vec<(RgbaImage, Rect)>,
+    annotations: &[Box<dyn ToolOperation>],
+) -> Option<RgbaImage> {
     let (first, first_rect) = frames.first()?;
     let scale = first.width() as f32 / first_rect.width() as f32;
     let bounds = frames.iter().map(|(_, r)| *r).reduce(Rect::union)?;
@@ -74,7 +77,9 @@ pub fn stitch_outputs(frames: Vec<(RgbaImage, Rect)>) -> Option<RgbaImage> {
         .into_iter()
         .map(|(img, r)| (img, r.scaled(scale)))
         .collect();
-    Some(combined_image(bounds.scaled(scale), frames))
+    let mut img = combined_image(bounds.scaled(scale), frames);
+    rasterize(&mut img, annotations, &bounds, scale);
+    Some(img)
 }
 
 /// The part of `img`, which shows `output` whole, under `region`: the crop,
@@ -268,7 +273,7 @@ fn render_selection(
                 .iter()
                 .filter_map(|output| Some((images.remove(&output.name)?.rgba, output.rect())))
                 .collect();
-            let img = stitch_outputs(frames);
+            let img = stitch_outputs(frames, annotations);
             if img.is_none() {
                 log::error!("No outputs available for all-screens capture");
             }

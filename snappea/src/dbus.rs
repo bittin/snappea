@@ -296,7 +296,7 @@ impl Screenshot {
             .iter()
             .filter_map(|o| Some((images.remove(&o.name)?.rgba, o.rect())))
             .collect();
-        let Some(image) = stitch_outputs(frames) else {
+        let Some(image) = stitch_outputs(frames, &[]) else {
             log::error!("No output image to save");
             return PortalResponse::Other;
         };
