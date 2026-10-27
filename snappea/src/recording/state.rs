@@ -92,6 +92,12 @@ impl RecordingHandle {
         }
     }
 
+    pub fn is_finished(&self) -> bool {
+        self.thread_handle
+            .as_ref()
+            .is_none_or(JoinHandle::is_finished)
+    }
+
     /// Signal the recording to stop
     pub fn request_stop(&self) {
         log::info!("Requesting recording stop...");
@@ -120,7 +126,7 @@ pub fn set_recording(handle: RecordingHandle) {
 /// Check if a recording is currently active
 pub fn is_recording() -> bool {
     let guard = RECORDING_HANDLE.lock().unwrap();
-    guard.is_some()
+    guard.as_ref().is_some_and(|handle| !handle.is_finished())
 }
 
 /// Stop the currently active recording

@@ -9,6 +9,7 @@ All notable changes to SnapPea are listed here. The format follows
 
 - Add a toggle to edit videos after recording
 - Can select pixelate after drawing one
+- Recording refuses to start/stops, when the save folder has less free space than `video_min_free_mb`
 
 ### Changed
 

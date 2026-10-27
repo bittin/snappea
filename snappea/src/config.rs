@@ -369,6 +369,9 @@ pub struct Config {
     pub video_container: Container,
     /// Recording framerate (30 or 60)
     pub video_framerate: u32,
+    /// Free space (MB) threshold on the disk to start/continue video recording
+    #[serde(default = "default_video_min_free_mb")]
+    pub video_min_free_mb: u64,
     /// Whether to show cursor in recordings
     pub video_show_cursor: bool,
     /// Whether to open the snappea edit tool after a video recording
@@ -410,6 +413,10 @@ const fn default_recognize_qr_codes() -> bool {
 
 const fn default_video_region_border() -> bool {
     true
+}
+
+const fn default_video_min_free_mb() -> u64 {
+    500
 }
 
 const fn default_highlighter_thickness() -> f32 {
@@ -544,6 +551,7 @@ impl Default for Config {
             video_encoder: None,
             video_container: Container::Mp4,
             video_framerate: 60,
+            video_min_free_mb: default_video_min_free_mb(),
             video_show_cursor: true,
             video_region_border: default_video_region_border(),
             video_open_snappea_edit: true,

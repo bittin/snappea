@@ -701,6 +701,7 @@ fn start_recording(app: &mut App) -> cosmic::Task<AppMsg> {
                 show_cursor,
                 system_audio,
                 microphone,
+                config.video_min_free_mb,
                 &stop_flag,
             );
             // The UI already shows "recording", so surface a failure as a notification.

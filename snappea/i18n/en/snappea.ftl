@@ -85,6 +85,8 @@ encoder-automatic = Automatic
 encoder = Encoder:
 format = Format:
 framerate = Framerate:
+recording-stopped = Recording Stopped
+low-disk-space = Less than { $limit } free in { $folder }
 
 # File dialogs
 browse-screenshots-title = Select save location for screenshots

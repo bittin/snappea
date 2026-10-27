@@ -543,6 +543,8 @@ impl cosmic::Application for App {
             }
             Msg::Ignore => cosmic::iced::Task::none(),
             Msg::RecordingStopped => {
+                // Save video if the thread ended on its own (disk low, capture lost)
+                let _ = crate::recording::stop_recording();
                 // Clean up capture and send Cancelled to portal
                 if let Some(capture) = self.capture.take() {
                     let tx = capture.portal.tx;
