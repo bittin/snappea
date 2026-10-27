@@ -17,6 +17,11 @@ All notable changes to SnapPea are listed here. The format follows
 - Default name for the output files is now just the date, with no prefix or suffixes.
 - Use libcosmic's dropdown widget for the video speed dropdown
 
+### Fixed
+
+- A screenshot that could not be written to disk, failed silently and left an empty file behind. The file is now removed and a notification is shown.
+- Annotations in "All Screens" mode are now saved.
+
 ## [1.2.0] - 2026-10-23
 
 ### Added

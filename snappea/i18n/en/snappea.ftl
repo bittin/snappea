@@ -112,5 +112,7 @@ ocr-error = OCR error: { $error }
 # Notifications
 recording-saved = Recording Saved
 saved-to = Saved to { $path }
+screenshot-failed = Screenshot Not Saved
+could-not-write = Could not write { $path }: { $error }
 
 # Default screenshot filename prefix

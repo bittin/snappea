@@ -7,6 +7,7 @@ use crate::app::{App, OutputState};
 use crate::config::{Config, SaveLocationChoice};
 use crate::dbus::PortalResponse;
 use crate::dbus::ScreenshotResult;
+use crate::fl;
 use crate::geometry::{Choice, DragState, Rect};
 use cosmic::iced::clipboard::mime::AsMimeTypes;
 use cosmic::iced::platform_specific::shell::commands::layer_surface::destroy_layer_surface;
@@ -16,7 +17,7 @@ use image::DynamicImage;
 use image::RgbaImage;
 use std::borrow::Cow;
 use std::io;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use tokio::sync::mpsc::Sender;
 use viewer_tools::ToolOperation;
 
@@ -34,7 +35,25 @@ impl AsMimeTypes for ScreenshotBytes {
     }
 }
 
+/// Write `img` to `path` as a PNG
 pub fn save_rgba(img: &RgbaImage, path: &PathBuf) -> anyhow::Result<()> {
+    let result = write_png_file(img, path);
+    if let Err(err) = &result {
+        // remove empty file
+        let _ = std::fs::remove_file(path);
+        crate::dbus::notify_error(
+            fl!("screenshot-failed"),
+            fl!(
+                "could-not-write",
+                path = path.display().to_string(),
+                error = format!("{err:#}")
+            ),
+        );
+    }
+    result
+}
+
+fn write_png_file(img: &RgbaImage, path: &Path) -> anyhow::Result<()> {
     let mut file = std::fs::File::create(path)?;
     Ok(write_png(&mut file, img)?)
 }
