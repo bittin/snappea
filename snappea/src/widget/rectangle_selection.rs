@@ -393,17 +393,18 @@ impl<Msg: 'static + Clone> Widget<Msg, cosmic::Theme, cosmic::Renderer>
                         let mut pos = cursor.position().unwrap_or_default();
                         pos.x += self.output_rect.left as f32;
                         pos.y += self.output_rect.top as f32;
+                        let rect = Rect {
+                            left: pos.x as i32,
+                            top: pos.y as i32,
+                            right: pos.x as i32 + 1,
+                            bottom: pos.y as i32 + 1,
+                        };
                         self.drag_state = DragState::SE;
+                        // A move in the same event batch drags from this copy,
+                        // before the view is rebuilt with the published one.
+                        self.rectangle_selection = rect;
                         shell.publish((self.on_move_offset)(None));
-                        shell.publish((self.on_rectangle)(
-                            DragState::SE,
-                            Rect {
-                                left: pos.x as i32,
-                                top: pos.y as i32,
-                                right: pos.x as i32 + 1,
-                                bottom: pos.y as i32 + 1,
-                            },
-                        ));
+                        shell.publish((self.on_rectangle)(DragState::SE, rect));
                     } else {
                         // Resize from corner or edge
                         self.drag_state = s;

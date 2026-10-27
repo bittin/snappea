@@ -21,6 +21,7 @@ All notable changes to SnapPea are listed here. The format follows
 
 - A screenshot that could not be written to disk, failed silently and left an empty file behind. The file is now removed and a notification is shown.
 - Annotations in "All Screens" mode are now saved.
+- Sometimes when drawing a region, the selection box starts from some random point
 
 ## [1.2.0] - 2026-10-23
 
