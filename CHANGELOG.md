@@ -3,6 +3,26 @@
 All notable changes to SnapPea are listed here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## Unreleased
+
+### Added
+
+- Add a toggle to edit videos after recording
+- Can select pixelate after drawing one
+- Recording refuses to start/stops, when the save folder has less free space than `video_min_free_mb`
+
+### Changed
+
+- Show file name in the video editor header instead of the full path.
+- Default name for the output files is now just the date, with no prefix or suffixes.
+- Use libcosmic's dropdown widget for the video speed dropdown
+
+### Fixed
+
+- A screenshot that could not be written to disk, failed silently and left an empty file behind. The file is now removed and a notification is shown.
+- Annotations in "All Screens" mode are now saved.
+- Sometimes when drawing a region, the selection box starts from some random point
+
 ## [1.2.0] - 2026-10-23
 
 ### Added

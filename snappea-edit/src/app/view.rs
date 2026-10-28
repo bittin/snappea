@@ -8,9 +8,6 @@ use cosmic::iced::{Alignment, ContentFit, Length};
 use cosmic::widget::{self, icon};
 use iced_video_player::VideoPlayer;
 
-const PLAYBACK_SPEED_ICON: &[u8] =
-    include_bytes!("../../res/icons/scalable/actions/playback-speed-symbolic.svg");
-
 pub fn view(editor: &Editor) -> cosmic::Element<'_, Message> {
     let preview = widget::container(
         VideoPlayer::new(&editor.video)
@@ -82,7 +79,11 @@ fn controls(editor: &Editor) -> cosmic::Element<'_, Message> {
     )
     .height(Length::Fixed(TRACK_HEIGHT))
     .align_y(Alignment::Center);
-    let speed = widget::container(speed_menu(editor))
+    let speeds: Vec<String> = SPEED_OPTIONS.iter().map(|s| format!("{s}x")).collect();
+    let selected = SPEED_OPTIONS
+        .iter()
+        .position(|&s| (editor.speed - s).abs() < 0.01);
+    let speed = widget::container(widget::dropdown(speeds, selected, Message::SetSpeed))
         .height(Length::Fixed(TRACK_HEIGHT))
         .align_y(Alignment::Center);
 
@@ -109,80 +110,6 @@ fn controls(editor: &Editor) -> cosmic::Element<'_, Message> {
     .spacing(8)
     .align_y(Alignment::Start)
     .into()
-}
-
-fn speed_menu(editor: &Editor) -> cosmic::Element<'_, Message> {
-    let trigger = widget::button::custom(
-        icon::from_svg_bytes(PLAYBACK_SPEED_ICON)
-            .symbolic(true)
-            .icon()
-            .size(16),
-    )
-    .class(cosmic::theme::Button::Icon)
-    .on_press(Message::ToggleSpeedMenu);
-
-    let mut menu = widget::popover(trigger);
-    if !editor.speed_menu_open {
-        return menu.into();
-    }
-
-    let items: Vec<cosmic::Element<'_, Message>> = SPEED_OPTIONS
-        .iter()
-        .enumerate()
-        .map(|(index, &option)| {
-            let active = (editor.speed - option).abs() < 0.01;
-            let mark: cosmic::Element<'_, Message> = if active {
-                icon::from_name("object-select-symbolic")
-                    .size(16)
-                    .icon()
-                    .into()
-            } else {
-                widget::container(cosmic::iced::widget::space().width(Length::Fixed(16.0))).into()
-            };
-            let label = widget::text(format!("{option}x"));
-            let label = if active {
-                label.font(cosmic::font::bold())
-            } else {
-                label
-            };
-
-            let row = widget::row::with_children(vec![mark, label.into()])
-                .spacing(8)
-                .align_y(Alignment::Center);
-            let content: cosmic::Element<'_, Message> = if active {
-                widget::container(row)
-                    .class(cosmic::theme::Container::custom(|theme| {
-                        let accent: cosmic::iced::Color = theme.cosmic().accent_color().into();
-                        cosmic::iced::widget::container::Style {
-                            icon_color: Some(accent),
-                            text_color: Some(accent),
-                            ..Default::default()
-                        }
-                    }))
-                    .into()
-            } else {
-                row.into()
-            };
-
-            widget::button::custom(content)
-                .width(Length::Fill)
-                .padding([12.0f32, 8.0f32])
-                .class(cosmic::theme::Button::MenuItem)
-                .on_press(Message::SetSpeed(index))
-                .into()
-        })
-        .collect();
-
-    menu = menu
-        .popup(
-            widget::container(widget::column::with_children(items))
-                .padding(4)
-                .width(Length::Fixed(120.0))
-                .class(cosmic::theme::Container::Dialog(true)),
-        )
-        .position(widget::popover::Position::Top)
-        .on_close(Message::ToggleSpeedMenu);
-    menu.into()
 }
 
 /// Side panel: output format, its settings, and the Export action

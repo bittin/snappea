@@ -104,7 +104,8 @@ pub fn samples_pixels(op: &dyn ToolOperation) -> bool {
 
 /// Draw `ops[range]` onto `renderer`, each sampling the picture with the
 /// operations below it rendered in. Global coordinates, mapped onto `bounds`
-/// from `origin`.
+/// from `origin`. `hidden` is skipped: a label open for re-editing is drawn by
+/// its preview instead.
 pub fn draw_operations(
     renderer: &mut cosmic::Renderer,
     bounds: cosmic::iced::core::Rectangle,
@@ -112,12 +113,16 @@ pub fn draw_operations(
     ops: &[Box<dyn ToolOperation>],
     range: std::ops::Range<usize>,
     source: SampleSource<'_>,
+    hidden: Option<usize>,
 ) {
     use cosmic::iced::advanced::graphics::geometry::Renderer as _;
     let mut frame = canvas::Frame::new(renderer, bounds.size());
     frame.push_transform();
     frame.translate(Vector::new(-origin.x, -origin.y));
     for i in range {
+        if Some(i) == hidden {
+            continue;
+        }
         let source = SampleSource {
             below: &ops[..i],
             ..source

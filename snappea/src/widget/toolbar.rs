@@ -236,8 +236,8 @@ pub struct AnnotateSection<'a, Msg> {
     /// Whether there is anything on the capture that could be picked up
     pub can_move: bool,
     pub on_move: Msg,
-    /// How far the delete button is out, 0 when nothing is picked out.
-    pub delete_progress: f32,
+    /// Whether an annotation is picked out for the delete button to delete
+    pub can_delete: bool,
     pub on_delete_selected: Msg,
     pub on_toggle: Msg,
     pub on_shape_popup: Msg,
@@ -509,26 +509,22 @@ fn build_annotate_row<'a, Msg: Clone + 'static>(
         tooltip::Position::Bottom,
     );
 
-    // Eased in and out so a button never appears under the pointer between clicks.
-    let btn_delete: Element<'_, Msg> = Collapse::new(
-        gap_before(
-            tooltip(
-                button::custom(
-                    toolbar_icon("user-trash-symbolic", ICON_PX)
-                        .width(Length::Fixed(BTN_SIZE))
-                        .height(Length::Fixed(BTN_SIZE)),
-                )
-                .class(cosmic::theme::Button::Icon)
-                .padding(BTN_PADDING)
-                .on_press(annotate.on_delete_selected.clone()),
-                text::body(fl!("delete-annotation")),
-                tooltip::Position::Bottom,
-            ),
-            BTN_GAP,
+    let btn_delete = tooltip(
+        button::custom(
+            toolbar_icon("user-trash-symbolic", ICON_PX)
+                .width(Length::Fixed(BTN_SIZE))
+                .height(Length::Fixed(BTN_SIZE)),
+        )
+        .class(cosmic::theme::Button::Icon)
+        .padding(BTN_PADDING)
+        .on_press_maybe(
+            annotate
+                .can_delete
+                .then_some(annotate.on_delete_selected.clone()),
         ),
-        annotate.delete_progress,
-    )
-    .into();
+        text::body(fl!("delete-annotation")),
+        tooltip::Position::Bottom,
+    );
 
     // Shapes dropdown: the geometric tools share one slot, showing whichever
     // was picked last.
@@ -606,27 +602,14 @@ fn build_annotate_row<'a, Msg: Clone + 'static>(
     let text_armed = annotate.active_tool == Some(ShapeTool::Text);
     let text_format_dropdown: Element<'a, Msg> = {
         let trigger = tooltip(
-            button::custom(
-                row![
-                    cosmic::widget::container(text::body("Aa"))
-                        .width(Length::Fixed(BTN_SIZE))
-                        .height(Length::Fixed(BTN_SIZE))
-                        .align_x(cosmic::iced::core::alignment::Horizontal::Center)
-                        .align_y(cosmic::iced::core::alignment::Vertical::Center),
-                    toolbar_icon("pan-down-symbolic", 24)
-                        .width(Length::Fixed(CHEVRON))
-                        .height(Length::Fixed(CHEVRON)),
-                ]
-                .spacing(BTN_GAP)
-                .align_y(cosmic::iced::core::Alignment::Center),
-            )
-            .class(if annotate.text_format_popup_open {
-                cosmic::theme::Button::Suggested
-            } else {
-                cosmic::theme::Button::Icon
-            })
-            .padding([BTN_PADDING, DROPDOWN_PADDING])
-            .on_press(annotate.on_text_format_popup.clone()),
+            button::custom(dropdown_face("font-symbolic"))
+                .class(if annotate.text_format_popup_open {
+                    cosmic::theme::Button::Suggested
+                } else {
+                    cosmic::theme::Button::Icon
+                })
+                .padding([BTN_PADDING, DROPDOWN_PADDING])
+                .on_press(annotate.on_text_format_popup.clone()),
             text::body(fl!("text-format")),
             tooltip::Position::Bottom,
         );
@@ -772,10 +755,11 @@ const SETTING_CONTROL_WIDTH: f32 = 140.0;
 fn setting_row<Msg: Clone + 'static>(label: String, control: Element<'_, Msg>) -> Element<'_, Msg> {
     cosmic::widget::container(
         row![
-            cosmic::iced::widget::space().width(Length::Fixed(16.0)),
             text::body(label),
             cosmic::iced::widget::space().width(Length::Fill),
-            cosmic::widget::container(control).width(Length::Fixed(SETTING_CONTROL_WIDTH)),
+            cosmic::widget::container(control)
+                .width(Length::Fixed(SETTING_CONTROL_WIDTH))
+                .align_x(cosmic::iced::core::alignment::Horizontal::Right),
         ]
         .width(Length::Fill)
         .align_y(cosmic::iced::core::Alignment::Center)
@@ -841,6 +825,7 @@ pub struct SettingsMenu<'a, Msg> {
     pub video_save_location: VideoSaveLocationChoice,
     pub video_show_cursor: bool,
     pub video_region_border: bool,
+    pub video_open_snappea_edit: bool,
     pub video_system_audio: bool,
     pub video_microphone: bool,
     /// Whether a screenshot includes the pointer.
@@ -856,6 +841,7 @@ pub struct SettingsMenu<'a, Msg> {
     pub on_save_clipboard: Msg,
     pub on_show_cursor: Msg,
     pub on_region_border: Msg,
+    pub on_open_snappea_edit: Msg,
     pub on_system_audio: Msg,
     pub on_microphone: Msg,
     pub on_screenshot_cursor: Msg,
@@ -885,6 +871,11 @@ fn build_settings_menu<Msg: Clone + 'static>(
             fl!("show-region-border"),
             settings.video_region_border,
             settings.on_region_border.clone(),
+        ));
+        list = list.push(menu_row(
+            fl!("open-snappea-edit"),
+            settings.video_open_snappea_edit,
+            settings.on_open_snappea_edit.clone(),
         ));
         list = list.push(menu_row(
             fl!("system-audio"),

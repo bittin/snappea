@@ -137,7 +137,6 @@ fn record(args: &[String]) -> cosmic::iced::Result {
     let mut show_cursor = false;
     let mut system_audio = false;
     let mut microphone = false;
-
     let mut rest = args.iter();
     while let Some(flag) = rest.next() {
         match flag.as_str() {
@@ -198,6 +197,7 @@ fn record(args: &[String]) -> cosmic::iced::Result {
         show_cursor,
         system_audio,
         microphone,
+        config::Config::load().video_min_free_mb,
     ) {
         log::error!("Recording failed: {e}");
         std::process::exit(1);

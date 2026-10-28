@@ -53,7 +53,6 @@ pub enum DrawMsg {
     Text(TextAction),
     Pen(DrawAction),
     Magnifier(DrawAction),
-    MagnifierSelect(Option<usize>),
     MagnifierMove(usize, f32, f32),
     MagnifierResize(usize, f32),
     MagnifierSetZoom(usize, f32),
@@ -176,6 +175,7 @@ pub enum SettingsMsg {
     SetVideoFramerate(u32),
     ToggleShowCursor,
     ToggleRegionBorder,
+    ToggleOpenSnappeaEdit,
     ToggleSystemAudio,
     ToggleMicrophone,
     ToggleScreenshotCursor,
@@ -223,9 +223,6 @@ impl Msg {
     }
     pub const fn magnifier_end(x: f32, y: f32) -> Self {
         Self::Draw(DrawMsg::Magnifier(DrawAction::End(x, y)))
-    }
-    pub const fn magnifier_select(index: Option<usize>) -> Self {
-        Self::Draw(DrawMsg::MagnifierSelect(index))
     }
     pub const fn magnifier_move(index: usize, x: f32, y: f32) -> Self {
         Self::Draw(DrawMsg::MagnifierMove(index, x, y))
@@ -436,6 +433,9 @@ impl Msg {
     }
     pub const fn toggle_region_border() -> Self {
         Self::Settings(SettingsMsg::ToggleRegionBorder)
+    }
+    pub const fn toggle_open_snappea_edit() -> Self {
+        Self::Settings(SettingsMsg::ToggleOpenSnappeaEdit)
     }
     pub const fn toggle_system_audio() -> Self {
         Self::Settings(SettingsMsg::ToggleSystemAudio)

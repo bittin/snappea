@@ -68,6 +68,7 @@ delay-seconds = { $secs } seconds
 selection-edge-magnification = Selection edge magnification
 show-cursor = Show cursor
 show-region-border = Show region border
+open-snappea-edit = Edit video after recording
 system-audio= System audio
 microphone= Microphone
 recognize-qr-codes = Recognize QR codes
@@ -84,6 +85,8 @@ encoder-automatic = Automatic
 encoder = Encoder:
 format = Format:
 framerate = Framerate:
+recording-stopped = Recording Stopped
+low-disk-space = Less than { $limit } free in { $folder }
 
 # File dialogs
 browse-screenshots-title = Select save location for screenshots
@@ -109,6 +112,7 @@ ocr-error = OCR error: { $error }
 # Notifications
 recording-saved = Recording Saved
 saved-to = Saved to { $path }
+screenshot-failed = Screenshot Not Saved
+could-not-write = Could not write { $path }: { $error }
 
 # Default screenshot filename prefix
-screenshot-filename-prefix = Screenshot

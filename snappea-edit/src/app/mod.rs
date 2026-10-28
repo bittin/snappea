@@ -49,7 +49,6 @@ pub struct Editor {
     seek_scheduled: bool,
     seek_generation: u64,
 
-    speed_menu_open: bool,
     /// for the timeline readability
     frame_colors: Vec<[u8; 3]>,
     /// the audio overlay's bars, empty when the file has no audio
@@ -85,7 +84,6 @@ pub enum Message {
     ColorsExtracted(Vec<[u8; 3]>),
     PeaksExtracted(Vec<f32>),
     // Speed
-    ToggleSpeedMenu,
     SetSpeed(usize),
     // Playback
     TogglePlay,
@@ -153,7 +151,7 @@ impl Editor {
             .unwrap_or_default()
             .to_string_lossy()
             .into_owned();
-        let default_name = format!("{stem}-trimmed.{}", format.extension());
+        let default_name = format!("{stem}.{}", format.extension());
         let start_dir = self.path.parent().map(std::path::Path::to_path_buf);
         Task::perform(
             async move {
@@ -249,7 +247,8 @@ impl Application for Editor {
         video.set_muted(false);
         let duration = video.duration().as_secs_f64();
 
-        let title = format!("{} - SnapPea Edit", flags.path.display());
+        let name = flags.path.file_name().unwrap_or(flags.path.as_os_str());
+        let title = format!("{} - SnapPea Edit", name.to_string_lossy());
         core.window.show_headerbar = true;
         core.set_header_title(title.clone());
         let title_task = core.set_title(None, title);
@@ -303,7 +302,6 @@ impl Application for Editor {
             pending_seek: None,
             seek_scheduled: false,
             seek_generation: 0,
-            speed_menu_open: false,
             frame_colors: Vec::new(),
             peaks: Vec::new(),
             export: None,
@@ -391,10 +389,8 @@ impl Application for Editor {
                 self.audio = !self.audio;
                 self.video.set_muted(!self.audio);
             }
-            Message::ToggleSpeedMenu => self.speed_menu_open = !self.speed_menu_open,
             Message::SetSpeed(index) => {
                 self.speed = SPEED_OPTIONS[index.min(SPEED_OPTIONS.len() - 1)];
-                self.speed_menu_open = false;
             }
 
             Message::TogglePlay => {

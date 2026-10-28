@@ -183,6 +183,11 @@ pub fn handle_tool_msg(app: &mut App, msg: ToolMsg) -> cosmic::Task<crate::app::
                 indicator.pencil_thickness = *thickness;
             }
         }
+        ToolMsg::SetAnnotateColor(color) => {
+            if let Some(edit) = &mut app.text {
+                edit.recolor(color.0);
+            }
+        }
         _ => {}
     }
 
@@ -309,6 +314,14 @@ pub fn handle_settings_msg(app: &mut App, msg: SettingsMsg) -> cosmic::Task<crat
             crate::config::Config::store("video_region_border", capture.ui.video_region_border);
             cosmic::Task::none()
         }
+        SettingsMsg::ToggleOpenSnappeaEdit => {
+            capture.ui.video_open_snappea_edit = !capture.ui.video_open_snappea_edit;
+            crate::config::Config::store(
+                "video_open_snappea_edit",
+                capture.ui.video_open_snappea_edit,
+            );
+            cosmic::Task::none()
+        }
         SettingsMsg::ToggleSystemAudio => {
             capture.ui.video_system_audio = !capture.ui.video_system_audio;
             crate::config::Config::store("video_system_audio", capture.ui.video_system_audio);
@@ -361,7 +374,6 @@ pub fn handle_settings_msg(app: &mut App, msg: SettingsMsg) -> cosmic::Task<crat
                 annotating: capture.ui.annotate_mode,
                 video: capture.ui.is_video_mode,
                 has_selection: capture.selection.choice.has_selection(),
-                annotation_selected: capture.annotations.selected.is_some(),
                 // Only a dragged region, and only where tesseract is
                 // installed to read it.
                 can_ocr: capture.ui.tesseract_available
@@ -648,7 +660,7 @@ fn start_recording(app: &mut App) -> cosmic::Task<AppMsg> {
         container = fallback;
     }
     let timestamp = chrono::Local::now().format("%Y-%m-%d_%H-%M-%S");
-    let output_file = output_dir.join(format!("recording-{timestamp}.{}", container.extension()));
+    let output_file = output_dir.join(format!("{timestamp}.{}", container.extension()));
 
     let Some(wl_output) = app.wayland_helper.outputs().into_iter().find(|o| {
         app.wayland_helper
@@ -667,6 +679,7 @@ fn start_recording(app: &mut App) -> cosmic::Task<AppMsg> {
 
     let wayland_helper = app.wayland_helper.clone();
     let stop_flag = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+    let open_snappea_edit = capture.ui.video_open_snappea_edit;
     let thread_handle = {
         let stop_flag = stop_flag.clone();
         let output_file = output_file.clone();
@@ -688,6 +701,7 @@ fn start_recording(app: &mut App) -> cosmic::Task<AppMsg> {
                 show_cursor,
                 system_audio,
                 microphone,
+                config.video_min_free_mb,
                 &stop_flag,
             );
             // The UI already shows "recording", so surface a failure as a notification.
@@ -702,6 +716,7 @@ fn start_recording(app: &mut App) -> cosmic::Task<AppMsg> {
         stop_flag,
         thread_handle,
         output_file.clone(),
+        open_snappea_edit,
     ));
     log::info!("Recording started: {}", output_file.display());
 
@@ -1041,29 +1056,30 @@ pub fn apply_draw(capture: &mut Capture, msg: DrawMsg) {
         DrawMsg::Text(_) => {}
         DrawMsg::Pen(action) => handle_pen(capture, action),
         DrawMsg::Magnifier(action) => handle_magnifier(capture, action),
-        DrawMsg::MagnifierSelect(index) => {
-            capture.annotations.selected_magnifier = index;
-        }
         DrawMsg::MagnifierMove(index, x, y) => {
-            capture.annotations.selected_magnifier = Some(index);
-            capture.annotations.edit_selected_magnifier(|m| {
-                let radius = m.radius();
-                m.set_geometry(Point::new(x, y), radius);
-            });
+            capture.annotations.selected = Some(index);
+            capture
+                .annotations
+                .edit_selected::<MagnifierOperation>(|m| {
+                    let radius = m.radius();
+                    m.set_geometry(Point::new(x, y), radius);
+                });
         }
         DrawMsg::MagnifierResize(index, radius) => {
-            capture.annotations.selected_magnifier = Some(index);
-            capture.annotations.edit_selected_magnifier(|m| {
-                let center = m.center();
-                m.set_geometry(center, radius);
-            });
+            capture.annotations.selected = Some(index);
+            capture
+                .annotations
+                .edit_selected::<MagnifierOperation>(|m| {
+                    let center = m.center();
+                    m.set_geometry(center, radius);
+                });
         }
         DrawMsg::MagnifierSetZoom(index, zoom) => {
-            capture.annotations.selected_magnifier = Some(index);
+            capture.annotations.selected = Some(index);
             let zoom = zoom.clamp(MAGNIFIER_MIN_ZOOM, MAGNIFIER_MAX_ZOOM);
             capture
                 .annotations
-                .edit_selected_magnifier(|m| m.magnification = zoom);
+                .edit_selected::<MagnifierOperation>(|m| m.magnification = zoom);
         }
         DrawMsg::Redact(action) => handle_redact(capture, action),
         DrawMsg::Pixelate(action) => handle_pixelate(capture, action),
@@ -1081,7 +1097,6 @@ pub fn apply_draw(capture: &mut Capture, msg: DrawMsg) {
         DrawMsg::DeleteSelected => {
             if let Some(index) = capture.annotations.selected.take() {
                 capture.annotations.stack.remove(index);
-                capture.annotations.selected_magnifier = None;
             }
         }
         DrawMsg::MoveAnnotation(index, dx, dy) => {
@@ -1191,7 +1206,7 @@ fn handle_magnifier(capture: &mut Capture, action: DrawAction) {
                 }
                 capture.annotations.commit(Box::new(loupe));
                 // Selected straight away, so its zoom can be adjusted.
-                capture.annotations.selected_magnifier = Some(capture.annotations.stack.len() - 1);
+                capture.annotations.selected = Some(capture.annotations.stack.len() - 1);
             }
         }
     }
@@ -1304,7 +1319,13 @@ pub fn apply_tool(capture: &mut Capture, msg: ToolMsg) -> bool {
             false
         }
         ToolMsg::SetAnnotateColor(color) => {
-            if capture.ui.move_mode && capture.annotations.selected.is_some() {
+            // A picked annotation with a color of its own takes the new one,
+            // whichever tool picked it up. The default stays.
+            if capture
+                .annotations
+                .picked()
+                .is_some_and(|p| p.color.is_some())
+            {
                 capture.annotations.recolor_selected(color);
                 return false;
             }
@@ -1313,15 +1334,13 @@ pub fn apply_tool(capture: &mut Capture, msg: ToolMsg) -> bool {
         }
         ToolMsg::SetShapeThickness(v) => {
             // A picked annotation takes the new size itself. The defaults stay.
-            if capture.ui.move_mode && capture.annotations.resize_selected(v) {
+            if capture.annotations.resize_selected(v) {
                 return false;
             }
             // For pixelation the number is a block size, with its own presets and value.
             if capture.annotations.pixelate_mode {
                 capture.ui.pixelation_block_size = v as u32;
             } else if capture.annotations.magnifier_mode {
-                // For the magnifier the same dropdown and message carry a zoom
-                // factor. The selected tool decides what the number means.
                 capture.ui.magnifier_magnification = v;
             } else if capture.annotations.highlighter_mode {
                 capture.ui.highlighter_thickness = v;
@@ -1447,6 +1466,7 @@ fn set_primary_shape_tool(capture: &mut Capture, tool: ShapeTool) {
     }
     // Arming a tool leaves move mode.
     capture.ui.move_mode = false;
+    capture.annotations.clear_selection();
 
     // Activate the new tool
     if let Some(kind) = tool.shape_kind() {
@@ -1561,6 +1581,7 @@ enum Mode {
 }
 
 fn disable_other_modes_except(capture: &mut Capture, keep: Mode) {
+    capture.annotations.clear_selection();
     if keep != Mode::Shape {
         capture.annotations.shape_mode = None;
         capture.annotations.shape_drawing = None;
@@ -1580,7 +1601,6 @@ fn disable_other_modes_except(capture: &mut Capture, keep: Mode) {
     if keep != Mode::Magnifier {
         capture.annotations.magnifier_mode = false;
         capture.annotations.magnifier_drawing = None;
-        capture.annotations.selected_magnifier = None;
     }
     if keep != Mode::Redact {
         capture.annotations.redact_mode = false;

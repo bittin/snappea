@@ -100,8 +100,6 @@ pub struct AnnotationState {
     pub stroke_drawing: Option<Vec<(f32, f32)>>,
     pub magnifier_mode: bool,
     pub magnifier_drawing: Option<(f32, f32)>,
-    /// The magnifier being adjusted, an index into `stack`.
-    pub selected_magnifier: Option<usize>,
 }
 
 /// Whether an operation hides content instead of marking it up.
@@ -120,13 +118,20 @@ pub struct Picked {
 }
 
 impl AnnotationState {
+    /// Clear the picked annotation's index
     pub const fn clear_selection(&mut self) {
         self.selected = None;
     }
 
+    /// The picked annotation's index
+    #[must_use]
+    pub const fn picked_index(&self) -> Option<usize> {
+        self.selected
+    }
+
     #[must_use]
     pub fn selected_annotation(&self) -> Option<&dyn ToolOperation> {
-        self.stack.get(self.selected?)
+        self.stack.get(self.picked_index()?)
     }
 
     /// The picked annotation's tool and the settings it was drawn with, so the
@@ -182,7 +187,7 @@ impl AnnotationState {
     /// Edit the picked annotation if it is a `T`.
     pub fn edit_selected<T: 'static>(&mut self, f: impl FnOnce(&mut T)) {
         if let Some(op) = self
-            .selected
+            .picked_index()
             .and_then(|i| self.stack.get_mut(i))
             .and_then(|op| op.as_any_mut().downcast_mut::<T>())
         {
@@ -192,7 +197,7 @@ impl AnnotationState {
 
     /// The picked annotation, for editing in place.
     fn selected_annotation_mut(&mut self) -> Option<&mut (dyn ToolOperation + 'static)> {
-        self.stack.get_mut(self.selected?)
+        self.stack.get_mut(self.picked_index()?)
     }
 
     /// Give the picked annotation a new color, whatever its tool.
@@ -226,14 +231,12 @@ impl AnnotationState {
     pub fn clear_all(&mut self) {
         self.stack.clear();
         self.selected = None;
-        self.selected_magnifier = None;
         self.disable_all_modes();
     }
 
     pub fn clear_shapes(&mut self) {
         self.stack.retain(is_redaction);
         self.selected = None;
-        self.selected_magnifier = None;
         self.shape_drawing = None;
         self.shape_mode = None;
         self.stroke_drawing = None;
@@ -246,21 +249,12 @@ impl AnnotationState {
 
     pub fn undo(&mut self) {
         self.stack.undo();
-        self.forget_stale_magnifier();
+        self.selected = None;
     }
 
     pub fn redo(&mut self) {
         self.stack.redo();
-        self.forget_stale_magnifier();
-    }
-
-    fn forget_stale_magnifier(&mut self) {
-        if self
-            .selected_magnifier
-            .is_some_and(|i| self.magnifier(i).is_none())
-        {
-            self.selected_magnifier = None;
-        }
+        self.selected = None;
     }
 
     #[must_use]
@@ -299,19 +293,6 @@ impl AnnotationState {
             .filter_map(|(i, op)| Some((i, op.as_any().downcast_ref()?)))
     }
 
-    pub fn edit_selected_magnifier(&mut self, f: impl FnOnce(&mut MagnifierOperation)) {
-        let Some(index) = self.selected_magnifier else {
-            return;
-        };
-        if let Some(m) = self
-            .stack
-            .get_mut(index)
-            .and_then(|op| op.as_any_mut().downcast_mut())
-        {
-            f(m);
-        }
-    }
-
     /// Whether there is annotation work that would be lost by exiting.
     #[must_use]
     pub fn has_unsaved_work(&self) -> bool {
@@ -348,8 +329,8 @@ impl AnnotationState {
         self.text_mode = false;
         self.magnifier_mode = false;
         self.magnifier_drawing = None;
-        // `selected_magnifier` stays: the zoom dropdown disables the modes and
-        // still needs to know which magnifier it is editing.
+        // `selected` stays: the zoom dropdown disables the modes and still
+        // needs to know which magnifier it is editing.
     }
 }
 
@@ -389,8 +370,6 @@ pub struct ToolbarAnim {
     pub annotate_row: Animation<f32>,
     /// Capture delay
     pub delay: Animation<f32>,
-    /// Delete button, present only while an annotation is picked out
-    pub delete: Animation<f32>,
     /// Recognize-text button
     pub ocr: Animation<f32>,
 }
@@ -414,7 +393,6 @@ impl ToolbarAnim {
             tools: Self::section(shown.tools),
             annotate_row: Self::section(shown.annotate_row),
             delay: Self::section(shown.delay),
-            delete: Self::section(shown.delete),
             ocr: Self::section(shown.ocr),
         }
     }
@@ -427,7 +405,6 @@ impl ToolbarAnim {
             (&mut self.tools, shown.tools),
             (&mut self.annotate_row, shown.annotate_row),
             (&mut self.delay, shown.delay),
-            (&mut self.delete, shown.delete),
             (&mut self.ocr, shown.ocr),
         ] {
             let target = if target { 1.0 } else { 0.0 };
@@ -447,7 +424,6 @@ impl ToolbarAnim {
             tools: at(&self.tools),
             annotate_row: at(&self.annotate_row),
             delay: at(&self.delay),
-            delete: at(&self.delete),
             ocr: at(&self.ocr),
         }
     }
@@ -460,7 +436,6 @@ impl ToolbarAnim {
             || self.tools.is_animating(now)
             || self.annotate_row.is_animating(now)
             || self.delay.is_animating(now)
-            || self.delete.is_animating(now)
             || self.ocr.is_animating(now)
     }
 }
@@ -473,8 +448,6 @@ pub struct ToolbarProgress {
     pub tools: f32,
     pub annotate_row: f32,
     pub delay: f32,
-    /// The delete button, which is there only while something is picked out.
-    pub delete: f32,
     /// The recognize-text button.
     pub ocr: f32,
 }
@@ -487,7 +460,6 @@ pub struct ToolbarSections {
     pub tools: bool,
     pub annotate_row: bool,
     pub delay: bool,
-    pub delete: bool,
     pub ocr: bool,
 }
 
@@ -497,9 +469,6 @@ pub struct ToolbarMode {
     pub annotating: bool,
     pub video: bool,
     pub has_selection: bool,
-    /// Whether the cursor tool has an annotation picked out, and so whether
-    /// there is anything for the delete button to delete.
-    pub annotation_selected: bool,
     /// Whether there is a region to read text out of, and something to read it
     /// with.
     pub can_ocr: bool,
@@ -513,7 +482,6 @@ impl ToolbarSections {
             annotating,
             video,
             has_selection,
-            annotation_selected,
             can_ocr,
         } = mode;
 
@@ -527,9 +495,6 @@ impl ToolbarSections {
             annotate_row: annotating,
             // Screenshots only, and not while annotating. Stays visible while armed so it can be disarmed.
             delay: !video && !annotating,
-            // Delete is part of the cursor tool, so it shows only with the
-            // annotation row and only while something is picked.
-            delete: annotating && annotation_selected,
             // OCR needs a dragged region and tesseract.
             ocr: can_ocr && !video && !annotating,
         }
@@ -600,6 +565,7 @@ pub struct UiState {
     pub video_container: Container,
     pub video_framerate: u32,
     pub video_show_cursor: bool,
+    pub video_open_snappea_edit: bool,
     /// Whether a blinking red border marks the recording region.
     pub video_region_border: bool,
     pub video_system_audio: bool,
@@ -636,7 +602,6 @@ impl UiState {
                 annotating: false,
                 video: false,
                 has_selection: false,
-                annotation_selected: false,
                 can_ocr: false,
             })),
             toolbar_pos: HashMap::new(),
@@ -677,6 +642,7 @@ impl UiState {
             video_framerate: config.video_framerate,
             video_show_cursor: config.video_show_cursor,
             video_region_border: config.video_region_border,
+            video_open_snappea_edit: config.video_open_snappea_edit,
             video_system_audio: config.video_system_audio,
             video_microphone: config.video_microphone,
             show_cursor: config.show_cursor,
@@ -718,7 +684,6 @@ mod toolbar_anim_tests {
             annotating: false,
             video: false,
             has_selection,
-            annotation_selected: false,
             can_ocr: false,
         }
     }
@@ -950,35 +915,6 @@ mod selection_tests {
         state.selected = Some(0);
         state.clear_all();
         assert_eq!(state.selected, None);
-    }
-
-    /// The delete button is a toolbar section, shown only with the annotation row.
-    #[test]
-    fn delete_needs_selection() {
-        let armed = ToolbarMode {
-            annotating: true,
-            video: false,
-            has_selection: true,
-            annotation_selected: true,
-            can_ocr: false,
-        };
-        assert!(ToolbarSections::of(armed).delete);
-        assert!(
-            !ToolbarSections::of(ToolbarMode {
-                annotation_selected: false,
-                can_ocr: false,
-                ..armed
-            })
-            .delete
-        );
-        assert!(
-            !ToolbarSections::of(ToolbarMode {
-                annotating: false,
-                ..armed
-            })
-            .delete,
-            "nothing to delete from when the tools are put away"
-        );
     }
 }
 

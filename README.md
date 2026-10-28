@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="data/logo.svg" alt="SnapPea Logo" width="128">
+  <img src="snappea/data/logo.svg" alt="SnapPea Logo" width="128">
 </p>
 
 # SnapPea

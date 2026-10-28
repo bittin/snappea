@@ -7,7 +7,7 @@ use drm_fourcc::{DrmFourcc, DrmModifier};
 use futures::executor::block_on;
 use gstreamer as gst;
 use std::os::fd::AsFd;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::{Duration, Instant};
 use wayland_client::Connection;
@@ -20,6 +20,7 @@ use super::pipeline::{
     vapostproc_dmabuf_formats,
 };
 use crate::config::Container;
+use crate::fl;
 use crate::wayland::{CaptureSource, Rect, WaylandHelper};
 
 /// Global flag for graceful shutdown on SIGTERM
@@ -176,6 +177,7 @@ pub fn start_recording(
     show_cursor: bool,
     system_audio: bool,
     microphone: bool,
+    min_free_mb: u64,
 ) -> Result<()> {
     setup_signal_handler();
 
@@ -223,7 +225,58 @@ pub fn start_recording(
         show_cursor,
         system_audio,
         microphone,
+        min_free_mb,
         &STOP_REQUESTED,
+    )
+}
+
+const MB: u64 = 1_000_000;
+
+/// 500 -> 500 MB, 2000 -> 2 GB.
+fn mb_label(mb: u64) -> String {
+    if mb >= 1000 && mb.is_multiple_of(1000) {
+        format!("{} GB", mb / 1000)
+    } else {
+        format!("{mb} MB")
+    }
+}
+
+/// Free space on the filesystem holding `path`
+pub fn free_bytes(path: &Path) -> Option<u64> {
+    let stat = rustix::fs::statvfs(path).ok()?;
+    Some(stat.f_bavail.saturating_mul(stat.f_frsize))
+}
+
+/// Stop recording before filling up the disk
+struct DiskGuard<'a> {
+    dir: &'a Path,
+    min_free_mb: u64,
+    last_check: Instant,
+}
+
+impl DiskGuard<'_> {
+    /// Whether free space has dropped below the floor. Tells the user when it has.
+    fn low(&mut self) -> bool {
+        if self.last_check.elapsed() < Duration::from_secs(2) {
+            return false;
+        }
+        self.last_check = Instant::now();
+        // A failed probe does not end a recording.
+        let low = free_bytes(self.dir).is_some_and(|free| free < self.min_free_mb * MB);
+        if low {
+            let body = low_disk_message(self.dir, self.min_free_mb);
+            log::error!("Stopping the recording: {body}");
+            crate::dbus::notify_error(fl!("recording-stopped"), body);
+        }
+        low
+    }
+}
+
+fn low_disk_message(dir: &Path, min_free_mb: u64) -> String {
+    fl!(
+        "low-disk-space",
+        limit = mb_label(min_free_mb),
+        folder = dir.display().to_string()
     )
 }
 
@@ -510,9 +563,23 @@ pub fn record(
     show_cursor: bool,
     system_audio: bool,
     microphone: bool,
+    min_free_mb: u64,
     stop: &AtomicBool,
 ) -> Result<()> {
     let is_toplevel = matches!(capture_source, CaptureSource::Toplevel(_));
+
+    let output_dir = match output_file.parent() {
+        Some(dir) if !dir.as_os_str().is_empty() => dir,
+        _ => Path::new("."),
+    };
+    if free_bytes(output_dir).is_some_and(|free| free < min_free_mb * MB) {
+        anyhow::bail!("{}", low_disk_message(output_dir, min_free_mb));
+    }
+    let mut disk = DiskGuard {
+        dir: output_dir,
+        min_free_mb,
+        last_check: Instant::now(),
+    };
 
     if is_toplevel {
         log::info!(
@@ -741,7 +808,7 @@ pub fn record(
     let mut last_frame: Option<gst::Buffer> = None;
 
     if actual_dmabuf {
-        while !stop.load(Ordering::Relaxed) {
+        while !stop.load(Ordering::Relaxed) && !disk.low() {
             let frame_start = Instant::now();
             // Wall-clock timestamps, so a lagging capture yields a shorter video at the right speed.
             let timestamp = start_time.elapsed().as_nanos() as u64;
@@ -780,7 +847,7 @@ pub fn record(
             })
         };
 
-        while !stop.load(Ordering::Relaxed) {
+        while !stop.load(Ordering::Relaxed) && !disk.low() {
             match frame_rx.recv_timeout(Duration::from_millis(100)) {
                 Ok(buffer) => {
                     last_frame = Some(buffer.clone());

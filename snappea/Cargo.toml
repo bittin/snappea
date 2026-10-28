@@ -20,7 +20,7 @@ chrono = "0.4"
 cosmic-client-toolkit = { git = "https://github.com/pop-os/cosmic-protocols", branch = "main" }
 cosmic-config = { git = "https://github.com/pop-os/libcosmic.git" }
 cosmic-protocols = { git = "https://github.com/pop-os/cosmic-protocols", branch = "main" }
-dirs = "6.0.0"
+dirs = "7.0.0"
 env_logger = "0.11.8"
 futures = "0.3"
 image = { version = "0.25", default-features = false, features = ["png"] }
@@ -30,7 +30,7 @@ memmap2 = "0.9.8"
 rusty-tesseract = "1.1.10"
 png = "0.18"
 rfd = "0.17"
-rqrr = "0.10"
+rqrr = "0.11"
 rustix = { version = "1.1", features = ["fs"] }
 serde = { version = "1.0", features = ["derive"] }
 tokio = { version = "1.47.1", features = ["macros", "net", "rt", "sync"] }
@@ -103,11 +103,6 @@ assets = [
   [
     "../snappea-edit/res/io.github.hojjatabdollahi.snappea.edit.desktop",
     "usr/share/applications/",
-    "644",
-  ],
-  [
-    "../snappea-edit/res/icons/scalable/actions/*.svg",
-    "usr/share/icons/hicolor/scalable/actions/",
     "644",
   ],
   [

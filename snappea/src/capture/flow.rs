@@ -17,7 +17,7 @@ use image::DynamicImage;
 use image::RgbaImage;
 use std::borrow::Cow;
 use std::io;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use tokio::sync::mpsc::Sender;
 use viewer_tools::ToolOperation;
 
@@ -35,7 +35,25 @@ impl AsMimeTypes for ScreenshotBytes {
     }
 }
 
+/// Write `img` to `path` as a PNG
 pub fn save_rgba(img: &RgbaImage, path: &PathBuf) -> anyhow::Result<()> {
+    let result = write_png_file(img, path);
+    if let Err(err) = &result {
+        // remove empty file
+        let _ = std::fs::remove_file(path);
+        crate::dbus::notify_error(
+            fl!("screenshot-failed"),
+            fl!(
+                "could-not-write",
+                path = path.display().to_string(),
+                error = format!("{err:#}")
+            ),
+        );
+    }
+    result
+}
+
+fn write_png_file(img: &RgbaImage, path: &Path) -> anyhow::Result<()> {
     let mut file = std::fs::File::create(path)?;
     Ok(write_png(&mut file, img)?)
 }
@@ -61,16 +79,16 @@ pub fn get_img_path(location: SaveLocationChoice, custom_dir: &str) -> Option<Pa
 /// Timestamped file name for a new screenshot.
 pub fn img_file_name() -> String {
     chrono::Local::now()
-        .format(&format!(
-            "{}_%Y-%m-%d_%H-%M-%S.png",
-            fl!("screenshot-filename-prefix")
-        ))
+        .format("%Y-%m-%d_%H-%M-%S.png")
         .to_string()
 }
 
 /// Stitch whole-output frames, each with its logical rect, into one image at
-/// the first frame's scale.
-pub fn stitch_outputs(frames: Vec<(RgbaImage, Rect)>) -> Option<RgbaImage> {
+/// the first frame's scale, with annotations burned in.
+pub fn stitch_outputs(
+    frames: Vec<(RgbaImage, Rect)>,
+    annotations: &[Box<dyn ToolOperation>],
+) -> Option<RgbaImage> {
     let (first, first_rect) = frames.first()?;
     let scale = first.width() as f32 / first_rect.width() as f32;
     let bounds = frames.iter().map(|(_, r)| *r).reduce(Rect::union)?;
@@ -78,7 +96,9 @@ pub fn stitch_outputs(frames: Vec<(RgbaImage, Rect)>) -> Option<RgbaImage> {
         .into_iter()
         .map(|(img, r)| (img, r.scaled(scale)))
         .collect();
-    Some(combined_image(bounds.scaled(scale), frames))
+    let mut img = combined_image(bounds.scaled(scale), frames);
+    rasterize(&mut img, annotations, &bounds, scale);
+    Some(img)
 }
 
 /// The part of `img`, which shows `output` whole, under `region`: the crop,
@@ -272,7 +292,7 @@ fn render_selection(
                 .iter()
                 .filter_map(|output| Some((images.remove(&output.name)?.rgba, output.rect())))
                 .collect();
-            let img = stitch_outputs(frames);
+            let img = stitch_outputs(frames, annotations);
             if img.is_none() {
                 log::error!("No outputs available for all-screens capture");
             }
@@ -424,7 +444,6 @@ fn restore_last_capture(app: &App, capture: &mut Capture) {
             annotating: false,
             video,
             has_selection: capture.selection.choice.has_selection(),
-            annotation_selected: false,
             can_ocr: capture.ui.tesseract_available
                 && matches!(&capture.selection.choice, Choice::Rectangle(r, _) if r.dimensions().is_some()),
         }),
