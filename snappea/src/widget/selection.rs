@@ -130,6 +130,8 @@ pub struct ScreenshotSelectionWidget<'a> {
     /// The open label and the corner its coordinates are measured from, for
     /// hit-testing the resize handles under the cursor.
     text_edit_ref: Option<(&'a viewer_tools::annotate::TextPreview, (f32, f32))>,
+    /// The committed label open for re-editing, drawn by its preview instead.
+    text_editing: Option<usize>,
     qr_codes_for_output: Vec<&'a DetectedQrCode>,
     /// Recognized text regions on this output, for the boxes drawn over them.
     ocr_overlays_for_output: Vec<&'a OcrTextOverlay>,
@@ -557,6 +559,7 @@ impl<'a> ScreenshotSelectionWidget<'a> {
             text_mode: annotations.text_mode,
             text_open: text.is_some(),
             text_edit_ref: text_edit,
+            text_editing: text.and_then(|edit| edit.editing),
             popover_open: ui.shape_popup_open
                 || ui.freehand_popup_open
                 || ui.stroke_popup_open
@@ -739,7 +742,15 @@ impl cosmic::iced::core::Widget<Msg, cosmic::Theme, cosmic::Renderer>
             {
                 if end > start {
                     renderer.with_layer(bounds, |renderer| {
-                        draw_operations(renderer, bounds, origin, ops, start..end, source);
+                        draw_operations(
+                            renderer,
+                            bounds,
+                            origin,
+                            ops,
+                            start..end,
+                            source,
+                            self.text_editing,
+                        );
                     });
                     start = end;
                 }
